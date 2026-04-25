@@ -1,4 +1,11 @@
-.PHONY: test lint format coverage hooks clean
+.PHONY: test lint format coverage hooks clean init walk
+
+# --- wikifi commands ---------------------------------------------------------
+init:
+	uv run wikifi init
+
+walk:
+	uv run wikifi walk
 
 # --- testing -----------------------------------------------------------------
 test:
