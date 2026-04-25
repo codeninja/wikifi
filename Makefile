@@ -1,15 +1,33 @@
-.PHONY: test dev seed hooks
+.PHONY: test lint format coverage hooks init walk clean
 
+# --- testing -----------------------------------------------------------------
 test:
-	cd backend && uv run pytest tests/ || true
-	cd frontend && pnpm test -- --run || true
+	uv run pytest
 
-dev:
-	docker compose up -d
+coverage:
+	uv run pytest --cov=wikifi --cov-report=term-missing
 
-seed:
-	cd backend && uv run python scripts/seed_dev.py || true
+# --- lint / format -----------------------------------------------------------
+lint:
+	uv run ruff check .
+	uv run ruff format --check .
 
+format:
+	uv run ruff check --fix .
+	uv run ruff format .
+
+# --- wikifi commands (against the current repo) ------------------------------
+init:
+	uv run wikifi init
+
+walk:
+	uv run wikifi walk
+
+# --- repo plumbing -----------------------------------------------------------
 hooks:
 	git config core.hooksPath .githooks
 	chmod +x .githooks/*
+
+clean:
+	rm -rf .pytest_cache .ruff_cache .coverage htmlcov dist build
+	find . -type d -name __pycache__ -prune -exec rm -rf {} +
