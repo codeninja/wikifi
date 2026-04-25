@@ -5,33 +5,25 @@ on:
   pull_request:
     branches: [ main ]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
 jobs:
-  backend:
+  test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v3
-      - name: Install deps
-        working-directory: backend
-        run: |
-          uv sync --frozen || true
-      - name: Test
-        working-directory: backend
-        run: |
-          uv run pytest -q || true
-  frontend:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-python@v5
         with:
-          node-version: 22
-          cache: 'pnpm'
-      - name: Install pnpm
-        run: npm i -g pnpm@9
+          python-version: "3.12"
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          cache-dependency-glob: uv.lock
       - name: Install deps
-        working-directory: frontend
-        run: pnpm i || true
+        run: uv sync --frozen
+      - name: Lint
+        run: uv run ruff check .
       - name: Test
-        working-directory: frontend
-        run: pnpm test -- --run || true
+        run: uv run pytest
