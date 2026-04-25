@@ -6,14 +6,23 @@ enforcement (see context7 /ollama/ollama-python). Temperature is pinned to 0
 for the JSON path so the same input produces the same structured output across
 runs; the text path leaves temperature at the model default.
 
-Thinking mode defaults to ``"low"`` for Qwen3-style models. Empirically:
+Thinking mode defaults to ``"high"`` for Qwen3-style models. wikifi prefers
+output quality over walk wall-time — the derivative-section pass especially
+benefits from a fuller reasoning trace. Empirical behavior on local 27B
+qwen3-family models:
 
 - ``think=False`` makes Qwen3 ignore the ``format=<schema>`` constraint and
   emit free text (e.g. ``"No findings."``), failing JSON validation.
-- ``think=True``/unset (default-high) sends the model into long chain-of-
-  thought traces that hit the request timeout on tiny inputs.
-- ``think="low"`` keeps a short reasoning trace, honors the schema, and
-  keeps per-call latency in the 15–60s range on local hardware.
+- ``think="low"`` keeps a short reasoning trace, honors the schema, runs in
+  15–60s per call. Use when wall-time matters more than depth.
+- ``think="high"`` gives noticeably cleaner abstraction and Gherkin in
+  Stage 4 derivatives. Plan for 1–3 minutes per real file on local
+  hardware — bump ``timeout`` to ~900s to absorb that.
+
+The walker's ``min_content_bytes`` filter is the companion guard: it
+keeps near-empty files (stub ``__init__.py``, one-line configs) from ever
+reaching the extractor, where high-think mode would otherwise wander past
+the request timeout.
 
 Pass ``True`` for DeepSeek-style reasoning models, ``"low" | "medium" |
 "high"`` for Qwen3-style thinking levels, or ``False`` to opt out entirely
@@ -40,8 +49,8 @@ class OllamaProvider:
         *,
         model: str,
         host: str,
-        timeout: float = 300.0,
-        think: ThinkLevel = "low",
+        timeout: float = 900.0,
+        think: ThinkLevel = "high",
     ) -> None:
         self.model = model
         self.host = host

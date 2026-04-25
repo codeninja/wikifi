@@ -40,9 +40,10 @@ def test_ollama_provider_complete_json_uses_schema_format(monkeypatch):
     assert captured["options"] == {"temperature": 0}
     assert captured["messages"][0] == {"role": "system", "content": "sys"}
     assert captured["messages"][1] == {"role": "user", "content": "usr"}
-    # Default think="low" is forwarded to the client (see provider docstring
-    # for why fully disabling thinking breaks Qwen3's schema enforcement).
-    assert captured["think"] == "low"
+    # Default think="high" is forwarded to the client — wikifi prioritizes
+    # wiki quality over per-call latency. See provider docstring for the
+    # rationale and the failure modes at the boundary settings.
+    assert captured["think"] == "high"
 
 
 def test_ollama_provider_forwards_custom_think_level(monkeypatch):
