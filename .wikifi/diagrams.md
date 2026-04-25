@@ -1,37 +1,44 @@
 # Diagrams
 
 ### Domain Map
-The following graph visualizes the primary bounded context and its decomposition into specialized subdomains. It highlights the sequential dependency chain coordinated by the orchestration layer, alongside supporting contexts that persist state and provide generative capabilities.
+The following graph visualizes the bounded contexts within the core domain of Automated Knowledge Translation. It reflects the strict, stage-gated dependency chain and the cross-cutting nature of external intelligence integration.
 
 ```mermaid
 graph TD
-    Core[Automated Knowledge Transformation]
-    Orch[Pipeline Orchestration]
-    Intros[Repository Introspection & Curation]
-    Ext[Semantic Extraction]
-    Agg[Information Aggregation]
-    Deriv[Artifact Derivation]
-    ExtInt[External Intelligence Integration]
-    WS[Workspace & State Management]
+  Core[Core Domain: Automated Knowledge Translation]
+  Introspection[Repository Introspection & Curation\nSupporting]
+  Extraction[Semantic Extraction & Analysis\nCore]
+  Aggregation[Information Aggregation & Synthesis\nCore]
+  Orchestration[Pipeline Orchestration & Lifecycle Management\nSupporting]
+  External[External Intelligence Integration\nGeneralized]
 
-    Core --> Orch
-    Orch -->|Coordinates Sequential Flow| Intros
-    Intros -->|Curated Manifest| Ext
-    Ext -->|Structured Notes| Agg
-    Agg -->|Synthesized Sections| Deriv
+  Core --> Introspection
+  Introspection -->|Curated artifacts & structural metadata| Extraction
+  Extraction -->|Structured knowledge units & analysis results| Aggregation
+  Aggregation -->|Synthesized content & workspace population| Orchestration
 
-    Ext -.->|Optional Semantic Translation| ExtInt
-    Intros -.->|Intermediate Outputs| WS
-    Ext -.->|Intermediate Outputs| WS
-    Agg -.->|Intermediate Outputs| WS
-    Deriv -.->|Intermediate Outputs| WS
+  External -.->|On-demand pattern resolution & narrative generation| Extraction
 ```
 
+**Key Observations:**
+- Data flows unidirectionally through the pipeline, with intermediate states explicitly persisted between stages to support incremental processing, auditability, and fault tolerance.
+- External Intelligence Integration operates as a generalized, cross-cutting capability invoked on-demand within the extraction context rather than dictating pipeline progression.
+- Orchestration and workspace lifecycle management responsibilities currently overlap; future modeling may require separating execution coordination from directory/configuration governance.
+
 ### Entity Relationship View
-This entity-relationship diagram maps the core domain objects, their primary attributes, and the structural dependencies that govern data flow through the pipeline. Relationships reflect the hierarchical configuration model, analysis boundaries, and cross-cutting observation points.
+This entity-relationship diagram maps the core domain entities, their primary fields, and the structural boundaries that govern data transformation from raw repository scanning to final documentation assembly.
 
 ```mermaid
 erDiagram
+    CONFIGURATION ||--o{ SCAN_TRAVERSAL_CONFIG : "defines"
+    SCAN_TRAVERSAL_CONFIG ||--o{ DIRECTORY_SUMMARY : "scopes"
+    DIRECTORY_SUMMARY ||--|| INTROSPECTION_ASSESSMENT : "generates"
+    INTROSPECTION_ASSESSMENT ||--o{ EXTRACTION_NOTE : "guides"
+    EXTRACTION_NOTE }o--|| DOCUMENTATION_SECTION : "aggregates_to"
+    DOCUMENTATION_SECTION ||--o{ AGGREGATION_STATS : "updates"
+    DOCUMENTATION_SECTION ||--o{ WORKSPACE_LAYOUT : "populates"
+    EXECUTION_SUMMARY }o--|| PIPELINE_EXECUTION : "observes"
+
     CONFIGURATION {
         string default_settings
         string local_overrides
@@ -39,13 +46,13 @@ erDiagram
     SCAN_TRAVERSAL_CONFIG {
         string root_path
         string inclusion_exclusion_patterns
-        int size_thresholds
+        number size_thresholds
     }
     DIRECTORY_SUMMARY {
-        int file_count
-        int total_size
+        number file_count
+        number total_size
         string extension_distribution
-        bool manifest_presence
+        boolean manifest_presence
     }
     INTROSPECTION_ASSESSMENT {
         string primary_languages
@@ -64,76 +71,67 @@ erDiagram
         string final_markdown_body
     }
     AGGREGATION_STATS {
-        int successful_writes
-        int empty_section_count
+        number successful_writes
+        number empty_section_count
+    }
+    WORKSPACE_LAYOUT {
+        string config_paths
+        string notes_paths
+        string sections_paths
     }
     EXECUTION_SUMMARY {
         string stage_metrics
         string completion_status
         string consolidated_findings
     }
-
-    CONFIGURATION ||--o{ SCAN_TRAVERSAL_CONFIG : "dictates boundaries for"
-    SCAN_TRAVERSAL_CONFIG ||--o{ DIRECTORY_SUMMARY : "scopes analysis of"
-    DIRECTORY_SUMMARY ||--o{ INTROSPECTION_ASSESSMENT : "feeds structural data to"
-    INTROSPECTION_ASSESSMENT ||--o{ EXTRACTION_NOTE : "triggers creation of"
-    EXTRACTION_NOTE }|--|| DOCUMENTATION_SECTION : "grouped and transformed into"
-    DOCUMENTATION_SECTION ||--o{ AGGREGATION_STATS : "updates upon generation"
-    EXECUTION_SUMMARY ||--o{ DOCUMENTATION_SECTION : "consolidates metrics for"
 ```
 
+**Key Observations:**
+- Configuration entities establish hard boundaries for traversal and analysis, ensuring processing never exceeds defined size constraints or excluded paths.
+- Extraction notes are immutable, timestamped records tied to single source files, serving as the raw material for downstream aggregation.
+- Aggregation statistics and the execution summary function as cross-cutting observers, tracking pipeline health and output readiness without interfering with the primary data flow.
+- **Known Gap:** The exact mapping rules between intermediate extraction notes and final documentation sections are implied but not explicitly detailed. Further specification is required to define how notes are grouped, prioritized, or filtered during section assembly, and how empty sections are resolved or reported upstream.
+
 ### Integration Flow
-The sequence diagram illustrates the runtime orchestration lifecycle, stage handoffs, external service abstraction, and observability integration. It emphasizes the unidirectional data flow and the centralized configuration contract that governs execution.
+The sequence diagram below illustrates the internal pipeline handoffs and external interface interactions. It captures the staged execution model, centralized orchestration, and abstracted external dependencies.
 
 ```mermaid
 sequenceDiagram
-    participant Op as Operator/Interface
-    participant Orch as Pipeline Orchestrator
-    participant Conf as Configuration Provider
-    participant WS as Workspace & State Manager
-    participant Intros as Traversal & Introspection
-    participant Ext as Extraction
-    participant ExtInt as External Intelligence Backend
-    participant Agg as Aggregation
-    participant Deriv as Derivation
-    participant Obs as Observability & Logging
+  participant CLI as CLI Interface
+  participant Orch as Orchestrator
+  participant Traversal as Traversal & Introspection
+  participant Extractor as Source Analysis & Extraction
+  participant Aggregator as Content Aggregation
+  participant Deriver as Derivative Generation
+  participant AI as Generative AI Services
+  participant Telemetry as Observability & Telemetry
+  participant Storage as Wiki Storage
 
-    Op->>Orch: Trigger execution command
-    Orch->>Conf: Retrieve runtime parameters & scoping rules
-    Conf-->>Orch: Return configuration
-    Orch->>WS: Provision documentation workspace
-    WS-->>Orch: Confirm workspace ready
-
-    Orch->>Intros: Initiate repository scan & filtering
-    Intros->>Intros: Generate directory summaries & assessments
-    Intros-->>Orch: Return filtered paths & structural metadata
-    Obs->>Obs: Log stage metrics & progress
-
-    Orch->>Ext: Pass filtered file lists & constraints
-    Ext->>Ext: Translate artifacts to structured notes
-    alt Complex semantic translation required
-        Ext->>ExtInt: Submit request via unified provider contract
-        ExtInt-->>Ext: Return structured/unstructured response
-    end
-    Ext-->>Orch: Return extraction notes
-    Obs->>Obs: Update processing statistics
-
-    Orch->>Agg: Forward structured notes
-    Agg->>Agg: Consolidate & resolve contradictions
-    Agg-->>Orch: Return synthesized documentation sections
-    Obs->>Obs: Track aggregation success & gaps
-
-    Orch->>Deriv: Deliver finalized sections
-    Deriv->>Deriv: Generate derivative knowledge assets
-    Deriv-->>Orch: Return polished documentation
-    Obs->>Obs: Finalize execution summary & health report
-
-    Orch-->>Op: Report completion & output readiness
+  CLI->>Orch: Trigger execution / provision workspace
+  Orch->>Traversal: Delegate scanning & structural analysis
+  Traversal->>Traversal: Apply path filters & size constraints
+  Traversal-->>Orch: Return filtered paths & metadata
+  Orch->>Extractor: Delegate artifact analysis
+  Extractor->>AI: Request pattern resolution / narrative generation (on-demand)
+  AI-->>Extractor: Return processed findings
+  Extractor->>Telemetry: Log processing metrics & outcomes
+  Extractor-->>Orch: Return structured analysis notes
+  Orch->>Aggregator: Delegate content synthesis
+  Aggregator->>AI: Request section-level synthesis
+  AI-->>Aggregator: Return synthesized markdown
+  Aggregator->>Storage: Write documentation sections
+  Aggregator-->>Orch: Return aggregation statistics
+  Orch->>Deriver: Delegate supplementary content generation
+  Deriver->>AI: Request derivative synthesis
+  AI-->>Deriver: Return derivative documentation
+  Deriver->>Storage: Write derivative artifacts
+  Deriver-->>Orch: Confirm completion
+  Orch->>Orch: Consolidate metrics & generate execution summary
+  Orch-->>CLI: Report pipeline health & output readiness
 ```
 
-### Modeling Constraints & Documented Gaps
-The diagrams above reflect the architectural boundaries and data flows explicitly defined in the upstream specifications. The following areas remain unspecified and are intentionally omitted from the visual models:
-- **Note-to-Section Mapping Rules:** The exact grouping, prioritization, or filtering logic used during section assembly is implied by the aggregation process but not formally defined.
-- **Error Handling & Resilience:** Retry mechanisms, fallback behaviors, and conflict resolution strategies for external service failures or stage interruptions are not documented.
-- **Inter-Stage Serialization:** The precise data exchange format used between pipeline stages is undefined, though the flow assumes structured, technology-agnostic payloads.
-- **State Consolidation Boundary:** Pipeline orchestration and workspace management are modeled as distinct contexts; if execution coordination and state persistence are tightly coupled in practice, they may warrant consolidation into a single bounded context.
+**Key Observations:**
+- The orchestrator acts as the central coordinator, delegating execution to specialized components in a strict sequence while maintaining a single source of truth for pipeline health.
+- All external dependencies are routed through standardized contracts, isolating core business logic from provider-specific implementations and enabling swappable analytical backends.
+- Observability and telemetry are integrated directly into the extraction stage to monitor processing metrics and record analysis outcomes in real time.
+- **Known Gaps:** The integration contracts do not specify exact data schemas or serialization formats for inter-module handoffs. Error handling, retry policies, fallback mechanisms for external service degradation, authentication/rate-limiting constraints, and versioning guarantees between pipeline stages remain undefined and require clarification in implementation documentation.

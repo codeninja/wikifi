@@ -1,30 +1,35 @@
 # Domains and Subdomains
 
-The system’s primary bounded context is **Automated Knowledge Transformation**. Its purpose is to ingest raw technical artifacts and convert them into structured, technology-agnostic documentation. This domain abstracts away implementation details to focus on the lifecycle of knowledge: discovery, extraction, synthesis, and publication.
+### Core Domain: Automated Knowledge Translation
+The system operates within a single core domain focused on transforming raw technical artifacts into structured, business-readable documentation. This domain treats source repositories as unstructured knowledge sources that require systematic discovery, semantic translation, and narrative synthesis. All processing is deliberately decoupled from implementation specifics, ensuring that technical constructs are consistently mapped to domain-agnostic business concepts.
 
-### Subdomains & Bounded Contexts
-The core domain is decomposed into specialized subdomains, each responsible for a distinct phase of the knowledge pipeline:
+### Bounded Contexts & Subdomains
+The core domain is partitioned into five bounded contexts, each with distinct responsibilities and clear boundaries:
 
-| Subdomain | Responsibility | Key Capabilities |
+| Subdomain | Primary Responsibility | DDD Classification |
 |---|---|---|
-| **Repository Introspection & Curation** | Structural discovery and content filtering | Maps project topology, classifies artifacts by type, and curates relevant content for downstream processing. |
-| **Semantic Extraction** | Granular artifact analysis | Translates technical syntax and implementation details into structured, domain-agnostic knowledge units. |
-| **Information Aggregation** | Section-level synthesis | Merges extracted notes, resolves contradictions, eliminates duplication, and constructs coherent narratives. |
-| **Artifact Derivation** | Downstream documentation generation | Produces specialized outputs such as user stories, personas, and architectural diagrams from synthesized knowledge. |
-| **External Intelligence Integration** | Generative service abstraction | Standardizes communication with external intelligence providers, managing request formatting and response parsing for both structured and unstructured data. |
-| **Workspace & State Management** | Environment lifecycle and persistence | Initializes documentation directories, manages configuration placeholders, and persists intermediate analysis states to support incremental processing and audit trails. |
-| **Pipeline Orchestration** | Execution coordination | Sequences subdomain operations, manages data handoffs, tracks progress, and generates execution reports. |
+| **Repository Introspection & Curation** | Discovers project structure, classifies artifacts, filters irrelevant content, and establishes workspace boundaries. | Supporting |
+| **Semantic Extraction & Analysis** | Processes individual artifacts to translate technical patterns into structured knowledge units. Leverages external analytical services for complex pattern recognition. | Core |
+| **Information Aggregation & Synthesis** | Consumes extracted knowledge units, resolves redundancies, aligns terminology, and composes coherent section-level documentation. | Core |
+| **Pipeline Orchestration & Lifecycle Management** | Governs sequential stage execution, manages reporting, coordinates output derivation, and controls the documentation workspace lifecycle. | Supporting |
+| **External Intelligence Integration** | Abstracts communication with generative analysis services. Standardizes request formulation and response consumption, decoupling core logic from provider implementations. | Generalized |
 
-### Inter-Subdomain Relationships & Data Flow
-The subdomains operate as a sequential dependency chain, coordinated by the Pipeline Orchestration context:
+### Context Relationships & Data Flow
+The subdomains form a strict, stage-gated dependency chain. Data flows unidirectionally through the pipeline:
 
-1. **Introspection** scans the target environment and filters content, passing a curated manifest to **Extraction**.
-2. **Extraction** processes individual artifacts, optionally leveraging **External Intelligence Integration** for complex semantic translation, and outputs structured notes.
-3. **Aggregation** consumes these notes, synthesizing them into cohesive documentation sections while maintaining technology neutrality.
-4. **Artifact Derivation** takes the synthesized content to generate specialized documentation assets.
-5. Throughout this flow, **Workspace & State Management** persists intermediate outputs, enabling resumable execution and versioned auditability.
+1. **Introspection → Extraction**: Curated artifact lists and structural metadata are passed to the extraction context.
+2. **Extraction → Aggregation**: Structured knowledge units and intermediate analysis results are consumed for section-level synthesis.
+3. **Aggregation → Orchestration**: Synthesized content is handed off for final artifact derivation, workspace population, and lifecycle closure.
 
-### Domain Boundaries & Observations
-- The separation between *Extraction* and *Aggregation* is strict: extraction focuses on fidelity to the source artifact, while aggregation prioritizes narrative coherence and business readability.
-- *External Intelligence Integration* acts as a supporting subdomain rather than a core one; it is designed to be swappable without altering the primary knowledge transformation logic.
-- *Note on granularity:* The current mapping treats pipeline orchestration and workspace management as distinct supporting contexts. If execution coordination and state persistence are tightly coupled in practice, they may warrant consolidation into a single *Execution & Persistence* bounded context. Further clarification on error handling, rollback mechanisms, and conflict resolution across stages would strengthen the domain model.
+External Intelligence Integration operates as a cross-cutting capability within the Extraction context. It is invoked on-demand to resolve ambiguous technical patterns or generate analytical narratives, but does not dictate pipeline progression.
+
+### State Management & Persistence
+Intermediate analysis results are explicitly persisted between pipeline stages. This design supports:
+- **Incremental Processing**: Only modified or newly discovered artifacts trigger re-analysis.
+- **Auditability**: Each transformation step is traceable, preserving the lineage from raw artifact to final documentation.
+- **Fault Tolerance**: Pipeline stages can resume from the last persisted state without requiring full re-execution.
+
+### Modeling Gaps & Observations
+- **Error & Conflict Resolution**: The notes emphasize a linear, deterministic flow but provide limited detail on how conflicting domain interpretations are resolved during synthesis, or how pipeline failures trigger rollback or recovery.
+- **Orchestration vs. Workspace Boundaries**: Responsibilities for pipeline execution and workspace lifecycle management appear overlapping. Future modeling may benefit from separating execution coordination from directory/configuration governance.
+- **Provider Abstraction Depth**: While external intelligence is abstracted, the notes do not specify how fallback mechanisms or service degradation are handled when analytical responses are incomplete or malformed.

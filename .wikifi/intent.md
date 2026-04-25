@@ -1,17 +1,34 @@
 # Intent and Problem Space
 
-### Core Purpose
-This system exists to automate the transformation of raw source repositories into structured, navigable documentation. It addresses the persistent challenge of fragmented technical knowledge by extracting implicit intent from code artifacts and synthesizing them into a cohesive, technology-agnostic knowledge base. Rather than documenting implementation mechanics, the system focuses on capturing business purpose, user value, and architectural relationships.
+### Purpose and Problem Statement
+The system exists to eliminate the labor-intensive overhead of manual documentation and resolve the fragmentation of technical knowledge within software repositories. When teams inherit, maintain, or scale complex codebases, understanding the underlying business logic, user value, and architectural relationships typically requires tedious reverse-engineering. This tool automates that process by systematically analyzing source artifacts to produce structured, navigable documentation that captures *what* the system does and *why* it exists, deliberately abstracting away implementation-specific mechanics.
 
-### Problem Space & Target Audience
-Manual documentation is labor-intensive, prone to drift, and often fails to reflect the actual behavior of a codebase. This system serves developers, maintainers, and technical stakeholders who need to understand what a project does, who it serves, and how its components interact—without manually tracing through every file or maintaining documentation that quickly becomes outdated. By treating source code as a repository of implicit intent, the system bridges the gap between fragmented technical artifacts and holistic system understanding.
+### Target Audience
+- Engineering teams onboarding to unfamiliar, legacy, or rapidly evolving codebases
+- Technical writers and architects seeking a reliable, evidence-based baseline for system documentation
+- Organizations requiring consistent, technology-agnostic knowledge bases across multiple projects or acquisition targets
 
-### Design Constraints
-The architecture is shaped by several non-negotiable constraints that ensure reliability and adaptability across diverse projects:
-- **Technology Agnosticism:** Analysis deliberately ignores implementation-specific details, focusing instead on functional contributions and user-centric narratives. This allows the system to operate across unknown or heterogeneous codebases without assuming specific languages, frameworks, or architectural patterns.
-- **Deterministic Processing:** The workflow follows a structured, stage-gated pipeline that adapts to repository complexity while maintaining predictable outputs. Intermediate analysis states are preserved to support incremental processing, debugging, and auditability.
-- **Decoupled Reasoning:** Core analytical logic is strictly separated from underlying inference services. This abstraction enables seamless substitution of reasoning backends without altering the system’s operational contract or output structure.
-- **Evidence Grounding:** High-level concepts, behavioral narratives, and architectural mappings are derived exclusively from aggregated code evidence. The system explicitly marks missing or contradictory information rather than fabricating content, preserving data integrity throughout the documentation lifecycle.
+### Design Constraints and Guiding Principles
+The system’s architecture is shaped by several non-negotiable constraints that prioritize reliability, analytical depth, and long-term maintainability:
 
-### Operational Philosophy
-The system operates on the principle that documentation should emerge from actual system behavior, not assumptions. By systematically filtering non-essential artifacts, extracting semantic insights per file, aggregating findings into coherent sections, and deriving user-centric documentation, it eliminates manual overhead while maintaining technical accuracy. The result is a stable, upgrade-safe documentation contract that evolves alongside the codebase, ensuring that knowledge remains accessible, structured, and aligned with real-world usage.
+- **Strict Technology Agnosticism:** All extraction and synthesis processes deliberately ignore language-specific syntax, framework conventions, or library dependencies. The focus remains exclusively on business purpose, user value, and behavioral specifications.
+- **Fidelity Over Throughput:** Processing is optimized for analytical depth and output accuracy rather than raw speed. The system explicitly trades computational cost for higher-quality, cross-cutting insights, providing configurable controls to balance resource expenditure against result quality.
+- **Deterministic, Stage-Gated Execution:** Analysis follows a strictly ordered pipeline. Each phase must complete successfully before downstream processing begins, ensuring predictable outcomes, graceful failure handling, and reproducible results across runs.
+- **Backend Decoupling:** Core analytical logic is strictly separated from underlying reasoning or generation services. This allows seamless substitution of processing backends without altering the system’s operational contract or output structure.
+- **Upgrade-Safe Documentation Contract:** The output structure adheres to a stable, version-resilient schema. This ensures that documentation remains navigable and consistent even as the underlying analysis methods evolve.
+- **Automated Noise Filtration:** The system automatically isolates production behavior from non-essential artifacts (e.g., tests, third-party dependencies, configuration files, generated code) to prevent analysis dilution and conserve processing resources.
+
+### Operational Boundaries
+| Dimension | In Scope | Out of Scope |
+|---|---|---|
+| **Analysis Focus** | Business logic, user value, architectural relationships, behavioral narratives | Low-level implementation details, syntax optimization, performance profiling |
+| **Input Handling** | Unknown or unstructured repositories, mixed-paradigm codebases | Pre-documented systems, strictly standardized templates |
+| **State Management** | Intermediate data preservation, incremental processing, debugging traceability | Real-time code generation, automated refactoring, deployment pipelines |
+
+### Documented Gaps
+While the system’s intent and high-level constraints are well-defined, the following operational parameters remain unspecified in the current documentation:
+- Exact thresholds or heuristics used to balance computational cost against result quality
+- Conflict resolution strategies when extracted insights from different files contradict one another
+- Specific criteria for classifying artifacts as "non-essential" across highly customized or non-standard repository structures
+
+These gaps do not impact the system’s core purpose but should be addressed before production deployment in complex or highly regulated environments.

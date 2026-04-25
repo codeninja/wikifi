@@ -1,33 +1,36 @@
 # Integrations
 
-### Pipeline Orchestration & Data Flow
-The system operates as a staged processing pipeline coordinated by a central orchestration layer. Execution begins when an interface command triggers the orchestrator, which provisions documentation workspaces and initiates full repository analysis cycles. The orchestrator delegates work to specialized modules in a strictly sequenced flow:
+#### Internal Pipeline Handoffs
+The system operates as a staged processing pipeline where each module consumes structured outputs from upstream stages and passes refined data downstream. The orchestration layer serves as the central coordinator, triggered by external commands to provision workspaces or initiate full processing cycles. It delegates execution to specialized components in the following sequence:
 
-| Pipeline Stage | Primary Input | Primary Output | Integration Role |
+- **Repository Traversal & Introspection:** The traversal component scans target directories and supplies filtered file paths and structural metadata. The introspection module consumes directory summaries and manifests to generate filtering patterns and metadata, which guide subsequent analysis stages.
+- **Source Analysis & Extraction:** The extraction engine receives the filtered file lists, analyzes individual artifacts, and translates technical content into structured, technology-agnostic notes. These notes are passed to the aggregation layer.
+- **Content Aggregation:** The aggregation module consumes the structured notes, synthesizes them into formatted documentation, and writes the results to the central knowledge base layout.
+- **Derivative Generation:** The derivation stage consumes finalized documentation, interfaces with generative synthesis services, and produces supplementary content. This output is written back into the central layout, completing the continuous pipeline from raw artifact analysis to polished documentation.
+
+#### External & Abstracted Interfaces
+All external dependencies are routed through standardized contracts to isolate core business logic from implementation details:
+
+- **Generative AI Services:** A unified abstraction layer handles all AI-driven content requests. Downstream modules submit contextual prompts and source snippets through this interface and receive processed findings or synthesized text in return. Provider-specific implementations are swappable without modifying the analysis engine.
+- **Configuration & Runtime Management:** A centralized settings provider supplies runtime parameters to the orchestration and traversal layers. These parameters govern model selection, provider routing, timeout thresholds, content size constraints, and file exclusion lists.
+- **User Interface & Console:** The command-line interface delegates initialization and execution to the orchestration service. It manages structured console output, progress reporting, and user feedback, ensuring a consistent interaction model.
+- **Observability & Telemetry:** The extraction stage integrates with a logging and statistics tracking system to monitor processing metrics, track pipeline health, and record analysis outcomes.
+
+#### Integration Touchpoint Summary
+| Component | Inbound Dependencies | Outbound Deliverables | External Interfaces |
 |---|---|---|---|
-| **Traversal & Introspection** | Repository structure, exclusion lists | Filtered file paths, directory summaries, filtering patterns | Supplies structural metadata and scoping rules to downstream analysis |
-| **Extraction** | Filtered file lists, runtime constraints | Structured, technology-agnostic analysis notes | Translates raw artifacts into domain-ready content; feeds aggregation |
-| **Aggregation** | Structured extraction notes | Synthesized documentation sections | Consolidates fragmented notes into coherent layout-ready content |
-| **Derivation** | Finalized documentation sections | Polished, derivative knowledge base content | Applies generative synthesis and writes back to the central layout |
+| **Orchestrator** | CLI commands, centralized config | Task delegation signals | None (internal coordinator) |
+| **CLI Interface** | User input, runtime config | Execution triggers, console feedback | Standard console/terminal |
+| **Traversal & Introspection** | Config/exclusion lists, directory manifests | Filtered paths, metadata, filtering patterns | Repository filesystem |
+| **Extractor** | Filtered file lists, AI responses | Structured analysis notes | AI provider interface, logging/telemetry |
+| **Aggregator** | Structured notes, AI responses | Synthesized markdown sections | AI provider interface, wiki storage |
+| **Deriver** | Finalized markdown, AI responses | Derivative documentation | Generative synthesis service, wiki storage |
+| **AI Provider Layer** | Contextual prompts, source snippets | Processed findings, synthesized text | External inference backends |
 
-This unidirectional data flow ensures that raw artifact analysis progressively transforms into structured documentation without circular dependencies.
-
-### External Service Dependencies
-All generative synthesis and content translation tasks are routed through an external intelligence backend. The system enforces a unified provider contract that acts as the sole integration boundary for these operations. This abstraction isolates core processing logic from backend-specific mechanics, enabling seamless interchange of inference services without modifying upstream extraction or aggregation modules. Currently, the system communicates with local inference services via a standard request-response protocol, transmitting system directives, user prompts, and formatting constraints.
-
-### Configuration & Runtime Interfaces
-Runtime behavior is governed by a centralized settings provider. Multiple pipeline stages consume these parameters to control:
-- Model selection and provider routing
-- Timeout thresholds and content size constraints
-- File exclusion lists and scoping rules
-- Workspace provisioning parameters
-
-Centralizing configuration ensures consistent behavior across the pipeline and simplifies environment-specific tuning without requiring changes to individual processing modules.
-
-### Observability & User Feedback
-During execution, the system interfaces with standard console output to deliver structured progress reporting and user feedback. Internally, the extraction and processing stages integrate with a dedicated logging and statistics tracking subsystem. This integration captures processing metrics, monitors pipeline health, and supports diagnostic workflows without interfering with the primary data flow.
-
-### Integration Boundaries & Documented Gaps
-The architecture deliberately separates pipeline sequencing, content transformation, and external service communication to minimize coupling. The provider contract and orchestration layer serve as the primary integration boundaries, ensuring that updates to inference backends or processing stages remain isolated.
-
-*Note: The available documentation does not specify error handling, retry mechanisms, or fallback behaviors for external service failures. Additionally, the exact serialization format used for data exchange between pipeline stages is not explicitly defined. These areas should be clarified before production deployment.*
+#### Documentation Gaps
+The provided notes outline the directional flow and high-level contracts but do not specify:
+- Exact data schemas or serialization formats used for inter-module handoffs
+- Error handling, retry policies, or fallback mechanisms for external service failures
+- Authentication, rate-limiting, or security constraints for AI provider interactions
+- Versioning or compatibility guarantees between pipeline stages
+These details should be clarified in implementation documentation or interface contracts.

@@ -1,39 +1,28 @@
 # Capabilities
 
-The application functions as an automated knowledge translation and documentation generation system. It ingests raw project artifacts, extracts domain-relevant information, and synthesizes structured, technology-agnostic documentation. The following capabilities outline how the system operates and the operational value it delivers.
+### Value Proposition & Core Purpose
+The application automates the transformation of raw source artifacts into structured, domain-focused documentation. By systematically analyzing codebases, it extracts business logic, system relationships, and functional capabilities, delivering a living knowledge base that reduces documentation debt, standardizes terminology, and accelerates cross-team onboarding. The system is designed to keep documentation synchronized with implementation without requiring manual authoring overhead.
 
-### Automated Scope Definition & Artifact Discovery
-The system begins by mapping the target repository structure to establish clear processing boundaries. It applies intelligent filtering rules to exclude version-controlled ignored paths, large binary assets, and empty stubs. By analyzing manifest files and directory layouts, it classifies artifacts by relevance and purpose, dynamically adjusting traversal scope to focus only on production-meaningful content.
+### Sequential Analysis Workflow
+The application operates through a deterministic, four-stage pipeline that progresses from structural discovery to polished documentation:
 
-**Value:** Eliminates noise and processing overhead, ensuring analysis resources are allocated exclusively to artifacts that contribute to system functionality.
+| Pipeline Stage | Domain Focus | Primary Output |
+|---|---|---|
+| **Structural Analysis** | Repository layout evaluation, manifest inspection, and production-relevance classification | Scoped processing boundaries and system purpose inference |
+| **Granular Extraction** | File-by-file translation of technical implementations into domain concepts | Schema-validated, technology-agnostic capability notes |
+| **Section Synthesis** | Aggregation of extracted notes into cohesive documentation units | Finalized wiki sections with consistent structure and terminology |
+| **Cross-Cutting Derivation** | Identification of relationships spanning multiple components | Inferred user personas, behavioral stories, and system interaction diagrams |
 
-### Technical-to-Domain Translation
-Individual source artifacts are analyzed to extract functional contributions and map them to business or architectural concepts. The system translates implementation-specific details into structured, technology-agnostic descriptions, validating each extraction against predefined data models to ensure consistency and completeness.
+### Key Capabilities
+- **Intelligent Traversal & Filtering:** Recursively navigates directory structures while automatically excluding version-controlled noise, large binary assets, and empty stubs. Processing focus is dynamically adjusted to prioritize substantive, domain-relevant files.
+- **Domain-Centric Translation:** Strips away implementation-specific syntax to surface underlying business rules, data flows, and functional responsibilities. Technical artifacts are consistently mapped to business-readable concepts.
+- **Adaptive Reasoning Depth:** Analytical intensity can be tuned to balance comprehensive detail against processing efficiency, allowing the system to scale from lightweight overviews to deep architectural breakdowns.
+- **Workspace Lifecycle Management:** Initializes and maintains a standardized documentation environment, handling section scaffolding, versioning rules, and intermediate state cleanup between generation cycles.
 
-**Value:** Bridges the gap between technical implementation and domain understanding, making system behavior accessible to product managers, architects, and new team members without requiring deep code literacy.
+### Quality Assurance & Transparency
+- **Explicit Gap Declaration:** When upstream data is incomplete or ambiguous, the system preserves raw evidence and explicitly documents missing information rather than generating speculative content.
+- **Execution Reporting:** Produces detailed summaries capturing file inclusion/exclusion metrics, processing counts, and generation status for full auditability and pipeline monitoring.
+- **Timestamped Provenance:** Maintains a chronological record of extraction notes per section, enabling traceability from final documentation back to the original source artifacts.
 
-### Structured Synthesis & Documentation Lifecycle Management
-Extracted findings are aggregated into cohesive, section-specific documentation bodies. The system manages the full documentation lifecycle: initializing standardized workspaces, writing and updating sections, appending timestamped extraction notes for auditability, and clearing intermediate state between runs. When upstream data is incomplete, it preserves raw evidence and generates explicit placeholders rather than fabricating content.
-
-**Value:** Delivers reliable, consistently formatted knowledge bases that evolve alongside the codebase, with transparent provenance and graceful handling of information gaps.
-
-### Cross-Cutting Insight Derivation & Visualization
-Beyond section-level synthesis, the system aggregates finalized documentation to generate high-level artifacts that span multiple components. It infers user personas, behavioral workflows, and system relationships, then renders structural and interaction diagrams to visualize complex dependencies and data flows.
-
-**Value:** Transforms fragmented technical details into holistic system understanding, supporting architecture reviews, onboarding, and cross-team alignment.
-
-### Pipeline Orchestration & Operational Reporting
-The entire process executes as a sequential, multi-stage workflow: structural analysis → granular extraction → section synthesis → high-level derivation. The orchestrator dynamically adjusts processing boundaries based on initial findings and produces detailed execution reports capturing inclusion/exclusion metrics, extraction counts, and generation status.
-
-**Value:** Provides full visibility into the documentation generation process, enabling auditability, performance tracking, and continuous refinement of analysis parameters.
-
-### Capability-to-Value Mapping
-| Capability | Domain Value Delivered |
-|---|---|
-| Scope Definition & Filtering | Reduces analysis noise; optimizes resource allocation |
-| Technical-to-Domain Translation | Democratizes technical knowledge; standardizes terminology |
-| Structured Synthesis & Lifecycle Management | Ensures documentation consistency; maintains audit trails |
-| Insight Derivation & Visualization | Reveals system architecture; supports strategic planning |
-| Pipeline Orchestration & Reporting | Enables process transparency; facilitates continuous improvement |
-
-*Note: The capabilities are tightly integrated into a sequential processing pipeline. All synthesis steps explicitly declare data gaps rather than inferring missing information, ensuring documentation accuracy remains prioritized over completeness.*
+### Adaptive Configuration
+The application supports flexible configuration of analysis parameters, including file size thresholds, content length filters, and traversal depth limits. Analytical interactions are standardized into two operational modes: schema-validated structured generation for systematic processing phases, and free-form analytical generation for narrative documentation and visual representations. This dual-mode approach ensures both machine-readable consistency and human-readable clarity across all generated artifacts.

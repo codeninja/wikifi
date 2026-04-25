@@ -1,57 +1,63 @@
 # User Personas
 
-### Primary User Personas
+### Primary Human Operators
 
-The system is designed to serve a cross-functional audience that requires reliable, up-to-date knowledge without manual documentation overhead. Personas are inferred from the documented problem space, capability mappings, and pipeline integrations. Each persona is defined by their operational goals, system needs, documented pain points, and the specific use cases the pipeline serves.
+The system’s target audience is explicitly defined across the intent and capability specifications. By aggregating the stated problem space, pipeline behaviors, and integration contracts, three distinct human operator personas emerge. Each persona interacts with the system to resolve specific documentation debt, knowledge fragmentation, or onboarding friction.
 
-#### 1. Onboarding Developer / New Team Member
-- **Goals:** Rapidly comprehend project structure, component interactions, and business purpose without tracing raw source files.
-- **Needs:** Navigable, consistently formatted documentation; technology-agnostic descriptions; clear mapping of technical artifacts to domain concepts; visual representations of system relationships.
-- **Pain Points:** Fragmented technical knowledge; steep learning curves caused by outdated or missing documentation; time spent manually correlating implementation details with functional intent.
-- **Served Use Cases:** 
-  - Reviewing synthesized documentation sections during initial project familiarization.
-  - Consulting cross-cutting insight derivations and structural diagrams to understand data flows and dependencies.
-  - Accessing timestamped extraction notes to trace how specific findings were derived from source artifacts.
+#### 1. Onboarding Engineering Practitioner
+*Focus: Rapid comprehension of unfamiliar, legacy, or rapidly evolving codebases.*
 
-#### 2. System Architect / Technical Lead
-- **Goals:** Validate architectural integrity, review system dependencies, ensure documentation reflects actual behavior, and facilitate cross-team alignment.
-- **Needs:** High-level derivative artifacts; deterministic processing outputs; explicit gap declarations; audit trails; visualization of complex dependencies; execution summaries for pipeline health.
-- **Pain Points:** Inconsistent terminology across teams; hidden or undocumented component interactions; documentation that fabricates content or obscures missing information; lack of visibility into how analysis parameters affect output quality.
+- **Goals:** Accelerate cross-team onboarding; quickly map business logic and functional capabilities without manual reverse-engineering; maintain awareness of system relationships as the codebase evolves.
+- **Needs:** Structured, navigable documentation that stays synchronized with implementation; standardized terminology across components; explicit declarations of missing or ambiguous information; traceability from documentation back to original source artifacts.
+- **Pain Points:** Fragmented technical knowledge; labor-intensive manual documentation; outdated or speculative content that drifts from actual implementation; difficulty distinguishing production behavior from test or configuration noise.
 - **Served Use Cases:**
-  - Conducting architecture reviews using aggregated documentation and interaction diagrams.
-  - Refining analysis parameters and inclusion/exclusion filters based on execution reports.
-  - Verifying that high-level concepts are strictly evidence-grounded and free of inferred assumptions.
+  - Structural analysis for system purpose inference and scoped processing boundaries
+  - Granular extraction of domain concepts from technical implementations
+  - Adaptive reasoning depth to toggle between lightweight overviews and deep architectural breakdowns
+  - Timestamped provenance for auditability and change tracking
 
-#### 3. Product Manager / Domain Stakeholder
-- **Goals:** Understand business purpose, user value, and functional contributions without requiring deep code literacy.
-- **Needs:** Technology-agnostic translations; domain-focused narratives; clear separation of implementation mechanics from business logic; standardized terminology.
-- **Pain Points:** Technical jargon obscuring product outcomes; difficulty connecting code changes to feature delivery; documentation that focuses on implementation rather than user-centric value.
+#### 2. Technical Writer & System Architect
+*Focus: Establishing reliable, evidence-based documentation baselines and behavioral narratives.*
+
+- **Goals:** Produce consistent, technology-agnostic documentation; capture cross-cutting relationships and behavioral specifications; maintain long-term documentation stability across tooling or backend updates.
+- **Needs:** Schema-validated structured generation for systematic phases; free-form analytical generation for narrative clarity; deterministic, stage-gated execution for reproducible outputs; explicit gap preservation rather than speculative filling.
+- **Pain Points:** Inconsistent terminology across projects; lack of traceability between documentation and source artifacts; manual authoring overhead; documentation contracts that break when analysis methods or backends change.
 - **Served Use Cases:**
-  - Reviewing technical-to-domain translated sections to assess feature coverage and system capabilities.
-  - Aligning product roadmaps with synthesized knowledge bases that reflect actual system behavior.
-  - Evaluating how architectural relationships impact user workflows and domain boundaries.
+  - Section synthesis for cohesive, consistently structured documentation units
+  - Cross-cutting derivation for behavioral stories and system interaction diagrams
+  - Workspace lifecycle management for section scaffolding, versioning rules, and intermediate state cleanup
+  - Dual-mode generation to balance machine-readable consistency with human-readable clarity
 
-#### 4. Pipeline Operator / Documentation Maintainer
-- **Goals:** Ensure reliable, repeatable documentation generation; monitor pipeline health; manage configuration and processing boundaries; support continuous improvement.
-- **Needs:** Centralized configuration management; structured progress reporting; observability and logging integrations; deterministic stage-gated workflows; clear inclusion/exclusion metrics.
-- **Pain Points:** Resource exhaustion from processing irrelevant or oversized artifacts; opaque processing steps; lack of auditability; manual intervention required when documentation drifts from the codebase.
+#### 3. Portfolio Manager & Acquisition Integrator
+*Focus: Standardizing knowledge bases across multiple projects, mixed-paradigm repositories, or acquisition targets.*
+
+- **Goals:** Assess system purpose and classification rationale quickly; maintain a unified, technology-agnostic knowledge base without manual overhead; ensure processing efficiency across diverse repository structures.
+- **Needs:** Automated noise filtration to isolate production behavior; flexible configuration of traversal depth, file size thresholds, and content filters; backend decoupling for seamless processing substitution; consistent workspace layouts across pipeline runs.
+- **Pain Points:** Resource exhaustion from scanning irrelevant directories; inconsistent output structures when analysis methods evolve; lack of auditability for compliance or assessment; fragmented knowledge across acquired or legacy projects.
 - **Served Use Cases:**
-  - Tuning runtime parameters, timeout thresholds, and scoping rules via the centralized settings provider.
-  - Diagnosing pipeline stages using aggregation statistics and execution summaries.
-  - Managing workspace layouts and verifying that intermediate states are preserved for incremental processing.
+  - Intelligent traversal & filtering for production-relevance classification and dynamic focus adjustment
+  - Introspection assessment for primary language identification and classification rationale
+  - Aggregation statistics and execution summaries for pipeline health monitoring and output readiness verification
+  - Upgrade-safe documentation contract to preserve navigability as underlying analysis methods evolve
 
-### Persona-to-Capability Mapping
-| Persona | Primary Capabilities Served | Key Integrations Consumed |
-|---|---|---|
-| Onboarding Developer | Technical-to-Domain Translation; Insight Derivation & Visualization | Aggregation outputs; Workspace layout navigation |
-| System Architect | Cross-Cutting Insight Derivation; Pipeline Orchestration & Reporting | Execution summaries; Observability/logging; Configuration overrides |
-| Product Manager | Technical-to-Domain Translation; Structured Synthesis & Lifecycle Management | Finalized documentation sections; Domain-focused aggregation |
-| Pipeline Operator | Automated Scope Definition; Pipeline Orchestration & Reporting | Centralized settings provider; Console progress reporting; Statistics tracking |
+### Persona-to-Pipeline Mapping
 
-### Documented Gaps in Persona Definition
-The upstream sections establish the functional boundaries and operational intent of the system but remain silent on several persona-specific dimensions. These gaps must be resolved before production deployment:
-- **Access Control & Role Permissions:** The system does not define how documentation workspaces, configuration overrides, or execution reports are restricted or shared across personas.
-- **Quantitative Success Metrics:** No persona-specific KPIs (e.g., onboarding time reduction, architecture review cycle time, documentation drift frequency) are specified to measure system impact.
-- **Interactive Feedback Loops:** While console reporting and logging are documented, the exact mechanisms for personas to submit corrections, flag inaccurate extractions, or request targeted re-scans are not defined.
-- **Persona-Specific Output Formats:** The system produces standardized markdown bodies and diagrams, but does not specify whether personas require tailored exports, dashboards, or integration hooks into external collaboration tools.
-- **Error Handling & Fallback Behaviors:** The integrations section explicitly notes that retry mechanisms, fallback behaviors, and error routing for external service failures are unspecified, which directly impacts operator and maintainer workflows during pipeline disruptions.
+| Pipeline Stage / Capability | Onboarding Practitioner | Technical Writer & Architect | Portfolio Manager & Integrator |
+|---|---|---|---|
+| **Structural Analysis & Introspection** | System purpose inference, scoped boundaries | Classification rationale, structural metadata | Primary language/purpose assessment across targets |
+| **Granular Extraction & Domain Translation** | Business logic mapping, noise isolation | Evidence-based baseline, traceable notes | Technology-agnostic abstraction, standardized terminology |
+| **Section Synthesis & Dual-Mode Generation** | Lightweight overviews vs. deep breakdowns | Schema-validated structure + narrative clarity | Consistent output formatting across projects |
+| **Cross-Cutting Derivation** | Relationship mapping, onboarding acceleration | Behavioral stories, interaction diagrams | *(Note: System also auto-generates behavioral personas as a downstream artifact)* |
+| **Workspace Lifecycle & Execution Reporting** | Change tracking, provenance | Reproducible runs, gap preservation | Pipeline health metrics, auditability, upgrade-safe contracts |
+
+### Documented Gaps & Unresolved Persona Dimensions
+
+The upstream specifications define the system’s operational boundaries and target audiences but remain silent on several persona-specific dimensions. These gaps must be resolved before production deployment in complex or regulated environments:
+
+- **Role-Based Configuration Presets:** No predefined configuration profiles or heuristic thresholds are specified for balancing computational cost against result quality per persona.
+- **Access & Security Controls:** Authentication, rate-limiting, and role-based access constraints for AI provider interactions and workspace management are not defined.
+- **Workflow Integration Points:** Exact data schemas, serialization formats, and error-handling/retry policies for inter-module handoffs are unspecified, leaving persona-specific CI/CD or documentation workflow integration undefined.
+- **Conflict Resolution:** Strategies for reconciling contradictory extracted insights across files are not documented, which may impact how architects and writers validate synthesized sections.
+- **Non-Essential Classification Criteria:** Specific heuristics for classifying artifacts as "non-essential" across highly customized or non-standard repository structures remain undefined, potentially affecting portfolio managers scanning atypical acquisition targets.
+
+These gaps do not alter the system’s core purpose but should be addressed in implementation contracts or operational runbooks to fully support each persona’s workflow expectations.

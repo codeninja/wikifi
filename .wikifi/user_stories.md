@@ -1,93 +1,121 @@
 # User Stories
 
-### Automated Scope & Artifact Discovery
-- **Persona:** Pipeline Operator
-- **Capability:** Automated Scope Definition & Artifact Discovery
-- **Entities Involved:** Configuration, Scan/Traversal Config, Directory Summary
+### Feature: Intelligent Traversal & Structural Analysis
+
+**User Story**
+As a Portfolio Manager & Acquisition Integrator, I want the system to automatically filter out non-essential files and large binaries during repository scanning, so that I can assess system purpose and classification rationale without resource exhaustion.
 
 ```gherkin
-Feature: Automated Scope & Artifact Discovery
-  Scenario: Filter irrelevant artifacts and establish processing boundaries
-    As a Pipeline Operator, I want automated scope definition and artifact discovery, so that analysis resources are allocated exclusively to production-meaningful content without manual filtering overhead.
-    Given a target repository containing mixed artifact types and version-controlled paths
-    When the system initializes scanning boundaries using hierarchical configuration and local overrides
-    Then large binary assets, empty stubs, and excluded paths are automatically filtered out
-    And manifest files and directory layouts are analyzed to classify artifacts by relevance
-    And the traversal scope dynamically adjusts to focus only on production-meaningful content
+Given a target repository containing mixed-paradigm artifacts and version-controlled noise
+When the structural analysis stage executes with configured path filters and size thresholds
+Then the system excludes irrelevant directories and oversized assets
+And produces a directory summary reflecting only allowed traversal boundaries
+And generates an introspection assessment identifying primary languages and system purpose
 ```
 
-### Technical-to-Domain Translation & Extraction
-- **Persona:** Onboarding Developer, Product Manager
-- **Capability:** Technical-to-Domain Translation
-- **Entities Involved:** Introspection Assessment, Extraction Note
+**Entities Involved:** `Scan/Traversal Config`, `Directory Summary`, `Introspection Assessment`
+**Acceptance Criteria:**
+- Processing never exceeds defined size constraints or traverses excluded paths.
+- Directory statistics accurately reflect file counts, total size, and extension distribution within allowed boundaries.
+- Classification rationale is derived strictly from structural data and path filters.
+- *(Gap Declaration)* Specific heuristics for classifying artifacts as "non-essential" across highly customized or non-standard repository structures remain undefined.
+
+---
+
+### Feature: Domain-Centric Translation & Granular Extraction
+
+**User Story**
+As an Onboarding Engineering Practitioner, I want technical implementations translated into domain concepts with explicit gap declarations, so that I can quickly map business logic and functional capabilities without manual reverse-engineering.
 
 ```gherkin
-Feature: Technical-to-Domain Translation & Extraction
-  Scenario: Translate implementation details into domain concepts with traceable provenance
-    As an Onboarding Developer, I want technical-to-domain translation of source artifacts, so that I can rapidly comprehend project structure and business purpose without tracing raw implementation details.
-    Given source files within the defined traversal boundaries
-    When the system performs structural and semantic analysis against predefined data models
-    Then implementation-specific details are translated into structured, technology-agnostic descriptions
-    And each finding is preserved as an immutable, timestamped extraction note linked to its source file
-    And the introspection assessment documents a classification rationale based strictly on directory summaries
+Given a set of source files within the scoped processing boundaries
+When the granular extraction stage translates technical implementations into domain concepts
+Then the system strips implementation-specific syntax to surface underlying business rules
+And creates timestamped extraction notes linking each file to a role summary and finding
+And preserves raw evidence for ambiguous data instead of generating speculative content
 ```
 
-### Structured Synthesis & Documentation Lifecycle
-- **Persona:** System Architect, Onboarding Developer
-- **Capability:** Structured Synthesis & Documentation Lifecycle Management
-- **Entities Involved:** Documentation Section, Aggregation Stats, Workspace Layout
+**Entities Involved:** `Configuration`, `Extraction Note`
+**Acceptance Criteria:**
+- Each extraction note is immutable once created and tied to a single source file.
+- Technical artifacts are consistently mapped to business-readable concepts.
+- Missing or ambiguous information is explicitly documented rather than filled speculatively.
+- *(Gap Declaration)* Strategies for reconciling contradictory extracted insights across files are not documented.
+
+---
+
+### Feature: Section Synthesis & Dual-Mode Generation
+
+**User Story**
+As a Technical Writer & System Architect, I want schema-validated structured generation combined with free-form narrative clarity, so that I can produce consistent, technology-agnostic documentation baselines.
 
 ```gherkin
-Feature: Structured Synthesis & Documentation Lifecycle
-  Scenario: Aggregate findings into consistent documentation sections with explicit gap handling
-    As a System Architect, I want structured synthesis and documentation lifecycle management, so that I can validate architectural integrity using consistently formatted, evidence-grounded documentation sections.
-    Given aggregated extraction notes from the analysis phase
-    When the system consolidates findings into categorized documentation sections
-    Then intermediate states are cleared between runs and timestamped extraction notes are appended for auditability
-    And explicit placeholders are generated for incomplete upstream data rather than fabricating content
-    And aggregation statistics atomically track successful writes and flag empty sections to highlight coverage gaps
+Given aggregated extraction notes from the granular extraction stage
+When the section synthesis stage consolidates findings into documentation units
+Then the system applies schema-validated structured generation for systematic phases
+And uses free-form analytical generation for narrative clarity
+And outputs finalized wiki sections with consistent terminology and structure
 ```
 
-### Cross-Cutting Insight Derivation & Visualization
-- **Persona:** Product Manager, System Architect
-- **Capability:** Cross-Cutting Insight Derivation & Visualization
-- **Entities Involved:** Documentation Section, Aggregation Stats
+**Entities Involved:** `Documentation Section`, `Aggregation Stats`, `Workspace Layout`
+**Acceptance Criteria:**
+- Sections are generated only after successful note aggregation.
+- Aggregation statistics track successful writes and explicitly flag empty sections.
+- Directory structure remains consistent across pipeline runs, handling scaffolding and intermediate state cleanup.
+- *(Gap Declaration)* Exact mapping rules between intermediate extraction notes and final documentation sections are implied by the aggregation process but not explicitly detailed.
+
+---
+
+### Feature: Cross-Cutting Derivation & Behavioral Mapping
+
+**User Story**
+As a Technical Writer & System Architect, I want the system to derive behavioral stories and interaction diagrams from cross-component relationships, so that I can capture system interactions and maintain long-term documentation stability.
 
 ```gherkin
-Feature: Cross-Cutting Insight Derivation & Visualization
-  Scenario: Generate high-level system relationships and dependency visualizations
-    As a Product Manager, I want cross-cutting insight derivation and visualization, so that I can understand business purpose and functional contributions without requiring deep code literacy.
-    Given finalized documentation sections across multiple components
-    When the system aggregates high-level artifacts spanning the codebase
-    Then behavioral workflows and system relationships are inferred from the synthesized knowledge
-    And structural and interaction diagrams are rendered to visualize complex dependencies and data flows
-    And the output supports architecture reviews and cross-team alignment without technical jargon
+Given finalized documentation sections and extracted domain concepts
+When the cross-cutting derivation stage identifies relationships spanning multiple components
+Then the system generates behavioral narratives and system interaction diagrams
+And auto-generates behavioral personas as downstream artifacts
+And ensures deterministic, stage-gated execution for reproducible outputs
 ```
 
-### Pipeline Orchestration & Operational Reporting
-- **Persona:** Pipeline Operator, System Architect
-- **Capability:** Pipeline Orchestration & Operational Reporting
-- **Entities Involved:** Execution Summary, Aggregation Stats
+**Entities Involved:** `Documentation Section`, `Execution Summary`
+**Acceptance Criteria:**
+- Cross-cutting relationships are identified without manual authoring overhead.
+- Generated artifacts maintain traceability back to original source artifacts.
+- Execution follows a deterministic, four-stage pipeline progression.
+- *(Gap Declaration)* Workflow integration points, including exact data schemas, serialization formats, and error-handling/retry policies for inter-module handoffs, are unspecified.
+
+---
+
+### Feature: Execution Reporting & Provenance Tracking
+
+**User Story**
+As a Portfolio Manager & Acquisition Integrator, I want detailed execution summaries and timestamped provenance for all generated artifacts, so that I can ensure auditability and verify pipeline health across acquisition targets.
 
 ```gherkin
-Feature: Pipeline Orchestration & Operational Reporting
-  Scenario: Execute sequential workflow stages and generate comprehensive execution reports
-    As a Pipeline Operator, I want pipeline orchestration and operational reporting, so that I can monitor processing health, verify stage completion, and refine analysis parameters for continuous improvement.
-    Given a sequential multi-stage workflow encompassing structural analysis, extraction, synthesis, and derivation
-    When the orchestrator dynamically adjusts processing boundaries based on initial findings
-    Then a unified execution summary is generated capturing inclusion/exclusion metrics, extraction counts, and generation status
-    And the report provides full visibility into pipeline health and processing efficiency
-    And operators can tune runtime parameters and scoping rules via the centralized settings provider
+Given a completed pipeline run across all processing stages
+When the system consolidates metrics, findings, and completion status
+Then an execution summary is generated as a single source of truth for pipeline health
+And a chronological record of extraction notes is maintained per section
+And file inclusion/exclusion metrics and generation status are reported for full auditability
 ```
 
-### Documented Gaps & Unresolved Dependencies
-The upstream sections establish functional boundaries and operational intent but remain silent on several dimensions required to fully validate these user stories in production. These gaps must be resolved before deployment:
+**Entities Involved:** `Execution Summary`, `Extraction Note`, `Aggregation Stats`
+**Acceptance Criteria:**
+- Execution summary is generated only after all pipeline stages report completion.
+- Provenance enables traceability from final documentation back to original source artifacts.
+- Pipeline health metrics and output readiness are verified before final delivery.
+- *(Gap Declaration)* Authentication, rate-limiting, and role-based access constraints for workspace management and AI provider interactions are not defined.
 
-| Gap Category | Impact on User Stories | Upstream Status |
-|---|---|---|
-| **Access Control & Role Permissions** | Stories assume personas can freely consume outputs and override configurations, but workspace restriction and sharing rules are undefined. | Silent |
-| **Quantitative Success Metrics** | Acceptance criteria lack measurable KPIs (e.g., onboarding time reduction, architecture review cycle time, documentation drift frequency). | Silent |
-| **Interactive Feedback Loops** | No mechanism is defined for personas to submit corrections, flag inaccurate extractions, or request targeted re-scans. | Silent |
-| **Persona-Specific Output Formats** | Stories assume standardized markdown and diagrams suffice, but tailored exports, dashboards, or external collaboration hooks are unspecified. | Silent |
-| **Error Handling & Fallback Behaviors** | Pipeline disruption handling, retry mechanisms, and error routing for external service failures are not defined, impacting operator workflows. | Silent |
-| **Note-to-Section Mapping Rules** | The exact grouping, prioritization, and filtering logic for transforming intermediate extraction notes into final documentation sections is implied but not detailed. | Silent |
+---
+
+### Story-to-Component Mapping Reference
+
+| Feature | Primary Persona | Core Capability | Key Entities | Known Gaps Addressed |
+|---|---|---|---|---|
+| Intelligent Traversal & Structural Analysis | Portfolio Manager & Acquisition Integrator | Intelligent Traversal & Filtering | `Scan/Traversal Config`, `Directory Summary`, `Introspection Assessment` | Non-essential classification heuristics |
+| Domain-Centric Translation & Granular Extraction | Onboarding Engineering Practitioner | Granular Extraction / Domain-Centric Translation | `Configuration`, `Extraction Note` | Contradictory insight resolution |
+| Section Synthesis & Dual-Mode Generation | Technical Writer & System Architect | Section Synthesis / Dual-Mode Generation | `Documentation Section`, `Aggregation Stats`, `Workspace Layout` | Note-to-section mapping rules |
+| Cross-Cutting Derivation & Behavioral Mapping | Technical Writer & System Architect | Cross-Cutting Derivation | `Documentation Section`, `Execution Summary` | Workflow integration & serialization schemas |
+| Execution Reporting & Provenance Tracking | Portfolio Manager & Acquisition Integrator | Execution Reporting / Timestamped Provenance | `Execution Summary`, `Extraction Note`, `Aggregation Stats` | Access controls & role-based presets |
