@@ -1,0 +1,11 @@
+[wikifi]
+provider = "ollama"
+model = "qwen3.6:27b"
+ollama_host = "http://localhost:11434"
+request_timeout = 900
+max_file_bytes = 200000
+min_content_bytes = 64
+introspection_depth = 3
+think = "high"
+allow_provider_fallback = true
+exclude_patterns = []

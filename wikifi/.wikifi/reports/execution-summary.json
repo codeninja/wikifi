@@ -1,0 +1,133 @@
+{
+  "aggregation_stats": {
+    "attempted_sections": 9,
+    "empty_section_count": 0,
+    "gaps": [
+      "Domains and Subdomains includes explicit gap declarations.",
+      "Intent and Problem Space includes explicit gap declarations.",
+      "External-System Dependencies includes explicit gap declarations.",
+      "Hard Specifications includes explicit gap declarations.",
+      "Inline Schematics includes explicit gap declarations."
+    ],
+    "section_paths": [
+      "/home/codeninja/wikifi/.claude/worktrees/benchmark-gpt-5.5/wikifi/.wikifi/sections/domains.md",
+      "/home/codeninja/wikifi/.claude/worktrees/benchmark-gpt-5.5/wikifi/.wikifi/sections/intent.md",
+      "/home/codeninja/wikifi/.claude/worktrees/benchmark-gpt-5.5/wikifi/.wikifi/sections/capabilities.md",
+      "/home/codeninja/wikifi/.claude/worktrees/benchmark-gpt-5.5/wikifi/.wikifi/sections/external_dependencies.md",
+      "/home/codeninja/wikifi/.claude/worktrees/benchmark-gpt-5.5/wikifi/.wikifi/sections/integrations.md",
+      "/home/codeninja/wikifi/.claude/worktrees/benchmark-gpt-5.5/wikifi/.wikifi/sections/cross_cutting.md",
+      "/home/codeninja/wikifi/.claude/worktrees/benchmark-gpt-5.5/wikifi/.wikifi/sections/entities.md",
+      "/home/codeninja/wikifi/.claude/worktrees/benchmark-gpt-5.5/wikifi/.wikifi/sections/hard_specifications.md",
+      "/home/codeninja/wikifi/.claude/worktrees/benchmark-gpt-5.5/wikifi/.wikifi/sections/inline_schematics.md"
+    ],
+    "successful_writes": 9
+  },
+  "completion_status": "completed",
+  "derivative_stats": {
+    "attempted_sections": 3,
+    "empty_section_count": 0,
+    "gaps": [],
+    "section_paths": [
+      "/home/codeninja/wikifi/.claude/worktrees/benchmark-gpt-5.5/wikifi/.wikifi/derivatives/personas.md",
+      "/home/codeninja/wikifi/.claude/worktrees/benchmark-gpt-5.5/wikifi/.wikifi/derivatives/user_stories.md",
+      "/home/codeninja/wikifi/.claude/worktrees/benchmark-gpt-5.5/wikifi/.wikifi/derivatives/diagrams.md"
+    ],
+    "successful_writes": 3
+  },
+  "directory_summary": {
+    "documentation_files": [],
+    "extension_distribution": {
+      ".py": 16
+    },
+    "file_count": 16,
+    "manifest_files": [],
+    "root": "/home/codeninja/wikifi/.claude/worktrees/benchmark-gpt-5.5/wikifi",
+    "selected_file_count": 15,
+    "skipped_counts": {
+      "excluded_path": 32,
+      "near_empty_content": 1
+    },
+    "top_level_entries": [
+      "__init__.py",
+      "__main__.py",
+      "aggregation.py",
+      "cli.py",
+      "config.py",
+      "constants.py",
+      "derivation.py",
+      "extraction.py",
+      "introspection.py",
+      "models.py",
+      "orchestrator.py",
+      "providers.py",
+      "reporting.py",
+      "text.py",
+      "traversal.py",
+      "workspace.py"
+    ],
+    "total_size_bytes": 73349
+  },
+  "extraction_note_count": 15,
+  "finished_at": "2026-04-25T15:27:27+00:00",
+  "introspection_assessment": {
+    "classification_rationale": "The assessment is derived from repository structure, notable manifests, extension distribution, and immutable path filters before any source content is parsed.",
+    "inferred_purpose": "A system centered on main, aggregation, cli, config, constants.",
+    "notable_gaps": [
+      "No notable manifest or documentation files were present for structural routing."
+    ],
+    "primary_languages": [
+      "Application source"
+    ],
+    "scope_description": "Selected 15 production source files from 16 traversable files. Documentation, manifests, tests, dependency caches, generated assets, and workspace artifacts were used only for routing or excluded from extraction."
+  },
+  "provider_status": "provider degraded; deterministic fallback used for 15 file(s)",
+  "stage_metrics": {
+    "aggregation": {
+      "duration_seconds": 0.0018,
+      "empty_section_count": 0,
+      "successful_writes": 9
+    },
+    "derivation": {
+      "duration_seconds": 0.0007,
+      "empty_section_count": 0,
+      "successful_writes": 3
+    },
+    "extraction": {
+      "duration_seconds": 15.1272,
+      "note_count": 15,
+      "provider_status": "provider degraded; deterministic fallback used for 15 file(s)"
+    },
+    "introspection": {
+      "duration_seconds": 0.0023,
+      "selected_file_count": 15,
+      "skipped_file_count": 33
+    },
+    "stage_order": [
+      "introspection",
+      "extraction",
+      "aggregation",
+      "derivation"
+    ]
+  },
+  "stage_order": [
+    "introspection",
+    "extraction",
+    "aggregation",
+    "derivation"
+  ],
+  "started_at": "2026-04-25T15:27:13+00:00",
+  "workspace": {
+    "config_file": "/home/codeninja/wikifi/.claude/worktrees/benchmark-gpt-5.5/wikifi/.wikifi/config.toml",
+    "derivatives_dir": "/home/codeninja/wikifi/.claude/worktrees/benchmark-gpt-5.5/wikifi/.wikifi/derivatives",
+    "gitignore": "/home/codeninja/wikifi/.claude/worktrees/benchmark-gpt-5.5/wikifi/.wikifi/.gitignore",
+    "notes_dir": "/home/codeninja/wikifi/.claude/worktrees/benchmark-gpt-5.5/wikifi/.wikifi/notes",
+    "notes_file": "/home/codeninja/wikifi/.claude/worktrees/benchmark-gpt-5.5/wikifi/.wikifi/notes/extraction.jsonl",
+    "reports_dir": "/home/codeninja/wikifi/.claude/worktrees/benchmark-gpt-5.5/wikifi/.wikifi/reports",
+    "root": "/home/codeninja/wikifi/.claude/worktrees/benchmark-gpt-5.5/wikifi",
+    "run_log": "/home/codeninja/wikifi/.claude/worktrees/benchmark-gpt-5.5/wikifi/.wikifi/run.log",
+    "sections_dir": "/home/codeninja/wikifi/.claude/worktrees/benchmark-gpt-5.5/wikifi/.wikifi/sections",
+    "summary_json": "/home/codeninja/wikifi/.claude/worktrees/benchmark-gpt-5.5/wikifi/.wikifi/reports/execution-summary.json",
+    "summary_markdown": "/home/codeninja/wikifi/.claude/worktrees/benchmark-gpt-5.5/wikifi/.wikifi/reports/execution-summary.md",
+    "wiki_dir": "/home/codeninja/wikifi/.claude/worktrees/benchmark-gpt-5.5/wikifi/.wikifi"
+  }
+}
