@@ -1,23 +1,19 @@
 # CLAUDE.md
 
-Process and procedures for working in this repo. For *what* wikify is, see [`README.md`](./README.md). For *why* it exists, see [`VISION.md`](./VISION.md).
+On first message read: 
+- `README.md` - for project layout
+- `VISION.md` - for the vision, problem space.
+- `CODE-FORMAT.md` - for code and project format rules.
+
+All assumptions must be clearly identified as (assumption) when you mention them. All facts must be cited with external sources. Your memory may be corrupted, validate all assumptions against source documentation.
 
 ## Commands
 The Makefile is the universal entry point — agents and humans run the same commands.
 
-```
-make hooks       # one-time: enables .githooks/ pre-commit + pre-push
-make dev         # docker compose up the local stack
-make seed        # backend/scripts/seed_dev.py — dev data + prints JWT
-make test        # full test suite (blocks pre-push on failure)
-make lint        # ruff (+ eslint if a JS surface exists)
-make coverage    # pytest --cov term-missing
-```
-
 Direct invocations: `uv sync` · `uv add <pkg>` · `uv add --dev <pkg>` · `uv run <cmd>` · `uv run pytest` · `uv run ruff check --fix .` · `uv run ruff format .`
 
 ## Tooling rules
-Full source of truth: the user's PROJECT.md gist. Fetch it with `gh api gists/75f94d35911df96b3c931a8f76242332 --jq '.files."PROJECT.md".content'`.
+Full source of truth: the user's PROJECT.md gist. Fetch it with `CODE-FORMAT.md`.
 
 - **`uv`** is the exclusive Python package manager. Commit `uv.lock`.
 - **`ruff`** is the single tool for lint and format — covers what flake8, isort, and black used to do.
@@ -46,10 +42,9 @@ Surface before deviating.
 - The pre-commit hook auto-fixes lint and re-stages. The pre-push hook runs the full test suite and gates the push. CI is the safety net for any `--no-verify` bypasses.
 
 ## Parallel agent workflow
-- Use git worktrees for parallel feature work: `git worktree add /tmp/wikifi-{N} -b feat/issue-{N}-{slug}`. Up to 3 in flight.
-- **Treat signal 9 from a backgrounded Claude process as a normal exit.** Check the log before restarting; restarts cost tokens and duplicate work.
+- Use git worktrees for parallel feature work: `git worktree add .claude/worktrees/wikifi-{N} -b feat/issue-{N}-{slug}`. Up to 3 in flight.
 
 ## Debug escalation
-Once a single fix attempt has gone past — same test failing twice, repeated SDK errors, an environment issue that persists past a first fix, or a mid-task urge to change approach — **escalate to the Codex plugin** (`openai/codex-plugin-cc`) for debug direction.
+Once a single fix attempt has gone past — same test failing twice, repeated SDK errors, an environment issue that persists past a first fix, or a mid-task urge to change approach — **escalate to the Codex plugin** (`openai/codex-plugin-cc`) for debug direction. Describe the error you see, the situation, all info on the problem, but do not lead the model with your own theories or assumptions. 
 
 This complements the `advisor` tool: `advisor` reviews approach; Codex debugs concrete failures.

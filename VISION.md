@@ -3,7 +3,7 @@
 ## Why wikify exists
 Legacy systems are hard to migrate because the **intent** of the code is locked inside its implementation choices. A team lifting a legacy project into a modern microservice-oriented architecture needs more than a repo — they need a description of *what the system does and why*, decoupled from *how it currently does it*.
 
-wikify produces that description. It walks a target codebase, uses an AI agent to hydrate domain knowledge per logical unit, and writes a **technology-agnostic** Notion wiki the target team can use to re-implement the system on a fresh stack from the wiki alone.
+wikify produces that description. It walks a target codebase, uses an AI agent to hydrate domain knowledge per logical unit, and writes a **technology-agnostic** markdown wiki the target team can use to re-implement the system on a fresh stack from the wiki alone.
 
 Once wikified as modular segregrated domain knowledge the wiki becomes the source of the new system's intent.
 
@@ -25,8 +25,12 @@ wikify exists to make the intent of a legacy system **explicit, complete, and po
 - **Cross-cutting concerns** — observability, monitoring, data integrity, authentication & authorization, data storage
 - **Core entities and their structures** - data structures, relationships, and patterns that define the system's domain model, independent of the current implementation. A definition of what the core entities needs are and how they relate to other entities. 
 - **Hard specifications** — Critical requirements which must be carried forward.
+- **Mermaide diagrams** — visual representations of the system's domains, entities, and integrations, without reference to the current tech stack or architecture.
 
 These are not hard requirements, and the agent is free to identify and capture additional relevant information beyond this list. The goal is a comprehensive, technology-agnostic representation of the system's intent and problem space that empowers a new team to re-implement the system into one or more smaller services in a modern stack from the wiki alone.
+
+## Storage
+Stores wiki content in the target projects .wikify/ directory as markdown files. 
 
 ## Interacting with the wiki
 The wiki will have a CLI and MCP interface into 
@@ -40,11 +44,4 @@ Wikify is not a code translation tool. It is a system wide feature discovery and
 ## Success criteria
 A migration team handed only the wiki wikify produces — working from the wiki alone — can deliver a microservice re-implementation that preserves the original system's personas, problem space, integrations, cross-cutting concerns, entities, and data patterns.
 
-## Open design questions
-Intent-level decisions still to resolve. Surface each at planning time so the choice is explicit.
 
-- **"Notion in Docker"** — official Notion SaaS API with a containerized client, or a self-hosted Notion-like alternative (Outline / AppFlowy / Wiki.js) running locally?
-- **Project-boundary discovery** — heuristic detection (`pyproject.toml`, `package.json`, `Cargo.toml`, etc.) or explicit user configuration?
-- **Token / target-page configuration** — interactive `wikify init` prompts, or `.env`-driven?
-- **Polyglot scope** — Python-only at v1, or multi-language from the first release?
-- **Notion-unavailable fallback** — markdown to disk, or hard-fail?
