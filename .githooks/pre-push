@@ -1,8 +1,3 @@
 #!/usr/bin/env bash
 set -euo pipefail
-if [ -d backend/tests ]; then
-  uv run pytest -q || exit 1
-fi
-if [ -d frontend ]; then
-  pnpm -C frontend test -- --run || exit 1
-fi
+uv run pytest

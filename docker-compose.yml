@@ -1,13 +1,7 @@
 services:
-  db:
-    image: postgres:16
-    environment:
-      POSTGRES_USER: wikifi
-      POSTGRES_PASSWORD: wikifi
-      POSTGRES_DB: wikifi
-    ports:
-      - "5432:5432"
+  wikifi:
+    build: .
+    working_dir: /workspace
     volumes:
-      - db_data:/var/lib/postgresql/data
-volumes:
-  db_data: {}
+      - .:/workspace
+    command: ["version"]

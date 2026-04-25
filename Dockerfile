@@ -1,11 +1,13 @@
-# Multi-stage build placeholder
-FROM python:3.12-slim AS backend
-WORKDIR /app
-COPY backend /app/backend
+FROM python:3.12-slim
 
-FROM node:22-slim AS frontend
 WORKDIR /app
-COPY frontend /app/frontend
 
-FROM debian:stable-slim AS runtime
-CMD ["/bin/sh", "-c", "echo Configure services in docker-compose.yml"]
+RUN pip install --no-cache-dir uv
+
+COPY pyproject.toml uv.lock README.md VISION.md ./
+COPY wikifi ./wikifi
+
+RUN uv sync --frozen --no-dev
+
+ENTRYPOINT ["uv", "run", "wikifi"]
+CMD ["--help"]

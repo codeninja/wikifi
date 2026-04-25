@@ -1,9 +1,5 @@
 #!/usr/bin/env bash
 set -euo pipefail
-if [ -f backend/pyproject.toml ]; then
-  uv run ruff format backend || true
-  uv run ruff check backend || true
-fi
-if [ -f frontend/package.json ]; then
-  pnpm -C frontend run lint || true
-fi
+uv run ruff check --fix .
+uv run ruff format .
+git add -u
