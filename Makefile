@@ -1,4 +1,4 @@
-.PHONY: test lint format coverage hooks clean
+.PHONY: test lint format coverage hooks init walk clean
 
 # --- testing -----------------------------------------------------------------
 test:
@@ -6,6 +6,12 @@ test:
 
 coverage:
 	uv run pytest --cov=wikifi --cov-report=term-missing
+
+init:
+	uv run wikifi init .
+
+walk:
+	uv run wikifi walk .
 
 # --- lint / format -----------------------------------------------------------
 lint:
