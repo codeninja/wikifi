@@ -30,17 +30,20 @@ Full source of truth: `CODE-FORMAT.md` in this repo (mirrors the user's PROJECT.
 - **Every feature ships with tests.** Coverage target **≥85%**.
 - Pre-commit hook should run lint with auto fix.
 - Pre-push hook should run the full test suite and block on failure.
-- **Default LLM runtime: local Ollama via the official `ollama` Python client.** Provider abstraction lives at `wikifi/providers/`; add new backends by implementing the `LLMProvider` protocol. The Anthropic Agent SDK is intentionally not used here — it wraps the Claude CLI, only reaches Ollama through an undocumented proxy path, and ships Claude-tuned prompts. Adding a hosted-Anthropic provider later is fair game; if/when that happens, invoke the `claude-api` skill while writing it.
+- **Local LLM by default.** wikifi must run against a local LLM out of the box, with no cloud dependency required to wikify a codebase. Hosted backends are valid additional options, not the default. If a hosted-Anthropic backend is ever added, invoke the `claude-api` skill while writing it.
+- **Provider abstraction is mandatory.** The LLM backend must be reached through an abstraction layer. Swapping the backend (local Ollama, hosted Anthropic, hosted OpenAI, custom) must not require changes outside the provider boundary.
+- **Reasoning quality preferred over walk speed.** When the chosen model exposes a thinking / reasoning level, the agent runs at the highest available setting. Lower levels are opt-in only.
 - For any Python UI surface, mount **NiceGUI on FastAPI**. Reserve React for genuine public-facing SPAs. (Not relevant in v1 — wikifi is a CLI library.)
 - For any JS surface, use **`pnpm`** as the package manager.
 
 ## Code rules
 Surface before deviating.
 
-- **wikifi is a CLI library, not a FastAPI app.** The router auto-discovery rule from the project template doesn't apply here — there is no `main.py` and no API surface. The CLI entry point is declared via `[project.scripts] wikifi = "wikifi.cli:main"` in `pyproject.toml`.
-- **Two-stage walk is the architecture.** Stage 1 is one LLM introspection call over the tree summary; Stage 2 is deterministic per-file extraction; Stage 3 is per-section synthesis. Keep new functionality inside one of those stages or behind a clearly named module — don't reintroduce LLM agency in the file walk.
+- **wikifi is a CLI library, not a FastAPI app.** The router auto-discovery rule from the project template doesn't apply here — there is no API surface. The CLI entry point is declared via `[project.scripts]` in `pyproject.toml`.
+- **The walk has four responsibilities, in order.** (1) Introspect the repository before parsing — the agent reviews the root structure and decides scope. (2) Filter unstructured or near-empty input before extraction — empty files must never reach the agent or stall the walk. (3) Extract from each in-scope file deterministically against the primary capture sections in `VISION.md`. (4) Synthesize sections from the aggregate, with derivative sections (personas, user stories, diagrams) produced *after* primary content is complete, never inferred from a single file. Don't reintroduce LLM agency in the file walk itself.
+- **Feature extraction only.** wikifi describes what the legacy system does. It does not transform the source into the shape of any target architecture, target language, or target framework — that work is for the migration team consuming the wiki.
+- **Wiki layout is at the implementor's discretion.** The on-disk shape inside `.wikifi/` (one file per section, nested taxonomy, rolled-up parents, …) is not prescribed. The contract is the *content* the wiki conveys, defined in `VISION.md`.
 - **Import from actual modules.** Keep `__init__.py` files free of re-exports.
-- **Pydantic schemas are the contract.** Every LLM call returns through `provider.complete_json(..., schema=...)` so structure-drift surfaces as validation errors at the call site.
 - **Keep `.env.example` placeholder-only.** Real values stay in `.env` (gitignored) or the secrets manager.
 
 ## Git workflow
