@@ -20,21 +20,41 @@ Core business domains, bounded contexts, and their relationships.
 
 ### Evidence-Based Findings
 
-- Main participates in the system's automated knowledge workflow.
-- Aggregation participates in the system's automated knowledge workflow.
+- CLI Application Execution
+- Automated Knowledge Translation: Core responsibility to transform source evidence into migration-ready system intent.
+- Repository Introspection and Curation: Supporting role to discover and filter production-relevant source evidence.
+- Semantic Extraction and Analysis: Core responsibility to turn source artifacts into domain knowledge notes.
+- Information Aggregation and Synthesis: Core responsibility to compose coherent wiki sections from extracted notes.
+- Pipeline Orchestration and Lifecycle: Supporting role to control stage order, workspace state, and execution reporting.
+- External Intelligence Integration: Generalized role to isolate reasoning backend interaction behind a provider boundary.
 - Cli participates in the system's automated knowledge workflow.
-- Config participates in the system's automated knowledge workflow.
-- Constants participates in the system's automated knowledge workflow.
-- Derivation participates in the system's automated knowledge workflow.
-- Extraction participates in the system's automated knowledge workflow.
-- Introspection participates in the system's automated knowledge workflow.
-- Models participates in the system's automated knowledge workflow.
-- Orchestrator participates in the system's automated knowledge workflow.
-- Providers participates in the system's automated knowledge workflow.
-- Reporting participates in the system's automated knowledge workflow.
-- Text participates in the system's automated knowledge workflow.
-- Traversal participates in the system's automated knowledge workflow.
-- Workspace participates in the system's automated knowledge workflow.
+- Configuration Management
+- System Initialization
+- Code repository analysis
+- Domain knowledge extraction
+- Documentation aggregation
+- Documentation Generation
+- Knowledge Synthesis
+- Repository Analysis
+- Participates in the system's automated knowledge extraction and migration preparation workflow.
+- Static Code Assessment
+- Language Detection
+- File Analysis
+- Knowledge Extraction
+- Workspace Management
+- Pipeline Orchestration
+- Content Processing Pipeline
+- Execution Orchestration
+- LLM Interaction
+- Provider Abstraction
+- Pipeline Execution Reporting
+- Data Serialization
+- Text Processing
+- Formatting
+- Data Normalization
+- File System Traversal
+- Source Code Analysis
+- Artifact Filtering
 
 ### Gap Declaration
 - No notable manifest or documentation files were present for structural routing.

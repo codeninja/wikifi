@@ -10,7 +10,7 @@ Derived from the aggregate primary wiki, not from any single source artifact.
 
 - Needs a fast, traceable map of system purpose, source boundaries, and domain behavior.
 - Uses generated sections to understand production behavior without reverse-engineering every file.
-- Depends on extracted capabilities such as Main defines internal behavior without public source-level entry points., Aggregation exposes behavior for aggregate sections, node id., Cli exposes behavior for main..
+- Depends on extracted capabilities such as Invoke the main CLI routine., Handle process exit with appropriate status codes., Given a repository with mixed source and non-source artifacts, when wikifi walks the repository through the configured source boundary, then it produces domain-focused documentation from included production artifacts..
 
 ### Technical Writer and System Architect
 
@@ -22,11 +22,11 @@ Derived from the aggregate primary wiki, not from any single source artifact.
 
 - Needs deterministic repository assessment, pipeline health metrics, and comparable outputs.
 - Uses execution reports to verify readiness across unfamiliar or mixed-paradigm repositories.
-- Reviews dependency signals such as Aggregation references external or host-provided services through an abstract boundary., Config references external or host-provided services through an abstract boundary., Constants references external or host-provided services through an abstract boundary..
+- Reviews dependency signals such as wikifi.cli module, No concrete third-party or infrastructure dependencies were detected inside the production source boundary., Authentication, rate limiting, and provider-side quota behavior are not inferable unless source evidence states them..
 
 ### Gap Declaration
 
 Role-based authorization, access controls, and persona-specific processing presets are not defined by source evidence.
 
-Primary context size used for derivation: 20075 characters.
+Primary context size used for derivation: 38270 characters.
 

@@ -11,7 +11,7 @@ Generated only after introspection, extraction, aggregation, and derivation comp
 | Metric | Value |
 | --- | --- |
 | Completion status | completed |
-| Provider status | provider degraded; deterministic fallback used for 15 file(s) |
+| Provider status | provider ollama completed extraction |
 | Selected source files | 15 |
 | Extraction notes | 15 |
 | Primary sections written | 9/9 with 0 empty |
@@ -21,10 +21,10 @@ Generated only after introspection, extraction, aggregation, and derivation comp
 
 | Stage | Status |
 | --- | --- |
-| introspection | {'duration_seconds': 0.0023, 'selected_file_count': 15, 'skipped_file_count': 33} |
-| extraction | {'duration_seconds': 15.1272, 'note_count': 15, 'provider_status': 'provider degraded; deterministic fallback used for 15 file(s)'} |
-| aggregation | {'duration_seconds': 0.0018, 'successful_writes': 9, 'empty_section_count': 0} |
-| derivation | {'duration_seconds': 0.0007, 'successful_writes': 3, 'empty_section_count': 0} |
+| introspection | {'duration_seconds': 0.0025, 'selected_file_count': 15, 'skipped_file_count': 33} |
+| extraction | {'duration_seconds': 823.6285, 'note_count': 15, 'provider_status': 'provider ollama completed extraction'} |
+| aggregation | {'duration_seconds': 0.0032, 'successful_writes': 9, 'empty_section_count': 0} |
+| derivation | {'duration_seconds': 0.0011, 'successful_writes': 3, 'empty_section_count': 0} |
 
 ### Skipped Input Counts
 

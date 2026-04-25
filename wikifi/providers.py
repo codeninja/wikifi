@@ -43,6 +43,7 @@ class OllamaProvider(LLMProvider):
             "system": system,
             "prompt": prompt,
             "stream": False,
+            "think": _think_value(self.settings.think),
             "options": {"temperature": 0},
         }
         return self._request(payload)
@@ -54,6 +55,7 @@ class OllamaProvider(LLMProvider):
             "prompt": f"{prompt}\n\nReturn only JSON matching this schema:\n{json.dumps(schema, sort_keys=True)}",
             "stream": False,
             "format": "json",
+            "think": _think_value(self.settings.think),
             "options": {"temperature": 0},
         }
         response = self._request(payload)
@@ -83,10 +85,19 @@ class OllamaProvider(LLMProvider):
         except json.JSONDecodeError as exc:
             raise ProviderError(f"Ollama provider returned invalid response JSON: {exc}") from exc
 
-        text = parsed.get("response")
+        text = parsed.get("response") or parsed.get("thinking")
         if not isinstance(text, str):
             raise ProviderError("Ollama provider response did not include a text response.")
         return text.strip()
+
+
+def _think_value(value: str) -> str | bool:
+    lowered = value.strip().lower()
+    if lowered in {"true", "yes", "1", "on"}:
+        return True
+    if lowered in {"false", "no", "0", "off"}:
+        return False
+    return lowered or "high"
 
 
 def build_provider(settings: Settings) -> LLMProvider:

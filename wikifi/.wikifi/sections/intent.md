@@ -9,21 +9,53 @@ A system centered on main, aggregation, cli, config, constants.
 
 ### Problem Space
 
-- Main supports the system's intent by handling main, py, wikifi, raise, SystemExit in domain-facing workflow terms.
-- Aggregation supports the system's intent by handling aggregation, py, annotations, collections, defaultdict, pathlib in domain-facing workflow terms.
+- Provide a standard entry point for running the CLI tool.
+- Delegate execution to the core CLI logic defined in wikifi.cli.
+- Purpose: Inferred from assessment data.
+- Problem Space: Derived from extracted findings.
+- Scope Rationale: Classification rationale from assessment.
+- Operational Boundary: Scope description from assessment.
 - Cli supports the system's intent by handling cli, py, annotations, command interface, structured data, pathlib in domain-facing workflow terms.
-- Config supports the system's intent by handling config, py, annotations, tomllib, dataclasses, replace in domain-facing workflow terms.
-- Constants supports the system's intent by handling constants, py, annotations, dataclasses, structured record, SUPPORTED PROVIDERS in domain-facing workflow terms.
-- Derivation supports the system's intent by handling derivation, py, annotations, wikifi, constants, DERIVATIVE SECTIONS in domain-facing workflow terms.
-- Extraction supports the system's intent by handling extraction, py, annotations, structured data, pathlib, Path in domain-facing workflow terms.
-- Introspection supports the system's intent by handling introspection, py, annotations, pathlib, Path, wikifi in domain-facing workflow terms.
-- Models supports the system's intent by handling models, py, annotations, dataclasses, asdict, structured record in domain-facing workflow terms.
-- Orchestrator supports the system's intent by handling orchestrator, py, annotations, pathlib, Path, time in domain-facing workflow terms.
-- Providers supports the system's intent by handling providers, py, annotations, structured data, urllib, error in domain-facing workflow terms.
-- Reporting supports the system's intent by handling reporting, py, annotations, structured data, dataclasses, asdict in domain-facing workflow terms.
-- Text supports the system's intent by handling text, py, annotations, collections, Iterable, IMPLEMENTATION WORDS in domain-facing workflow terms.
-- Traversal supports the system's intent by handling traversal, py, annotations, fnmatch, hashlib, collections in domain-facing workflow terms.
-- Workspace supports the system's intent by handling workspace, py, annotations, shutil, pathlib, Path in domain-facing workflow terms.
+- Load system settings from environment variables and local local configuration files
+- Validate configuration values against business rules
+- Coerce raw configuration values to appropriate data types
+- Filter file systems to identify relevant source code and structural files while excluding noise (caches, binaries, lock files, tests).
+- Define a structured schema for generating or aggregating documentation sections (domains, intent, capabilities, etc.).
+- Establish a processing pipeline order (introspection, extraction, aggregation, derivation).
+- Generate technology-agnostic derivative documentation
+- Synthesize user personas and stories from extracted capabilities
+- Create abstract behavioral diagrams
+- Preserve source traceability and explicit gap declarations
+- Supports the system's intent by handling source analysis, provider orchestration, fallback reasoning, and evidence preservation in domain-facing workflow terms.
+- Infer repository purpose from structure and documentation
+- Identify primary programming languages based on file extensions
+- Generate a structured assessment of repository scope and characteristics
+- Analyze source code repositories to extract domain knowledge
+- Structure extracted information into a wiki-like format
+- Track pipeline execution metrics and gaps
+- Manage configuration for AI provider interactions
+- Automate the end-to-end processing of source files into structured content
+- Provide measurable execution metrics for each pipeline stage
+- Ensure consistent workspace setup and configuration validation
+- Handle errors gracefully with specific exit codes
+- Abstract LLM provider interactions to allow for potential future provider support
+- Implement specific integration with local reasoning service API
+- Ensure structured structured data output from LLMs
+- Validate provider configuration against supported list
+- Provide visibility into pipeline health and stage completion
+- Persist extraction notes for audit or review
+- Generate readiness statements based on content emptiness checks
+- Provide reusable text manipulation utilities
+- Enable consistent formatting of text outputs
+- Translate technical terminology into domain-agnostic language
+- Identify production source files within a repository
+- Exclude test files, binary files, and structural artifacts
+- Aggregate directory metadata and file statistics
+- Provide detailed reasons for file exclusion
+- Initialize and maintain a structured workspace for documentation artifacts
+- Provide default configuration and ignore patterns
+- Reset intermediate processing data
+- Document workspace structure via README
 
 ### Scope Rationale
 

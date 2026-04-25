@@ -49,3 +49,16 @@ def test_ollama_provider_parses_text_and_json_responses(monkeypatch: pytest.Monk
     assert parsed == {"role_summary": "Analyzes intent."}
     assert len(requests) == 2
     assert requests[0][1] == 7
+    assert json.loads(requests[0][0].data.decode("utf-8"))["think"] == "high"
+
+
+def test_ollama_provider_uses_thinking_field_for_thinking_models(monkeypatch: pytest.MonkeyPatch) -> None:
+    def fake_urlopen(request, timeout):
+        return FakeResponse({"response": "", "thinking": json.dumps({"role_summary": "Structured thinking output."})})
+
+    monkeypatch.setattr("wikifi.providers.urllib.request.urlopen", fake_urlopen)
+    provider = OllamaProvider(Settings(think="high"))
+
+    parsed = provider.generate_json(system="system", prompt="prompt", schema={"type": "object"})
+
+    assert parsed == {"role_summary": "Structured thinking output."}

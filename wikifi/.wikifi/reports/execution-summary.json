@@ -6,6 +6,7 @@
       "Domains and Subdomains includes explicit gap declarations.",
       "Intent and Problem Space includes explicit gap declarations.",
       "External-System Dependencies includes explicit gap declarations.",
+      "Cross-Cutting Concerns includes explicit gap declarations.",
       "Hard Specifications includes explicit gap declarations.",
       "Inline Schematics includes explicit gap declarations."
     ],
@@ -65,10 +66,10 @@
       "traversal.py",
       "workspace.py"
     ],
-    "total_size_bytes": 73349
+    "total_size_bytes": 73732
   },
   "extraction_note_count": 15,
-  "finished_at": "2026-04-25T15:27:27+00:00",
+  "finished_at": "2026-04-25T16:04:56+00:00",
   "introspection_assessment": {
     "classification_rationale": "The assessment is derived from repository structure, notable manifests, extension distribution, and immutable path filters before any source content is parsed.",
     "inferred_purpose": "A system centered on main, aggregation, cli, config, constants.",
@@ -80,25 +81,25 @@
     ],
     "scope_description": "Selected 15 production source files from 16 traversable files. Documentation, manifests, tests, dependency caches, generated assets, and workspace artifacts were used only for routing or excluded from extraction."
   },
-  "provider_status": "provider degraded; deterministic fallback used for 15 file(s)",
+  "provider_status": "provider ollama completed extraction",
   "stage_metrics": {
     "aggregation": {
-      "duration_seconds": 0.0018,
+      "duration_seconds": 0.0032,
       "empty_section_count": 0,
       "successful_writes": 9
     },
     "derivation": {
-      "duration_seconds": 0.0007,
+      "duration_seconds": 0.0011,
       "empty_section_count": 0,
       "successful_writes": 3
     },
     "extraction": {
-      "duration_seconds": 15.1272,
+      "duration_seconds": 823.6285,
       "note_count": 15,
-      "provider_status": "provider degraded; deterministic fallback used for 15 file(s)"
+      "provider_status": "provider ollama completed extraction"
     },
     "introspection": {
-      "duration_seconds": 0.0023,
+      "duration_seconds": 0.0025,
       "selected_file_count": 15,
       "skipped_file_count": 33
     },
@@ -115,7 +116,7 @@
     "aggregation",
     "derivation"
   ],
-  "started_at": "2026-04-25T15:27:13+00:00",
+  "started_at": "2026-04-25T15:51:56+00:00",
   "workspace": {
     "config_file": "/home/codeninja/wikifi/.claude/worktrees/benchmark-gpt-5.5/wikifi/.wikifi/config.toml",
     "derivatives_dir": "/home/codeninja/wikifi/.claude/worktrees/benchmark-gpt-5.5/wikifi/.wikifi/derivatives",
