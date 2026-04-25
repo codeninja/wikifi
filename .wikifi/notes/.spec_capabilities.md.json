@@ -1,0 +1,6 @@
+{
+  "timestamp": "2026-04-25T13:10:41.599163",
+  "file_path": ".spec/capabilities.md",
+  "role_summary": "Automated documentation engine that transforms raw source artifacts into a synchronized, living knowledge base by extracting business logic and functional capabilities, thereby reducing documentation debt, standardizing terminology, and accelerating cross-team onboarding through domain-focused analysis.",
+  "finding": "The system employs a deterministic four-stage analysis pipeline to translate technical implementations into domain-centric concepts, generating structured wiki sections alongside cross-cutting derivatives such as user personas, behavioral stories, and interaction diagrams. It ensures quality and transparency through explicit gap declarations to prevent speculative content, dual-mode output support (schema-validated structure and free-form narrative), and timestamped provenance for full traceability from documentation back to source artifacts."
+}

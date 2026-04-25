@@ -1,0 +1,6 @@
+{
+  "timestamp": "2026-04-25T13:12:16.207319",
+  "file_path": ".spec/hard_specifications.md",
+  "role_summary": "Defines the immutable operational constraints, processing lifecycle, and quality standards for a documentation generation pipeline. It establishes non-negotiable rules regarding data safety, execution order, output semantics, configuration hierarchy, and backward compatibility.",
+  "finding": "Key functional discoveries include:\n- **Strict Pipeline Sequence:** Execution is locked to a mandatory four-stage order: Introspection → Extraction → Aggregation → Derivation.\n- **Robust Data Handling:** Processing is deterministic and non-destructive; the system is fault-tolerant, logging and skipping invalid inputs without halting.\n- **Semantic Output Requirements:** Outputs must be technology-agnostic narratives structured with 'Given/When/Then' for behavioral descriptions, explicitly reporting gaps or contradictions rather than fabricating content.\n- **Configuration & Compatibility:** Local configuration overrides environment variables, the output directory schema is immutable to ensure backward compatibility, and intermediate artifacts are isolated from version control."
+}

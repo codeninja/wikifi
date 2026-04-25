@@ -1,0 +1,6 @@
+{
+  "timestamp": "2026-04-25T13:07:56.533794",
+  "file_path": "wikifi/provider/factory.py",
+  "role_summary": "Configuration-driven factory responsible for instantiating and returning the appropriate Large Language Model (LLM) service client based on system settings.",
+  "finding": "Centralizes provider selection logic to decouple downstream application code from specific AI backend implementations. Enforces a fail-fast validation approach for unconfigured or unsupported providers and establishes a clear extension point for integrating additional LLM services while mapping global configuration parameters to provider-specific initialization requirements."
+}

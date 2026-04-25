@@ -1,0 +1,6 @@
+{
+  "timestamp": "2026-04-25T13:17:30.000586",
+  "file_path": "tests/conftest.py",
+  "role_summary": "Test infrastructure component that simulates an external AI language model service within a code analysis domain. It provides deterministic responses to validate automated repository and source file evaluation workflows without requiring live API access.",
+  "finding": "The system relies on AI to automatically parse and classify software projects, extracting structured insights such as primary programming languages, inferred project purpose, classification rationale, and notable files. The test harness ensures these AI-driven analytical pipelines are evaluated using predictable, controlled outputs."
+}

@@ -75,10 +75,20 @@ class Extractor:
         try:
             response = await self.provider.generate(prompt, json_mode=True)
             data = json.loads(response)
+            
+            # Ensure fields are strings
+            role_summary = data["role_summary"]
+            if isinstance(role_summary, list):
+                role_summary = "\n".join(role_summary)
+            
+            finding = data["finding"]
+            if isinstance(finding, list):
+                finding = "\n".join(finding)
+                
             return ExtractionNote(
                 file_path=relative_path,
-                role_summary=data["role_summary"],
-                finding=data["finding"]
+                role_summary=role_summary,
+                finding=finding
             )
         except Exception as e:
             logger.error(f"Failed to extract note for {relative_path}: {e}")

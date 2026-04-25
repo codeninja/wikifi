@@ -1,0 +1,6 @@
+{
+  "timestamp": "2026-04-25T13:00:58.691003",
+  "file_path": "VISION.md",
+  "role_summary": "Product vision and strategic requirements specification that defines the purpose, functional boundaries, operational constraints, and success criteria for a legacy code analysis tool. It serves as the authoritative blueprint guiding the design and development of an AI-driven domain knowledge extraction engine.",
+  "finding": "The system is designed to decouple business intent from technical implementation by automatically extracting and synthesizing legacy code into a technology-agnostic wiki. It operates via a two-phase process: direct extraction of core domains, entities, integrations, and specifications from source files, followed by aggregate synthesis of user personas, user stories, and high-level structural views. This enables development teams to completely rebuild the system in a modern architecture using only the generated documentation, without referencing the original codebase."
+}

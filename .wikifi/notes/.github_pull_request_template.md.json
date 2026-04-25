@@ -1,0 +1,6 @@
+{
+  "timestamp": "2026-04-25T13:08:17.859863",
+  "file_path": ".github/pull_request_template.md",
+  "role_summary": "Standardizes the code contribution and review workflow by enforcing consistent documentation, traceability, and quality assurance practices for all submitted changes.",
+  "finding": "The system enforces a structured change management process that requires contributors to explicitly link changes to tracked issues, document modifications and testing procedures, and validate compliance with predefined quality gates (testing, code quality checks, and documentation updates) prior to integration."
+}

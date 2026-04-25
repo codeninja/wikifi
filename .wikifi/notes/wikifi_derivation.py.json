@@ -1,0 +1,6 @@
+{
+  "timestamp": "2026-04-25T13:05:01.836103",
+  "file_path": "wikifi/derivation.py",
+  "role_summary": "Artifacts synthesis module that transforms primary documentation and an inferred system purpose into structured requirements and design deliverables, including user personas, user stories, and system diagrams.",
+  "finding": "The derivation logic enforces a strict integrity policy requiring explicit declarations for missing information rather than fabrication, while mandating technology-agnostic outputs formatted according to specific domain standards (e.g., Gherkin for stories, Mermaid for diagrams) and constrained by an assessed system purpose."
+}

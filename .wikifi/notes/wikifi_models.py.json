@@ -1,0 +1,6 @@
+{
+  "timestamp": "2026-04-25T13:06:47.574974",
+  "file_path": "wikifi/models.py",
+  "role_summary": "Defines the core data schema for an automated project introspection, analysis, and documentation pipeline, modeling directory metadata, assessment results, documentation outputs, execution telemetry, and workspace organization.",
+  "finding": "The system is designed to statically analyze project directories to infer technical composition and intended purpose, generate structured documentation artifacts, track multi-stage processing progress and success metrics, and manage a standardized workspace for configuration, inputs, and generated outputs."
+}

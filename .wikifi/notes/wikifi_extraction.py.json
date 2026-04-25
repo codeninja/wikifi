@@ -1,0 +1,6 @@
+{
+  "timestamp": "2026-04-25T13:04:39.027289",
+  "file_path": "wikifi/extraction.py",
+  "role_summary": "Serves as a structured code analysis module that translates repository summaries and individual file contents into high-level system purpose, technology context, and functional responsibilities.",
+  "finding": "Implements a two-tier inspection workflow: a directory-level analyzer that infers overall project intent and identifies key architectural artifacts, and a file-level parser that extracts business logic and domain roles while intentionally filtering out implementation-specific details. The module is designed for reliable integration into a larger code intelligence pipeline, featuring configurable content boundaries, structured output validation, and graceful fallback handling for uninterrupted processing."
+}

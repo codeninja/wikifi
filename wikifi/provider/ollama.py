@@ -15,18 +15,22 @@ class OllamaProvider(LLMProvider):
             "model": self.model,
             "prompt": prompt,
             "stream": False,
-            "format": "json" if json_mode else None,
         }
         if system_prompt:
             payload["system"] = system_prompt
         
-        # Ollama doesn't have a direct "thinking level" but we can adjust options if needed
-        # For now, we assume the model handles it or we can pass num_predict etc.
-        
         async with httpx.AsyncClient(timeout=300.0) as client:
             response = await client.post(url, json=payload)
             response.raise_for_status()
-            return response.json()["response"]
+            text = response.json()["response"]
+            
+            if json_mode:
+                # Basic attempt to extract JSON if embedded in markdown or other text
+                import re
+                match = re.search(r'\{.*\}', text, re.DOTALL)
+                if match:
+                    return match.group(0)
+            return text
 
     async def chat(self, messages: List[Dict[str, str]], json_mode: bool = False) -> str:
         url = f"{self.base_url}/api/chat"

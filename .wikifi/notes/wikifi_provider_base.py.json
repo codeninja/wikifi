@@ -1,0 +1,6 @@
+{
+  "timestamp": "2026-04-25T13:07:06.762061",
+  "file_path": "wikifi/provider/base.py",
+  "role_summary": "Defines the standardized interface/contract for integrating and abstracting external Large Language Model (LLM) providers within the system.",
+  "finding": "Establishes a provider-agnostic abstraction layer that standardizes AI interactions into two core modes: direct prompt generation and multi-turn conversational chat. Both modes enforce support for structured output (JSON mode) and asynchronous execution, enabling seamless swapping of underlying LLM backends while maintaining consistent system-level integration, predictable response formats, and non-blocking scalability."
+}

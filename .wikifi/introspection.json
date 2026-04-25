@@ -1,0 +1,16 @@
+{
+  "primary_languages": [
+    "Python"
+  ],
+  "inferred_purpose": "A Python-based project template or lightweight application designed for AI-assisted development and containerized deployment. It likely serves as a structured starter kit for building automated workflows, data pipelines, or AI agents, emphasizing reproducibility, modern DevOps practices, and LLM-guided code maintenance.",
+  "classification_rationale": "Python is clearly the primary language, evidenced by 17 .py files and the presence of pyproject.toml for dependency and build configuration. The inclusion of Dockerfile, docker-compose.yml, and Makefile indicates a standardized, container-ready development environment with build automation. CLAUDE.md and VISION.md are distinctive markers: the former is commonly used to store project context and instructions for Anthropic's Claude AI, while the latter suggests intentional architectural planning. The relatively small repository size (~200KB, 44 files) and documentation-heavy structure point to a focused boilerplate, agent framework, or early-stage utility rather than a large-scale application.",
+  "notable_files": [
+    "pyproject.toml",
+    "Dockerfile",
+    "docker-compose.yml",
+    "Makefile",
+    "CLAUDE.md",
+    "VISION.md",
+    "README.md"
+  ]
+}

@@ -1,0 +1,6 @@
+{
+  "timestamp": "2026-04-25T13:01:50.253966",
+  "file_path": "README.md",
+  "role_summary": "System documentation generator and migration readiness assistant",
+  "finding": "Automates the extraction of architectural and functional context from source code to produce standardized, technology-agnostic documentation, specifically designed to de-risk and streamline system migration and modernization efforts."
+}

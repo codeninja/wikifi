@@ -1,0 +1,6 @@
+{
+  "timestamp": "2026-04-25T13:12:42.132030",
+  "file_path": ".spec/cross_cutting.md",
+  "role_summary": "Defines the architectural cross-cutting concerns for a content generation pipeline, establishing standards for observability, data integrity, traceability, deterministic execution, state isolation, and operational resilience, while identifying a gap in security access controls.",
+  "finding": "The system prioritizes high-fidelity content generation by enforcing evidence-based synthesis, schema validation, and traceability to source artifacts, supported by idempotent state management and configurable guardrails that balance processing depth with resource efficiency; however, authentication and authorization requirements remain undefined."
+}

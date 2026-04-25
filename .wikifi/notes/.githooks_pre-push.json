@@ -1,0 +1,6 @@
+{
+  "timestamp": "2026-04-25T13:16:07.357755",
+  "file_path": ".githooks/pre-push",
+  "role_summary": "Local repository quality gate that enforces automated testing prior to remote code promotion",
+  "finding": "Implements a mandatory pre-push validation workflow that conditionally executes test suites for both backend and frontend components, blocking the push operation if any tests fail to ensure baseline system stability and code quality."
+}

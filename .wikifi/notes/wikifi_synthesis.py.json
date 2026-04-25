@@ -1,0 +1,6 @@
+{
+  "timestamp": "2026-04-25T13:05:51.552437",
+  "file_path": "wikifi/synthesis.py",
+  "role_summary": "Orchestrates the generation of structured, domain-focused documentation by aggregating repository introspection data and granular extraction notes, translating technical observations into technology-agnostic narratives using large language models.",
+  "finding": "The system establishes a canonical documentation framework centered on eight core domain areas: DDD modeling, intent and problem space, solution capabilities, dependency mapping, integration flows, cross-cutting concerns, entity structures, and hard specifications. It implements strict synthesis rules to guarantee technology independence, factual accuracy by prohibiting content fabrication, and behavioral clarity through Given/When/Then formatting, ensuring the output serves as a coherent, user-facing domain artifact derived from multi-level code analysis."
+}

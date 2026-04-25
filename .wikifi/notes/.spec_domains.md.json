@@ -1,0 +1,6 @@
+{
+  "timestamp": "2026-04-25T13:14:51.787628",
+  "file_path": ".spec/domains.md",
+  "role_summary": "Defines the strategic domain model and bounded contexts for the Automated Knowledge Translation system, outlining the unidirectional pipeline architecture, subdomain responsibilities, state management strategy, and identified modeling gaps.",
+  "finding": "The system is designed as a deterministic, stage-gated pipeline that transforms unstructured technical artifacts into structured business documentation through a sequence of introspection, semantic extraction, aggregation, and orchestration. Key functional attributes include technology-agnostic mapping of technical constructs to business concepts, support for incremental processing and auditability via persisted intermediate states, and the use of external intelligence services as a decoupled capability to enhance semantic analysis without dictating pipeline flow."
+}
