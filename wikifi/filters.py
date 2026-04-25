@@ -11,29 +11,37 @@ from pathspec.patterns import GitWildMatchPattern
 
 # Permanently-excluded directories. Hard-spec: VCS metadata, dependency caches,
 # build artifacts, and tool-specific directories never enter traversal.
+# Per VISION.md scope boundary, test infrastructure and dev tooling
+# directories are also excluded — wikifi targets production intent.
 HARD_EXCLUDED_DIRS: frozenset[str] = frozenset(
     {
+        # VCS metadata
         ".git",
         ".hg",
         ".svn",
         ".bzr",
+        # Editor/IDE
         ".idea",
         ".vscode",
+        # Tool caches
         ".ruff_cache",
         ".pytest_cache",
         ".mypy_cache",
         ".tox",
         ".nox",
+        # Python envs
         ".venv",
         "venv",
         "env",
         ".env",
         ".uv",
         "__pycache__",
+        # JS deps + caches
         "node_modules",
         ".next",
         ".nuxt",
         ".cache",
+        # Build artefacts
         "dist",
         "build",
         "target",
@@ -43,10 +51,54 @@ HARD_EXCLUDED_DIRS: frozenset[str] = frozenset(
         "coverage",
         ".coverage",
         "htmlcov",
+        # Agent state / local config
         ".claude",
         ".wikifi",
+        # Repo plumbing — not production intent
+        ".github",
+        ".githooks",
+        ".gitlab",
+        ".circleci",
+        ".azure-pipelines",
         # Spec mirror — never feed our own benchmark spec back to the LLM.
         ".spec",
+        # Tests — per scope boundary, unless something is truly remarkable.
+        "tests",
+        "test",
+        "__tests__",
+        "specs",
+        "spec",
+    }
+)
+
+# Files that should never enter the extraction pipeline regardless of
+# extension — lockfiles, generated artefacts, repo plumbing.
+HARD_EXCLUDED_FILES: frozenset[str] = frozenset(
+    {
+        # Worktree pointer (looks like a file, not a dir)
+        ".git",
+        ".gitignore",
+        ".gitattributes",
+        ".gitmodules",
+        ".dockerignore",
+        ".editorconfig",
+        # Lockfiles — high size, zero business intent
+        "uv.lock",
+        "poetry.lock",
+        "Pipfile.lock",
+        "package-lock.json",
+        "pnpm-lock.yaml",
+        "yarn.lock",
+        "Cargo.lock",
+        "Gemfile.lock",
+        "composer.lock",
+        "go.sum",
+        # Build / CI tooling — explicitly out of scope per spec.
+        "Makefile",
+        "Dockerfile",
+        "docker-compose.yml",
+        "docker-compose.yaml",
+        "Procfile",
     }
 )
 
@@ -246,6 +298,10 @@ def scan(
                 continue
 
             report.files_seen += 1
+
+            if entry.name in HARD_EXCLUDED_FILES:
+                report.skipped_excluded.append(rel)
+                continue
 
             if _is_ignored(rel):
                 report.skipped_excluded.append(rel)
