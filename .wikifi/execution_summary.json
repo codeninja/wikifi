@@ -1,0 +1,25 @@
+{
+  "stage_metrics": {
+    "introspection": {
+      "file_count": 40,
+      "total_size": 329859,
+      "manifest_presence": true,
+      "primary_languages": [
+        "Python"
+      ],
+      "inferred_purpose": "The repository is a Python library designed to analyze a codebase and generate a markdown wiki documentation of its structure and functionality."
+    },
+    "extraction": {
+      "notes_extracted": 40
+    },
+    "aggregation": {
+      "successful_writes": 9,
+      "empty_section_count": 3
+    },
+    "derivation": {
+      "completed": true
+    }
+  },
+  "completion_status": "success",
+  "consolidated_findings": "Pipeline completed successfully. 40 notes extracted. 9 sections written."
+}

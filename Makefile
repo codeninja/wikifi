@@ -24,3 +24,9 @@ hooks:
 clean:
 	rm -rf .pytest_cache .ruff_cache .coverage htmlcov dist build
 	find . -type d -name __pycache__ -prune -exec rm -rf {} +
+
+init:
+	uv run wikifi init
+
+walk:
+	uv run wikifi walk

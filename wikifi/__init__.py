@@ -1,0 +1,3 @@
+"""
+wikifi package
+"""
