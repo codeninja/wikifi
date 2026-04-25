@@ -1,64 +1,101 @@
-# wikify
+# wikifi
 
-> A Python library that walks a codebase and produces a **technology-agnostic** markdown wiki describing the system in migration-ready terms.
+> A Python library and CLI that walks any codebase and produces a **technology-agnostic** markdown wiki of its intent — sized for a migration team to re-implement the system on a new stack from the wiki alone.
 
-For the *why* behind wikify and the design questions still to resolve, see [`VISION.md`](./VISION.md). For the development process, see [`CLAUDE.md`](./CLAUDE.md).
-
-> **Naming:** the repo directory is `wikifi`; the library and CLI are `wikify`. Use the names deliberately.
+For the *why*, see [`VISION.md`](./VISION.md). For the development process, see [`CLAUDE.md`](./CLAUDE.md).
 
 ## Status
-Pre-implementation. Architecture and CLI surface are sketched below; binding decisions live in `VISION.md` under "Open design questions."
+**v0.1 — `init` + `walk` shipping.** `ask` and `chat` come in a follow-up.
 
 ## Install & use
-Add wikify to a target project, then run `init` to bootstrap wikification of that project's source.
 
 ```bash
-uv add wikify
-uv run wikify init
+uv add wikifi
+uv run wikifi init    # scaffold .wikifi/ in the current project
+uv run wikifi walk    # populate every section by walking the source
+```
+
+The wiki lives at `<target>/.wikifi/` as one markdown file per capture section. Commit it alongside your code.
+
+## Runtime — local LLM by default
+
+wikifi runs on a local Ollama server with **`qwen3.6:27b`** out of the box. A small provider abstraction lives at `wikifi/providers/`, so swapping in another local or hosted backend is a one-class change. Anthropic's Claude Agent SDK is intentionally *not* used — it wraps the Claude CLI and only reaches Ollama through an undocumented proxy path inheriting Claude-tuned prompts; native [ollama-python](https://github.com/ollama/ollama-python) is a cleaner fit (structured output via JSON schema, native tool calling).
+
+Verify Ollama is up before running `walk`:
+
+```bash
+ollama serve            # if not already running
+ollama pull qwen3.6:27b
 ```
 
 ## CLI
 
-- `init` — one-time setup and configuration, including boundary-walker heuristics and wiki target
-- `walk` — the main entry point for walking a codebase and producing the wiki content
-- `ask` — natural language queries against the wiki content, with optional context injection from the target codebase
-- `chat` — an interactive REPL for iterative exploration of the wiki content and the target codebase
+| Command | Purpose |
+|---|---|
+| `wikifi init [target]` | Create `.wikifi/` (config, gitignore, empty section files) in `target` (default: CWD). Idempotent. |
+| `wikifi walk [target]` | Run the full Stage 1 → 2 → 3 pipeline against `target` (default: CWD). |
+| `wikifi --version` | Print the installed version. |
+| `wikifi --help` | Show usage. |
 
+`-v` / `--verbose` enables debug logging.
 
-## Code Structure
-Modularity is the key to successful parallel agent work. The codebase must follow our 
+## How `walk` works (two-stage)
 
+Because the target repo is unknown, wikifi runs an **LLM introspection pass** before walking — the model sees a directory summary plus manifest contents and decides which paths are production source worth analyzing. Once that's settled, parsing is **deterministic** — one LLM call per file, output validated against a strict JSON schema.
 
-## Architecture (sketch)
-- **`wikify/` package** — the library, with the CLI entry point exposed via `[project.scripts] wikify = "wikify.cli:main"` in `pyproject.toml`.
-- **Boundary walker** — detects logical units in the target tree using manifest files (`pyproject.toml`, `package.json`, `Cargo.toml`, …) and yields them in dependency-aware order.
-- **Agent-SDK orchestrator** — invokes the Anthropic Agent SDK per unit to produce the eight capture-scope sections defined in `VISION.md`.
-- **Wiki adapter** — writes the rendered output to the wiki target. Selection of target system follows the open design questions.
+1. **Stage 1 — Introspection.** Compress the tree (depth-limited summaries, file counts, extensions, manifest contents). Send to the model. Get back `{include, exclude, primary_languages, likely_purpose, rationale}`.
+2. **Stage 2 — Extraction.** Walk every file in the included paths (gitignore-aware, default excludes for VCS / build / cache dirs). For each file, ask the model what it contributes to each capture section. Append findings to `.wikifi/.notes/<section>.jsonl`.
+3. **Stage 3 — Aggregation.** For each section, hand the collected notes to the model and have it synthesize the final markdown body. Write to `.wikifi/<section>.md`.
+
+## Capture sections
+
+Personas · User Stories · Domains · Intent · Capabilities · External Dependencies · Integrations · Cross-Cutting Concerns · Entities · Hard Specifications · Diagrams. See [`VISION.md`](./VISION.md) and [`wikifi/sections.py`](./wikifi/sections.py).
 
 ## Tech stack
+
 - **Python 3.12+**, packaged with **`uv`**
-- **Anthropic Agent SDK** (`claude-agent-sdk`) — the engine for per-unit knowledge hydration
-- **`ruff`** as the single tool for lint and format
-- **`pytest` + `pytest-asyncio` + `pytest-cov`** for tests
-- **NiceGUI** if and when wikify gains a UI surface (mounted on FastAPI, no JS build step)
-- **Docker** + **Docker Compose** for the local stack
-- **GitHub Actions** for CI
+- **`ollama`** (official Python client) — JSON-schema structured output via `format=...`
+- **`pydantic` + `pydantic-settings`** — schemas and runtime config
+- **`typer`** + **`rich`** — CLI surface and pretty output
+- **`pathspec`** — gitignore-aware walking
+- **`ruff`** — lint and format
+- **`pytest` + `pytest-cov`** — tests, ≥85% coverage target
 
 ## Configuration
-wikify reads its configuration from environment variables (a `.env.example` lands once the surface is finalized):
 
-- `ANTHROPIC_API_KEY` — credentials for the Agent SDK
+All settings load from environment (or a `.env` file in the target's CWD) under the `WIKIFI_` prefix. Defaults in [`wikifi/config.py`](./wikifi/config.py).
 
-## Setup (development)
+| Variable | Default | Purpose |
+|---|---|---|
+| `WIKIFI_PROVIDER` | `ollama` | LLM provider id (only `ollama` in v1) |
+| `WIKIFI_MODEL` | `qwen3.6:27b` | Model identifier passed to the provider |
+| `WIKIFI_OLLAMA_HOST` | `http://localhost:11434` | Ollama HTTP endpoint |
+| `WIKIFI_REQUEST_TIMEOUT` | `300` | Per-request timeout, seconds |
+| `WIKIFI_MAX_FILE_BYTES` | `200000` | Skip files larger than this during extraction |
+| `WIKIFI_INTROSPECTION_DEPTH` | `3` | Tree depth fed to the introspection pass |
+
+## Development
+
 ```bash
-make hooks       # one-time: enables .githooks/ pre-commit + pre-push
+make hooks       # one-time: enable .githooks/ pre-commit + pre-push
 uv sync          # install dependencies
-make test        # run the test suite
-make dev         # start the local stack
+make test        # full test suite + coverage
+make lint        # ruff check + format check
+make format      # ruff auto-fix + format
 ```
 
-See [`CLAUDE.md`](./CLAUDE.md) for the full development process — commands, code rules, agent workflow, and debug escalation.
+See [`CLAUDE.md`](./CLAUDE.md) for the full development process.
 
 ## Distribution
-wikify ships as a Python library (PyPI / private index); it operates as a CLI invoked from a target project rather than as a server. 
 
+wikifi ships as a Python library (PyPI / private index). It operates as a CLI invoked from a target project rather than as a server.
+
+## Self-validation
+
+Run wikifi against this repo to produce its own `.wikifi/`:
+
+```bash
+uv run wikifi walk
+```
+
+The PR for v0.1 includes the `.wikifi/` directory generated by that command, so you can read what wikifi makes of itself before pointing it at your own project.

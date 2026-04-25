@@ -10,26 +10,37 @@ All assumptions must be clearly identified as (assumption) when you mention them
 ## Commands
 The Makefile is the universal entry point — agents and humans run the same commands.
 
-Direct invocations: `uv sync` · `uv add <pkg>` · `uv add --dev <pkg>` · `uv run <cmd>` · `uv run pytest` · `uv run ruff check --fix .` · `uv run ruff format .`
+```
+make hooks       # one-time: enable .githooks/ pre-commit + pre-push
+make test        # full test suite + coverage
+make lint        # ruff check + format check
+make format      # ruff auto-fix + format
+make init        # `uv run wikifi init` against this repo
+make walk        # `uv run wikifi walk` against this repo
+make coverage    # pytest --cov term-missing
+```
+
+Direct invocations: `uv sync` · `uv add <pkg>` · `uv add --dev <pkg>` · `uv run <cmd>` · `uv run pytest` · `uv run ruff check --fix .` · `uv run ruff format .` · `uv run wikifi <subcommand>`.
 
 ## Tooling rules
-Full source of truth: the user's PROJECT.md gist. Fetch it with `CODE-FORMAT.md`.
+Full source of truth: `CODE-FORMAT.md` in this repo (mirrors the user's PROJECT.md gist).
 
 - **`uv`** is the exclusive Python package manager. Commit `uv.lock`.
 - **`ruff`** is the single tool for lint and format — covers what flake8, isort, and black used to do.
 - **Every feature ships with tests.** Coverage target **≥85%**.
 - Pre-commit hook should run lint with auto fix.
 - Pre-push hook should run the full test suite and block on failure.
-- When touching the **Anthropic Agent SDK** or the Anthropic API, invoke the `claude-api` skill so we use current model IDs and caching patterns.
-- For any Python UI surface, mount **NiceGUI on FastAPI**. Reserve React for genuine public-facing SPAs.
+- **Default LLM runtime: local Ollama via the official `ollama` Python client.** Provider abstraction lives at `wikifi/providers/`; add new backends by implementing the `LLMProvider` protocol. The Anthropic Agent SDK is intentionally not used here — it wraps the Claude CLI, only reaches Ollama through an undocumented proxy path, and ships Claude-tuned prompts. Adding a hosted-Anthropic provider later is fair game; if/when that happens, invoke the `claude-api` skill while writing it.
+- For any Python UI surface, mount **NiceGUI on FastAPI**. Reserve React for genuine public-facing SPAs. (Not relevant in v1 — wikifi is a CLI library.)
 - For any JS surface, use **`pnpm`** as the package manager.
 
 ## Code rules
 Surface before deviating.
 
-- **Auto-discover routers in `main.py`** via `pkgutil.iter_modules(...)`. The discovery loop is the single mount point — keeping it that way eliminates the top merge-conflict hotspot for parallel agents.
+- **wikifi is a CLI library, not a FastAPI app.** The router auto-discovery rule from the project template doesn't apply here — there is no `main.py` and no API surface. The CLI entry point is declared via `[project.scripts] wikifi = "wikifi.cli:main"` in `pyproject.toml`.
+- **Two-stage walk is the architecture.** Stage 1 is one LLM introspection call over the tree summary; Stage 2 is deterministic per-file extraction; Stage 3 is per-section synthesis. Keep new functionality inside one of those stages or behind a clearly named module — don't reintroduce LLM agency in the file walk.
 - **Import from actual modules.** Keep `__init__.py` files free of re-exports.
-- **UUID primary keys**, with `created_at` + `updated_at` on every model and JSONB for flexible data.
+- **Pydantic schemas are the contract.** Every LLM call returns through `provider.complete_json(..., schema=...)` so structure-drift surfaces as validation errors at the call site.
 - **Keep `.env.example` placeholder-only.** Real values stay in `.env` (gitignored) or the secrets manager.
 
 ## Git workflow
