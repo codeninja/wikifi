@@ -1,10 +1,20 @@
-### Hard Specifications
+## Pipeline Execution & Data Flow
+The system enforces a deterministic, four-stage sequential lifecycle for all knowledge translation operations: Introspection, Extraction, Aggregation, and Derivation. Data flows unidirectionally through these stage-gated phases, with automatic execution halting if initial validation fails or extraction yields zero valid results. Processing is strictly non-destructive, ensuring that raw repository assets remain unaltered while intermediate analysis states are persisted to support fault tolerance and incremental processing. A single-backend execution model is mandated, with automatic workspace provisioning triggered upon initial invocation to guarantee a clean, isolated operating environment.
 
-- **Execution Order**: The processing pipeline must adhere to a strict execution order to maintain consistency and reliability during data handling.
-- **Backend Integration**: The system is limited to a single backend language model provider, ensuring uniformity in output and processing behavior.
-- **Data Processing**: All data handling must be non-destructive, preserving the integrity of source materials throughout the processing stages.
-- **Fault Tolerance**: The pipeline should incorporate fault tolerance mechanisms to handle errors gracefully, preventing complete process failures.
-- **Output Structure**: Outputs from the processing pipeline must be immutable, ensuring that generated documents remain unchanged post-creation.
-- **User-Focused Narrative**: All transformation processes must be framed within a user-focused narrative, facilitating accessibility and understanding in the generated documentation.
-- **Configuration Precedence**: There should be clear rules regarding configuration precedence to ensure that settings are applied in a defined order.
-- **Artifact Management**: Best practices for managing artifacts should be enforced to maintain organized and efficient operations throughout the documentation lifecycle.
+## Configuration & State Management
+Configuration precedence follows a rigid hierarchical rule: locally defined workspace settings strictly override environment variables, while sensitive remote credentials are systematically stripped to maintain security boundaries. Workspace initialization is idempotent, preventing redundant setup and returning explicit state feedback when directories already exist. To preserve version control integrity, intermediate analysis artifacts and transient extraction notes are explicitly excluded from committed repositories, leaving only the finalized documentation structure under source control. The output directory schema is contractually immutable, ensuring backward compatibility across pipeline versions and guaranteeing that downstream consumers can reliably parse generated documentation.
+
+## Content Generation & Output Standards
+All synthesized documentation must adhere to strict technology-agnostic translation rules, abstracting implementation details into domain-centric business logic and architectural intent. The generation engine prohibits data fabrication or speculative inference; when source evidence is insufficient or contradictory, the system must explicitly declare missing or conflicting information rather than attempting resolution. Derivative behavioral artifacts are required to follow a standardized Given/When/Then structural format, while all cross-cutting relationship mappings must utilize standardized diagram syntax. Narrative outputs are constrained to sub-headings and structured lists, excluding top-level headings to maintain consistent document topology. Context windows for synthesis stages are capped to prevent token exhaustion, with graceful truncation applied to notes exceeding defined character thresholds.
+
+## Processing Boundaries & Filtering Rules
+| Constraint Category | Specification |
+|---------------------|---------------|
+| **Content Size Thresholds** | Rigid processing limits enforce a maximum file size of 200 KB and a minimum content threshold of 64 KB to filter out trivial or excessively large artifacts. |
+| **Repository Exclusions** | Version control metadata, dependency directories, build caches, and transient runtime artifacts are automatically pruned during traversal. |
+| **Invalid Input Handling** | The pipeline implements graceful degradation, logging and skipping inaccessible or malformed files without interrupting downstream stage execution. |
+| **Request & Reasoning Controls** | Centralized timeout parameters and adaptive reasoning mode toggles regulate AI inference intensity, balancing analytical depth against resource consumption. |
+| **Path & Scope Boundaries** | Traversal is strictly bounded by configured exclusion patterns and local ignore rules, preventing infinite recursion and ensuring scope confinement to production-grade source assets. |
+
+## Data Integrity & Compliance
+Extraction records are immutable and timestamped upon creation, establishing a verifiable audit trail that links every generated documentation section back to its originating source evidence. All derivative outputs undergo mandatory schema validation to enforce structural consistency, with fallback mechanisms preserving raw findings if synthesis operations encounter failures. Telemetry and remote tracking are explicitly disabled to maintain strict privacy compliance, while deterministic execution parameters guarantee reproducible outputs across identical input states. The architecture isolates core business logic from provider-specific implementations, ensuring that external AI inference services operate through abstracted contracts without influencing pipeline determinism or data lineage.

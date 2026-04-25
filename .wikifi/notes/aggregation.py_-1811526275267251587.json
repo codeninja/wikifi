@@ -1,0 +1,6 @@
+{
+  "timestamp": "2026-04-25T15:52:45.180810",
+  "file_reference": "wikifi/core/aggregation.py",
+  "role_summary": "Orchestrates the synthesis of extracted domain notes into structured, technology-agnostic technical documentation sections using an LLM, managing prompt construction, generation, file output, and statistics tracking.",
+  "extracted_finding": "The module defines a fixed taxonomy of primary documentation categories (domains, intent, application, external dependencies, integrations, cross-cutting concerns, entities, hard specifications, schematics). It implements an LLM-driven aggregation pipeline that formats extracted notes into prompts with strict constraints (domain language focus, no speculation, explicit missing-data handling, no top-level headings). It manages context window limits by truncating notes exceeding 80,000 characters, handles generation failures gracefully, validates output for emptiness, writes synthesized markdown to a designated workspace directory, and tracks aggregation statistics. It serves as the functional bridge between raw data extraction artifacts and the final structured knowledge base."
+}

@@ -1,37 +1,23 @@
-### Core Entities and Their Structures
+### Core Entity Definitions
+- **Configuration & Workspace Artifacts**: Hierarchical structures that establish processing boundaries, traversal constraints, and reasoning parameters. Local workspace definitions strictly supersede environment-level defaults, while security protocols isolate sensitive credentials and define exclusion patterns to filter non-essential repository noise.
+- **Introspection Assessments**: Structural metadata aggregates that capture repository profiles, including artifact counts, cumulative sizes, language distributions, and dependency manifest presence. These assessments infer system purpose and classify architectural intent before semantic analysis begins.
+- **Extraction Records**: Immutable, timestamped domain-concept notes that map individual source artifacts to their inferred business logic, functional responsibilities, and architectural roles. These records serve as the atomic data units for downstream synthesis, preserving raw evidence to prevent speculative documentation.
+- **Aggregation Structures**: Categorized documentation containers aligned with a fixed taxonomy spanning domain boundaries, system intent, external dependencies, cross-cutting concerns, and architectural schematics. These structures normalize disparate extraction records into coherent, technology-agnostic technical narratives.
+- **Derivative Artifacts**: Secondary documentation outputs synthesized from aggregated sections, including user persona profiles, behavioral requirement narratives, and high-level interaction diagrams. These entities translate technical findings into stakeholder-facing specifications.
+- **Execution & Observability Summaries**: Consolidated reporting entities that track pipeline health, stage transition metrics, inclusion/exclusion statistics, and chronological provenance. These structures provide deterministic audit trails and operational guardrails for the entire analysis lifecycle.
 
-#### Configuration Entities
-- **docker-compose.yml**: Defines settings for the PostgreSQL database service within a multi-container application architecture, including environment configurations, credentials, and data persistence via Docker volumes.
-- **Makefile**: Automates tasks related to the development lifecycle including testing, code quality checks, and project initialization for a Python project.
-- **pyproject.toml**: Serves as the project's main configuration file detailing metadata, dependencies (e.g., litellm, pydantic), build settings, and development tools.
+### Structural Patterns & Relationships
+- **Unidirectional, Stage-Gated Data Flow**: Entities progress through a strictly sequential four-phase lifecycle spanning configuration initialization, structural introspection, granular extraction, and section aggregation or derivation. Data handoffs are explicitly bounded, preventing cross-stage contamination and ensuring deterministic processing order.
+- **Immutability & Traceability Contracts**: Once generated, extraction records and intermediate analysis states are locked to preserve auditability. Each synthesized documentation section maintains explicit traceability back to its originating source artifacts and extraction timestamps, with fallback mechanisms preserving raw findings during synthesis failures.
+- **Hierarchical Override & Validation Contracts**: Configuration entities enforce a local-over-default precedence model. All structured outputs conform to strict validation schemas that reject malformed or speculative data, while intermediate artifacts remain isolated from version-controlled outputs to maintain clean repository states.
+- **Boundary Enforcement & Context Management**: Processing entities operate within rigid size thresholds and content validation rules. Intermediate data is truncated or filtered when exceeding defined limits, ensuring consistent resource utilization, preventing pipeline exhaustion, and maintaining reproducible execution outcomes.
 
-#### Documentation Entities
-- **README.md**: Introduces the `wikifi` library, detailing its role in automating technology-agnostic documentation generation from codebases.
-- **CLAUDE.md**: A guide for project setup and development workflows, outlining coding conventions and tooling standards to maintain quality and consistency.
-- **CODE-FORMAT.md**: Specifies standard practices for code structure, testing, CI/CD processes, and repository management.
-
-#### Processing Entities
-- **ExtractionEngine (from extraction.py)**: Responsible for extracting domain concepts and generating structured notes from source files using a language model.
-- **AggregationEngine (from aggregation.py)**: Compiles various notes into structured documentation sections, focusing on domains, intents, and external dependencies.
-- **TraversalEngine (from traversal.py)**: Navigates the project directory, gathering statistics and validating file presence based on defined criteria.
-
-#### Output and Summary Entities
-- **ExecutionSummary (from models.py)**: Tracks stages and results of processing, contributing to monitoring the health of the documentation pipeline.
-- **ExtractionNote (from models.py)**: Logs findings and role summaries, preserving contextual information for downstream processing.
-
-#### User Entities
-- **User Personas (from personas.md)**: Describes distinct user roles (e.g., Onboarding Engineering Practitioner, Technical Writer) with their goals, needs, and pain points to guide documentation practices and tool development.
-
-#### Analysis Entities
-- **IntrospectionAssessment (from models.py)**: Evaluates programming languages and system purposes, helping to inform documentation strategies.
-- **Capabilities and Domains (from capabilities.md and domains.md)**: Outline the structured processing stages and subdomains involved in transforming technical artifacts into structured documentation.
-
-#### External Dependencies
-- **.env.example and external_dependencies.md**: Define configuration parameters for integrating with external AI services, essential for semantic analysis and documentation generation. The management of these configurations ensures reliable operational flow.
-
-### Relationships and Patterns
-- Configuration files govern the operational boundaries and settings for processing entities, while output entities encapsulate the results of those processes.
-- Analysis entities draw their insights from the documentation and processing entities, creating a feedback loop that informs and improves the documentation generation pipeline.
-- User personas inform the design choices within the documentation framework, ensuring that various stakeholder needs are met through tailored practices and tools. 
-
-These core entities, their structures, and the relationships among them create a cohesive framework that supports efficient documentation generation, promoting clarity and organization within complex software environments.
+### Entity Lifecycle & Dependency Mapping
+| Entity Category | Primary Function | Input Dependencies | Output Destinations | Persistence State |
+|---|---|---|---|---|
+| Configuration Artifacts | Define traversal boundaries, reasoning modes, and security filters | Environment defaults, local overrides | Pipeline orchestrator, traversal engine | Mutable (local override capable) |
+| Introspection Assessments | Profile repository structure and infer architectural intent | Raw file metadata, dependency manifests | Extraction pipeline, execution summary | Transient (stage-gated) |
+| Extraction Records | Capture semantic domain concepts and functional roles | Filtered source artifacts, semantic analysis engine | Aggregation structures, derivative synthesis | Immutable & timestamped |
+| Aggregation Structures | Synthesize categorized technical documentation | Validated extraction records | Workspace documentation directory, derivation stage | Writable & version-controlled |
+| Execution Summaries | Consolidate pipeline metrics and operational status | Stage transition data, observability logs | Reporting interface, audit module | Final & terminal |
+| Derivative Artifacts | Translate technical findings into behavioral narratives | Aggregated documentation sections | Workspace output directory, stakeholder review | Writable & version-controlled |

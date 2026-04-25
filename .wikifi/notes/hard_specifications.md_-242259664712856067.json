@@ -1,0 +1,6 @@
+{
+  "timestamp": "2026-04-25T16:03:26.323900",
+  "file_reference": ".spec/hard_specifications.md",
+  "role_summary": "Defines strict architectural, processing, and output constraints for a deterministic documentation generation pipeline, serving as a system compliance contract and behavioral specification.",
+  "extracted_finding": "The system enforces a strict four-stage sequential pipeline (Introspection, Extraction, Aggregation, Derivation) with single-backend support and automatic workspace provisioning. Data processing must be deterministic and non-destructive, enforcing rigid size thresholds (200KB max, 64KB min), excluding version control and build artifacts, and gracefully skipping invalid inputs. Output generation requires technology-agnostic translation, narrative coherence, mandatory Given/When/Then behavioral formatting, standardized diagrams, and explicit declaration of missing or conflicting data. Configuration follows a local-over-environment precedence hierarchy, intermediate artifacts are excluded from version control, and the output directory schema remains immutable to ensure backward compatibility and compliance."
+}

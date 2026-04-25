@@ -1,0 +1,6 @@
+{
+  "timestamp": "2026-04-25T15:46:34.891511",
+  "file_reference": "CODE-FORMAT.md",
+  "role_summary": "Project convention guide and architectural blueprint that standardizes development workflows, technology stacks, and quality assurance protocols for both human developers and AI coding agents.",
+  "extracted_finding": "Defines mandatory structural standards including a standardized repository layout, deterministic package management (uv/pnpm), and a FastAPI/PostgreSQL backend with React or NiceGUI frontends. Establishes strict operational rules: ≥85% test coverage requirements, automated pre-commit/pre-push quality gates, conventional commit formatting, and CI/CD pipelines that enforce build and test success. Outlines an agentic development workflow featuring isolated Git worktrees, parallel execution constraints, timeout recovery procedures, and explicit anti-pattern avoidance. Functional responsibilities are partitioned across auto-discovered API routing, Pydantic-based centralized configuration, service-layer business logic isolation, and containerized Kubernetes deployments managed via Helm charts."
+}

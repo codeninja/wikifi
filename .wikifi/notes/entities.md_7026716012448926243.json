@@ -1,0 +1,6 @@
+{
+  "timestamp": "2026-04-25T16:00:14.927822",
+  "file_reference": ".spec/entities.md",
+  "role_summary": "Architectural specification defining the domain entities, data flow, processing boundaries, and invariants for an automated documentation generation pipeline.",
+  "extracted_finding": "The system implements a documentation generation pipeline structured around five core processing stages: configuration, analysis, extraction, aggregation, and reporting. Key domain concepts include hierarchical configuration management (where local overrides strictly supersede defaults), bounded repository scanning with path and size constraints, semantic introspection for language and purpose inference, immutable timestamped extraction notes linking files to contextual findings, and categorized markdown section assembly. Business rules and invariants enforce strict processing boundaries (no traversal of excluded paths or size thresholds), data immutability for extraction records, atomic updates for aggregation statistics, and a guaranteed execution summary only after all stages complete. The pipeline follows a unidirectional data flow from configuration constraints to analysis outputs, then to intermediate notes, which feed into final documentation sections, while cross-cutting observers track system health and coverage gaps."
+}

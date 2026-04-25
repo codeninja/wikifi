@@ -1,0 +1,6 @@
+{
+  "timestamp": "2026-04-25T15:51:47.231098",
+  "file_reference": "wikifi/config.py",
+  "role_summary": "Manages application configuration by defining default parameters for workspace paths, file processing constraints, exclusion filters, and LLM model selection, while implementing a hierarchical loading mechanism that prioritizes local JSON overrides over environment variables and enforces credential security.",
+  "extracted_finding": "The system implements a layered configuration strategy where base settings are initialized from environment variables or defaults, then optionally overridden by a local config.json placed in the workspace. A strict business rule enforces that local files override environment variables, while simultaneously stripping sensitive remote credentials (e.g., llm_api_key) to maintain security boundaries. Functional constraints include file size limits, minimum content thresholds, and comprehensive exclusion patterns to prevent infinite recursion and skip transient or cache artifacts. The architecture centralizes LLM model selection and workspace directory resolution, ensuring consistent validation through Pydantic models across the application."
+}

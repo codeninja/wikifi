@@ -1,0 +1,6 @@
+{
+  "timestamp": "2026-04-25T15:47:21.082631",
+  "file_reference": "VISION.md",
+  "role_summary": "Defines the strategic vision, core capabilities, scope boundaries, and success criteria for the wikifi tool, which serves as an AI-driven domain knowledge extraction system for legacy codebase migration.",
+  "extracted_finding": "wikifi is designed to decouple business intent from legacy implementation by analyzing source code and generating a technology-agnostic wiki. The tool operates in two capture phases: primary extraction (DDD domains, system intent, functionality, dependencies, cross-cutting concerns, core entities, hard specs, and Mermaid schematics) and derivative synthesis (user personas, Gherkin user stories, and high-level architecture diagrams). Key functional responsibilities include focusing exclusively on production code, acting as a feature-extraction rather than code-transposition tool, and ensuring the output empowers migration teams to rebuild systems from scratch. Operational rules mandate a default local LLM backend, a swappable provider abstraction layer, prioritization of reasoning quality over processing speed, and robust filtering of non-informative files. Success is measured by the wiki's ability to fully support a microservice reimplementation without referencing the original codebase."
+}

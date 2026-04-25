@@ -1,0 +1,6 @@
+{
+  "timestamp": "2026-04-25T16:06:41.688558",
+  "file_reference": ".spec/integrations.md",
+  "role_summary": "Architectural specification detailing system component interactions, data flow, and integration contracts for a staged document processing pipeline.",
+  "extracted_finding": "The system operates as a centralized, orchestrated pipeline that progressively transforms raw repository artifacts into structured documentation and derivative content. Key functional responsibilities include sequential stage handoffs (traversal/introspection to extraction to aggregation to derivation), abstraction of external services (generative AI, configuration management, telemetry, and CLI) via standardized contracts, and progressive data refinement from filtered file metadata to technology-agnostic notes and synthesized markdown. The architecture enforces clear dependency boundaries, isolates core business logic from provider-specific implementations, and supports continuous execution with observability tracking. Noted documentation gaps indicate pending formalization of inter-module data schemas, error recovery policies, security constraints, and stage versioning."
+}

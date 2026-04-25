@@ -1,0 +1,6 @@
+{
+  "timestamp": "2026-04-25T15:57:50.344848",
+  "file_reference": ".github/pull_request_template.md",
+  "role_summary": "Standardizes the pull request workflow by providing a structured template for contributors to document changes, testing procedures, and quality assurance checks before code merging.",
+  "extracted_finding": "Enforces a consistent contribution process that requires linking to issue tracking, detailing implemented changes and testing methodologies, and verifying quality standards through a mandatory checklist covering test coverage, linting compliance, and documentation updates."
+}

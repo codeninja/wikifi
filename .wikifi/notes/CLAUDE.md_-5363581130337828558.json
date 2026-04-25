@@ -1,0 +1,6 @@
+{
+  "timestamp": "2026-04-25T15:43:49.393882",
+  "file_reference": "CLAUDE.md",
+  "role_summary": "Operational directive and configuration guide for an AI agent, defining development workflows, tooling constraints, coding standards, Git practices, and debugging protocols to ensure consistent and safe AI-assisted repository management.",
+  "extracted_finding": "The artifact establishes strict operational and architectural boundaries for an AI-driven development workflow. Key domain concepts include a deterministic four-phase repository analysis pipeline (introspection, filtering, extraction, synthesis) focused exclusively on legacy feature documentation without architectural transformation. Architectural constraints mandate a local-first LLM backend with a mandatory provider abstraction layer, exclusive use of uv and ruff for Python environment and code quality management, and a strict 85% minimum test coverage threshold. Workflow rules enforce conventional Git commits, mandatory pre-commit and pre-push validation gates, and parallel execution via git worktrees. A formal debug escalation protocol separates architectural guidance from concrete failure resolution, routing persistent errors to specialized debugging plugins after initial fix attempts."
+}

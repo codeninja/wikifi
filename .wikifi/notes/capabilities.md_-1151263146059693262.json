@@ -1,0 +1,6 @@
+{
+  "timestamp": "2026-04-25T16:02:00.461400",
+  "file_reference": ".spec/capabilities.md",
+  "role_summary": "System specification defining the capabilities, processing workflow, and quality standards of an automated documentation generation engine.",
+  "extracted_finding": "The system executes a deterministic four-stage pipeline to transform source code into structured documentation: Structural Analysis, Granular Extraction, Section Synthesis, and Cross-Cutting Derivation. It employs intelligent traversal to filter repository noise, translates technical implementations into domain-centric business rules, and offers adaptive reasoning depth. Quality assurance includes explicit gap declaration for ambiguity, detailed execution reporting, and timestamped provenance. Configuration supports dual-mode generation for both schema-validated consistency and human-readable narratives."
+}

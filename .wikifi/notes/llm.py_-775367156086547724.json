@@ -1,0 +1,6 @@
+{
+  "timestamp": "2026-04-25T15:51:18.045065",
+  "file_reference": "wikifi/llm.py",
+  "role_summary": "Centralized LLM abstraction layer that manages model configuration, disables telemetry for privacy, and provides dual interfaces for generating strictly typed structured outputs and free-form analytical text.",
+  "extracted_finding": "The module implements a provider pattern to encapsulate LLM interactions via litellm. It enforces a strict data validation rule by converting Pydantic schemas into system prompts, sanitizing LLM markdown formatting quirks, and validating responses at runtime to ensure schema compliance. A key privacy constraint explicitly disables telemetry and remote tracking. The system supports two distinct functional modes: structured data extraction for analytical pipelines and narrative generation for human-readable insights, both wrapped in a singleton instance for consistent access across the application."
+}

@@ -1,48 +1,34 @@
-- **User Story 1: Repository Introspection**
-  - As a **Repository Manager**, I want to analyze the project directory and manifest contents to ensure proper organization and dependencies are maintained.
-    - **Acceptance Criteria**:
-      - The system successfully scans the repository and lists all identified directories and files.
-      - Dependency relationships among the components are presented clearly.
-      - The analysis can handle various project structures consistently.
+### Repository Introspection & Noise Filtration
+- **Persona:** Migration Engineer
+- **User Story:** As a migration engineer, I want the system to automatically profile and filter source repositories so that only relevant, production-grade artifacts enter the processing pipeline.
+- **Acceptance Criteria:**
+  - **Given** a target repository containing mixed code, dependencies, and build caches, **when** introspection initiates, **then** version control metadata, transient runtime artifacts, and files outside the 64 KB–200 KB content thresholds are automatically pruned.
+  - **Given** configured exclusion patterns and traversal boundaries, **when** the pipeline encounters inaccessible or malformed files, **then** anomalies are logged, invalid inputs are skipped, and execution continues without interrupting downstream stages.
 
-- **User Story 2: Semantic Extraction**
-  - As a **Technical Writer**, I want to extract domain concepts and analyze programming languages used in the codebase so that I can document them accurately.
-    - **Acceptance Criteria**:
-      - The extraction engine generates structured notes based on defined domain concepts.
-      - Programming languages used in the codebase are accurately identified and documented.
-      - All extracted information is easily accessible for review and integration into documentation.
+### Semantic Translation & Non-Fabrication Enforcement
+- **Persona:** System Architect
+- **User Story:** As a system architect, I want low-level code patterns translated into high-level domain concepts so that business intent is decoupled from legacy implementation details.
+- **Acceptance Criteria:**
+  - **Given** validated source artifacts, **when** semantic analysis executes through the abstracted inference layer, **then** outputs map to functional responsibilities and architectural roles using strictly technology-agnostic terminology.
+  - **Given** ambiguous, incomplete, or contradictory source material, **when** the extraction engine evaluates evidence, **then** explicit gap declarations are generated instead of speculative inference or fabricated assumptions.
 
-- **User Story 3: Information Aggregation**
-  - As an **Onboarding Engineering Practitioner**, I want synthesized documentation from extracted information so that I can quickly understand the system without delving into the code.
-    - **Acceptance Criteria**:
-      - The aggregation service compiles notes into structured documentation sections reflecting key domain knowledge.
-      - Documentation accurately represents the extracted domain concepts.
-      - Generated documentation is organized in a user-friendly format for easy navigation.
+### Information Aggregation & Immutable Traceability
+- **Persona:** Engineering Analyst
+- **User Story:** As an engineering analyst, I want discrete extraction findings consolidated into structured documentation sections so that downstream teams can audit and navigate system knowledge reliably.
+- **Acceptance Criteria:**
+  - **Given** timestamped extraction records, **when** synthesis aggregates findings, **then** documentation aligns with a fixed taxonomy (domains, intent, dependencies, entities) and maintains explicit traceability to originating source evidence.
+  - **Given** intermediate processing states, **when** pipeline stages transition, **then** extraction notes persist immutably within an isolated workspace, preventing cross-stage contamination and supporting fault-tolerant stage resumption.
 
-- **User Story 4: Pipeline Orchestration**
-  - As a **System Architect**, I want to manage the workflow of the documentation generation pipeline to ensure each processing stage is executed smoothly.
-    - **Acceptance Criteria**:
-      - The orchestrator effectively manages task flows across introspection, extraction, aggregation, and derivation stages.
-      - Feedback is provided on the status of each stage in real-time.
-      - Error handling mechanisms are in place to address any failures during the process.
+### Derivative Generation & Behavioral Narrative Structuring
+- **Persona:** Product Manager / QA Lead
+- **User Story:** As a product manager or QA lead, I want technical findings converted into stakeholder-facing profiles and scenario-driven requirements so that validation and redesign efforts align with actual usage patterns.
+- **Acceptance Criteria:**
+  - **Given** synthesized documentation sections, **when** cross-cutting derivation executes, **then** outputs generate user and stakeholder persona profiles alongside behavioral requirement narratives.
+  - **Given** functional interaction patterns, **when** behavioral artifacts are structured, **then** acceptance criteria follow a standardized Given/When/Then format, constrained to sub-headings and structured lists without top-level headings.
 
-- **User Story 5: External Intelligence Integration**
-  - As a **Project Manager**, I want to connect with external AI services to enhance documentation quality so that it meets high standards of fidelity and usability.
-    - **Acceptance Criteria**:
-      - The application successfully interfaces with designated AI services for semantic analysis.
-      - Configuration management ensures seamless operation with external dependencies.
-      - Generated documentation uses insights from AI services to improve clarity and usability.
-
-- **User Story 6: Continuous Documentation Synchronization**
-  - As a **Development Team Member**, I want documentation to remain synchronized with ongoing software development so that I have access to the most current information.
-    - **Acceptance Criteria**:
-      - The system tracks updates in source code and reflects these changes in the generated documentation promptly.
-      - Users are notified of significant updates to the documentation.
-      - Documentation updates do not interfere with the overall processing pipeline.
-
-- **User Story 7: Quality Assurance in Documentation**
-  - As a **Quality Assurance Specialist**, I want to ensure that all documentation produced is accurate and comprehensive so that it aligns with project requirements.
-    - **Acceptance Criteria**:
-      - The application integrates strict quality control measures during the documentation generation process.
-      - Automated tests validate the accuracy of the generated documentation against source content.
-      - An audit trail is maintained for all generated documents to track changes and updates.
+### Pipeline Orchestration & Configuration Governance
+- **Persona:** DevOps Operator / Security Administrator
+- **User Story:** As a DevOps operator or security administrator, I want deterministic stage-gated execution with isolated configuration handling so that pipeline integrity, reproducibility, and data privacy are guaranteed.
+- **Acceptance Criteria:**
+  - **Given** a target workspace and hierarchical configuration inputs, **when** the pipeline initializes, **then** idempotent provisioning occurs with local settings strictly overriding environment variables, while sensitive remote credentials are systematically stripped.
+  - **Given** a unidirectional workflow, **when** stage validation completes, **then** progression remains hard-gated, telemetry remains explicitly disabled, and execution concludes with a consolidated summary of inclusion/exclusion statistics, stage metrics, and chronological provenance.

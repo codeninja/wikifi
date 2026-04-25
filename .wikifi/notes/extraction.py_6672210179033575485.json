@@ -1,0 +1,6 @@
+{
+  "timestamp": "2026-04-25T15:55:13.695593",
+  "file_reference": "wikifi/core/extraction.py",
+  "role_summary": "Orchestrates LLM-driven static analysis of source code artifacts to extract high-level architectural roles, domain concepts, and functional responsibilities, while persisting structured findings and ensuring pipeline resilience.",
+  "extracted_finding": "Implements a fault-tolerant extraction workflow that processes source files, delegates semantic analysis to an LLM provider, and captures structured outputs conforming to a defined schema. The system enforces business rules prioritizing pipeline continuity by logging and skipping invalid inputs without interruption. Extracted metadata is normalized into timestamped ExtractionNote objects and persisted as JSON artifacts in a configured workspace directory, enabling automated architectural documentation and domain concept mapping across the codebase."
+}

@@ -1,0 +1,6 @@
+{
+  "timestamp": "2026-04-25T16:08:38.614275",
+  "file_reference": ".githooks/pre-push",
+  "role_summary": "Git pre-push hook that enforces local test execution before allowing code to be pushed to the remote repository.",
+  "extracted_finding": "Implements a mandatory testing gate within the version control workflow. The script conditionally runs backend tests using pytest via uv and frontend tests using pnpm, depending on directory existence. A non-zero exit code from either test suite aborts the push operation, enforcing a local continuous integration practice that ensures only verified code is shared, thereby maintaining code quality and preventing regressions from entering the remote repository."
+}

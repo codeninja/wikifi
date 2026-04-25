@@ -1,0 +1,6 @@
+{
+  "timestamp": "2026-04-25T15:57:11.885693",
+  "file_reference": "wikifi/core/derivation.py",
+  "role_summary": "Orchestrates the AI-driven generation of derivative documentation artifacts (user personas, user stories, and diagrams) from aggregated primary documentation, enforcing consistency, technology-agnosticism, and context limits before persisting the results as markdown files.",
+  "extracted_finding": "The system implements a structured derivative documentation pipeline that transforms aggregated primary technical documentation into three key secondary artifacts: (1) User Personas detailing AI-generated intent, needs, and use cases; (2) User Stories formatted as Gherkin-style requirements with acceptance criteria; and (3) High-level, technology-agnostic domain and integration diagrams. Business rules enforce strict constraints on the LLM, including prohibition of fabricated data, mandatory technology-agnostic output, specific markdown formatting (sub-headings/lists only), and an 80,000-character context window limit to manage token constraints. The engine aggregates source sections, routes them through an LLM provider with architect-specific system prompts, and persists the generated content to a configured workspace directory."
+}
