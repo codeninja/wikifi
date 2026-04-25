@@ -1,3 +1,38 @@
 {
-  "mcpServers": {}
+  "mcpServers": {
+    "nano-banana": {
+      "command": "npx",
+      "args": [
+        "nano-banana-mcp"
+      ],
+      "env": {
+        "GEMINI_API_KEY": "${GOOGLE_API_KEY}"
+      }
+    },
+    "firecrawl": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "firecrawl-mcp"
+      ],
+      "env": {
+        "FIRECRAWL_API_KEY": "locally-running-no-key-needed",
+        "FIRECRAWL_API_URL": "http://localhost:3002"
+      }
+    },
+    "context7": {
+      "type": "http",
+      "url": "https://mcp.context7.com/mcp",
+      "headers": {
+        "X-Goog-Api-Key": "${CONTEXT_7_API_KEY}"
+      }
+    },
+    "stitch": {
+      "type": "http",
+      "url": "https://stitch.googleapis.com/mcp",
+      "headers": {
+        "X-Goog-Api-Key": "${GOOGLE_API_KEY}"
+      }
+    }
+  }
 }
