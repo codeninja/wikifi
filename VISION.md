@@ -26,13 +26,14 @@ The wiki must convey at least the following about the target system. Whether eac
 - **Cross-cutting concerns** — observability, monitoring, data integrity, authentication & authorization, data storage.
 - **Core entities and their structures** — data structures, relationships, and patterns that define the system's domain model, independent of the current implementation. A definition of what the core entities need are and how they relate to other entities.
 - **Hard specifications** — critical requirements which must be carried forward.
+- **Inline Schmatics** — Mermaid diagram visual representations of the system's domains, entities, and integrations, without reference to the current tech stack or architecture. Use only where it adds clarity to your words and is necessary to simplify understanding. 
 
 ### Derivative capture — synthesized from the aggregate after primary capture is complete
 Some knowledge cannot be extracted from any single file — it emerges from the aggregate of what the system does. The implementation must produce these items in a step that runs *after* primary capture, taking the synthesized primary content as its input. They must never be inferred from a single source file.
 
 - **User personas** — derived from the aggregate of capabilities, intent, entities, and integrations. AI-generated, with intent, needs, painpoints, usage patterns, and use cases.
-- **User stories** — features expressed as Gherkin-style user stories with acceptance criteria, keyed to the personas above.
-- **Diagrams** — visual representations of the system's domains, entities, and integrations, rendered from the aggregate; technology-agnostic.
+- **User stories** — all core features expressed as Gherkin-style user stories with acceptance criteria, keyed to the personas above.
+- **Diagrams** — Separate from the schematics, the diagram pass captures representations of the system's domains, entities, and integrations, rendered from the aggregate; technology-agnostic. And captures the 10000-foot view of the system's structure and behavior that may not be evident from any single file.
 
 These are not hard requirements, and the agent is free to identify and capture additional relevant information beyond this list. The goal is a comprehensive, technology-agnostic representation of the system's intent and problem space that empowers a new team to re-implement the system into one or more smaller services in a modern stack from the wiki alone.
 
@@ -55,4 +56,4 @@ The wiki will have a CLI interface. An MCP interface is in scope for a follow-up
 - **Resilience to unstructured or near-empty input.** The walker must recognize and skip files that carry no extractable intent (stub `__init__` files, empty fixtures, generated lockfiles, and similar) before they reach the agent. A single empty or unstructured file must never stall the walk.
 
 ## Success criteria
-A migration team handed only the wiki wikifi produces — working from the wiki alone — can deliver a microservice re-implementation that preserves the original system's personas, problem space, integrations, cross-cutting concerns, entities, and data patterns.
+A migration team handed only the wiki wikifi produces — working from the wiki alone — can deliver a microservice re-implementation that preserves the original system's personas, problem space, integrations, cross-cutting concerns, entities, and data patterns, and can deliver the same user value, without reference to the original codebase.
