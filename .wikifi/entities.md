@@ -1,46 +1,35 @@
 # Core Entities
 
-The domain models revolve around three primary concerns: defining analysis boundaries, capturing structural and textual data from the target workspace, and producing structured documentation artifacts. Entities are organized by their role in the analysis lifecycle.
+The documentation generation pipeline relies on a set of core domain entities that manage configuration, source analysis, content extraction, and final output assembly. These entities are organized to enforce consistent processing boundaries, track intermediate findings, and produce structured documentation artifacts.
 
-#### Scope & Configuration Entities
-These entities establish the parameters and limits for the processing pipeline.
-- **Analysis Scope:** Defines traversal boundaries and filtering rules. It tracks the target root directory, additional exclusion patterns, a flag for version-control ignore compliance, and a maximum allowable file size.
-- **Introspection Decision:** Captures the outcome of the initial workspace evaluation. It records include/exclude path patterns, identified runtimes (informational only), a concise summary of the system’s likely purpose, and the rationale behind classification choices.
-- **Configuration Profile:** Stores connection parameters required to interface with the external processing service, including provider identifiers, model specifications, and host endpoints.
+### Configuration & Processing Boundaries
+The system uses a hierarchical configuration model to define how source repositories are scanned and processed. A base settings container manages default values, which can be overridden by local configuration files to ensure environment-specific customization. Scanning and traversal configurations establish the root directory, path inclusion/exclusion filters, and file size constraints. These boundaries ensure that only relevant source files are processed while preventing resource exhaustion from oversized or irrelevant directories.
 
-#### Workspace & Content Representation
-These entities abstract the filesystem into processable units without exposing low-level I/O details.
-- **Documentation Workspace / Wiki Layout:** Defines the target directory structure and computes derived paths for configuration files, documentation sections, and state-tracking artifacts.
-- **Directory Snapshot:** Provides a non-recursive view of a directory. It records the relative path, file count, total byte size, the most frequent file extensions, and a list of recognized configuration or documentation files.
-- **Manifest Content:** Maps relative file paths to their textual content for downstream processing.
+### Analysis & Introspection
+Before content generation, the system performs structural and semantic analysis of the target repository. Directory summaries capture aggregate statistics, including file counts, total size, extension distribution, and the presence of key manifest or documentation files. An introspection assessment synthesizes this structural data to identify primary languages, infer the system's overarching purpose, and document a classification rationale. This assessment respects the previously defined path filters and serves as the foundation for targeted content extraction.
 
-#### Extraction & Documentation Artifacts
-These entities represent intermediate findings and final documentation outputs.
-- **Extraction Finding:** Links a specific source file to a target documentation section, accompanied by a technology-agnostic description of its role.
-- **Extraction Note:** A timestamped record of intermediate analysis results, logically grouped by their corresponding documentation section.
-- **Documentation Section:** Represents a distinct wiki category. It encapsulates a title, a descriptive summary, and a dynamically generated markdown body.
-- **Processing Summary:** Tracks operational metrics, including the volume of files processed, successful extractions, and skipped items.
-- **Pipeline Execution Report:** A consolidated artifact that aggregates metrics and results across the introspection, extraction, and aggregation phases.
+### Extraction & Intermediate Records
+During source analysis, intermediate findings are captured as timestamped extraction notes. Each note functions as a structured record that links a specific file reference to a role summary and the extracted finding. These records preserve the context of individual source files and serve as the raw material for downstream aggregation. The system maintains a chronological log of these notes to ensure traceability throughout the pipeline.
 
-#### Cross-Entity Invariants
-The following constraints must hold true across the domain to ensure data integrity and deterministic processing:
+### Aggregation & Output Structure
+Extracted notes are consolidated into categorized documentation sections. Each section acts as a logical container for generated content, ultimately producing a final markdown body. Aggregation statistics track the success rate of section writes and explicitly flag empty sections to highlight coverage gaps. The final output adheres to a predefined workspace layout that organizes configuration files, intermediate notes, and final section artifacts into a consistent, navigable directory hierarchy.
 
-| Entity | Invariant |
-|---|---|
-| **Analysis Scope** | The target root must resolve to a valid directory; the maximum file size threshold must be strictly positive. |
-| **Introspection Decision** | Include and exclude patterns must be mutually exclusive and collectively cover the analyzed scope. Output must strictly conform to a predefined schema. |
-| **Directory Snapshot** | File extension counts are capped at the top ten. Notable configuration/documentation files are identified exclusively via a fixed registry of standard manifest names. |
-| **Manifest Content** | Textual content is truncated to a safe processing length to prevent context overflow during analysis. |
+### Pipeline Execution & Reporting
+A unified execution summary consolidates metrics, findings, and completion status across all processing stages. This entity provides a single source of truth for pipeline health, output readiness, and overall processing efficiency, enabling operators to verify that all stages completed successfully before final delivery.
 
-#### Relationships & Data Flow
-The entities interact in a sequential pipeline:
-1. **Configuration Profile** and **Analysis Scope** initialize the run.
-2. The system evaluates the workspace, producing an **Introspection Decision** that refines traversal boundaries.
-3. Refined boundaries drive the creation of **Directory Snapshots** and **Manifest Content** objects.
-4. Content is analyzed to generate **Extraction Findings** and **Extraction Notes**, which are routed to specific **Documentation Sections**.
-5. Final outputs are organized within the **Documentation Workspace**, while **Processing Summaries** and **Pipeline Execution Reports** capture lifecycle metrics.
+### Entity Fields, Relationships & Invariants
+| Entity | Primary Fields | Key Invariants |
+|---|---|---|
+| Configuration | Default settings, local overrides | Local overrides always take precedence over environment defaults |
+| Scan/Traversal Config | Root path, inclusion/exclusion patterns, size thresholds | Processing never exceeds defined size constraints or traverses excluded paths |
+| Directory Summary | File count, total size, extension distribution, manifest presence | Statistics reflect only files within allowed traversal boundaries |
+| Introspection Assessment | Primary languages, inferred purpose, classification rationale | Assessment is derived strictly from directory summaries and path filters |
+| Extraction Note | Timestamp, file reference, role summary, extracted finding | Each note is immutable once created and tied to a single source file |
+| Documentation Section | Category, aggregated content, final markdown body | Sections are generated only after successful note aggregation |
+| Aggregation Stats | Successful writes, empty section count | Stats are updated atomically after each section generation attempt |
+| Workspace Layout | Paths for config, notes, sections | Directory structure remains consistent across pipeline runs |
+| Execution Summary | Stage metrics, completion status, consolidated findings | Summary is generated only after all pipeline stages report completion |
 
-#### Known Gaps
-- Field definitions for the **Pipeline Execution Report** and **Processing Summary** are not detailed in the available notes; only their high-level purposes are documented.
-- The exact mechanism for how **Extraction Notes** are aggregated into the final **Documentation Section** markdown body is not specified.
-- No explicit validation rules are provided for the **Configuration Profile** parameters beyond their existence.
+**Relationships:** Configuration entities dictate the boundaries for analysis entities. Analysis outputs feed directly into extraction notes, which are then grouped and transformed into documentation sections. Aggregation statistics and the execution summary operate as cross-cutting observers, tracking the health and output of the entire flow.
+
+**Known Gaps:** The exact mapping rules between intermediate extraction notes and final documentation sections are implied by the aggregation process but not explicitly detailed in the available notes. Further specification may be needed to define how notes are grouped, prioritized, or filtered during section assembly, as well as how empty sections are resolved or reported upstream.

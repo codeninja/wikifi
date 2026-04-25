@@ -1,74 +1,93 @@
 # User Stories
 
-### Feature: Workspace Initialization & Target Configuration
-**User Story:** As a project maintainer, I want to initialize a documentation workspace and specify a target directory so that the system prepares the necessary structure for analysis.
+### Automated Scope & Artifact Discovery
+- **Persona:** Pipeline Operator
+- **Capability:** Automated Scope Definition & Artifact Discovery
+- **Entities Involved:** Configuration, Scan/Traversal Config, Directory Summary
 
-**Acceptance Criteria:**
-- **Scenario: Initialize documentation structure**
-  - Given a target project directory
-  - When the initialization command is executed
-  - Then the system creates the necessary configuration and output directories
-  - And displays confirmation with configuration details
-- **Scenario: Analyze external project**
-  - Given a path to a project directory
-  - When the target path is specified
-  - Then the system analyzes the specified directory instead of the current working directory
-- **Scenario: Configure analysis constraints**
-  - Given configuration parameters for analysis depth and file size limits
-  - When the pipeline runs
-  - Then it respects the specified constraints during file traversal and extraction
+```gherkin
+Feature: Automated Scope & Artifact Discovery
+  Scenario: Filter irrelevant artifacts and establish processing boundaries
+    As a Pipeline Operator, I want automated scope definition and artifact discovery, so that analysis resources are allocated exclusively to production-meaningful content without manual filtering overhead.
+    Given a target repository containing mixed artifact types and version-controlled paths
+    When the system initializes scanning boundaries using hierarchical configuration and local overrides
+    Then large binary assets, empty stubs, and excluded paths are automatically filtered out
+    And manifest files and directory layouts are analyzed to classify artifacts by relevance
+    And the traversal scope dynamically adjusts to focus only on production-meaningful content
+```
 
----
+### Technical-to-Domain Translation & Extraction
+- **Persona:** Onboarding Developer, Product Manager
+- **Capability:** Technical-to-Domain Translation
+- **Entities Involved:** Introspection Assessment, Extraction Note
 
-### Feature: Automated Analysis Pipeline Execution
-**User Story:** As a developer, I want to trigger a single command to analyze the entire codebase and generate structured documentation sections so that documentation remains synchronized with code changes.
+```gherkin
+Feature: Technical-to-Domain Translation & Extraction
+  Scenario: Translate implementation details into domain concepts with traceable provenance
+    As an Onboarding Developer, I want technical-to-domain translation of source artifacts, so that I can rapidly comprehend project structure and business purpose without tracing raw implementation details.
+    Given source files within the defined traversal boundaries
+    When the system performs structural and semantic analysis against predefined data models
+    Then implementation-specific details are translated into structured, technology-agnostic descriptions
+    And each finding is preserved as an immutable, timestamped extraction note linked to its source file
+    And the introspection assessment documents a classification rationale based strictly on directory summaries
+```
 
-**Acceptance Criteria:**
-- **Scenario: Generate structured documentation output**
-  - Given a configured project directory
-  - When the analysis pipeline is triggered
-  - Then the system inspects the codebase, extracts intent, and aggregates findings
-  - And produces a structured documentation output
-  - And displays a stage-by-stage execution report
-- **Scenario: End-to-end pipeline execution**
-  - Given a target repository
-  - When the analysis pipeline is executed
-  - Then it automatically initializes the documentation workspace if missing, introspects the structure, extracts per-file findings, and aggregates them into sections
+### Structured Synthesis & Documentation Lifecycle
+- **Persona:** System Architect, Onboarding Developer
+- **Capability:** Structured Synthesis & Documentation Lifecycle Management
+- **Entities Involved:** Documentation Section, Aggregation Stats, Workspace Layout
 
----
+```gherkin
+Feature: Structured Synthesis & Documentation Lifecycle
+  Scenario: Aggregate findings into consistent documentation sections with explicit gap handling
+    As a System Architect, I want structured synthesis and documentation lifecycle management, so that I can validate architectural integrity using consistently formatted, evidence-grounded documentation sections.
+    Given aggregated extraction notes from the analysis phase
+    When the system consolidates findings into categorized documentation sections
+    Then intermediate states are cleared between runs and timestamped extraction notes are appended for auditability
+    And explicit placeholders are generated for incomplete upstream data rather than fabricating content
+    And aggregation statistics atomically track successful writes and flag empty sections to highlight coverage gaps
+```
 
-### Feature: Source Classification & Noise Reduction
-**User Story:** As a migration analyst, I want the system to automatically classify repository paths and exclude non-essential files so that downstream processing focuses only on intent-bearing code.
+### Cross-Cutting Insight Derivation & Visualization
+- **Persona:** Product Manager, System Architect
+- **Capability:** Cross-Cutting Insight Derivation & Visualization
+- **Entities Involved:** Documentation Section, Aggregation Stats
 
-**Acceptance Criteria:**
-- **Scenario: Filter standard noise patterns**
-  - Given a project root
-  - When the system traverses the file tree
-  - Then all paths matching standard version control, dependency cache, and build artifact patterns are omitted from the output
-- **Scenario: Apply custom exclusions and size limits**
-  - Given custom exclusion rules and a maximum file size threshold
-  - When the traversal executes
-  - Then only files matching inclusion criteria and under the size limit are yielded
-- **Scenario: Generate structural summary**
-  - Given a target directory
-  - When a compressed directory tree summary is generated
-  - Then it returns file counts, size totals, top file extensions, and truncated configuration file contents without exceeding depth limits
+```gherkin
+Feature: Cross-Cutting Insight Derivation & Visualization
+  Scenario: Generate high-level system relationships and dependency visualizations
+    As a Product Manager, I want cross-cutting insight derivation and visualization, so that I can understand business purpose and functional contributions without requiring deep code literacy.
+    Given finalized documentation sections across multiple components
+    When the system aggregates high-level artifacts spanning the codebase
+    Then behavioral workflows and system relationships are inferred from the synthesized knowledge
+    And structural and interaction diagrams are rendered to visualize complex dependencies and data flows
+    And the output supports architecture reviews and cross-team alignment without technical jargon
+```
 
----
+### Pipeline Orchestration & Operational Reporting
+- **Persona:** Pipeline Operator, System Architect
+- **Capability:** Pipeline Orchestration & Operational Reporting
+- **Entities Involved:** Execution Summary, Aggregation Stats
 
-### Feature: Contextual Inference & Deterministic Output
-**User Story:** As a technical lead, I want a high-level summary of the system's purpose and schema-conformant classification results so that the documentation has accurate framing and analysis decisions can be reliably tracked.
+```gherkin
+Feature: Pipeline Orchestration & Operational Reporting
+  Scenario: Execute sequential workflow stages and generate comprehensive execution reports
+    As a Pipeline Operator, I want pipeline orchestration and operational reporting, so that I can monitor processing health, verify stage completion, and refine analysis parameters for continuous improvement.
+    Given a sequential multi-stage workflow encompassing structural analysis, extraction, synthesis, and derivation
+    When the orchestrator dynamically adjusts processing boundaries based on initial findings
+    Then a unified execution summary is generated capturing inclusion/exclusion metrics, extraction counts, and generation status
+    And the report provides full visibility into pipeline health and processing efficiency
+    And operators can tune runtime parameters and scoping rules via the centralized settings provider
+```
 
-**Acceptance Criteria:**
-- **Scenario: Infer system purpose**
-  - Given project configuration files and directory summaries
-  - When the analysis runs
-  - Then it produces a concise description of the system's likely function
-- **Scenario: Ensure deterministic decision tracking**
-  - Given the same repository state
-  - When the analysis runs
-  - Then the output strictly conforms to a predefined schema for deterministic parsing and reliable comparison between runs
+### Documented Gaps & Unresolved Dependencies
+The upstream sections establish functional boundaries and operational intent but remain silent on several dimensions required to fully validate these user stories in production. These gaps must be resolved before deployment:
 
----
-
-> **Note on Coverage:** The extracted notes consistently describe initialization, traversal, inference, and output generation workflows. No contradictions were identified; overlapping constraints (e.g., file size limits, workspace auto-initialization) have been consolidated into their respective feature groups for clarity.
+| Gap Category | Impact on User Stories | Upstream Status |
+|---|---|---|
+| **Access Control & Role Permissions** | Stories assume personas can freely consume outputs and override configurations, but workspace restriction and sharing rules are undefined. | Silent |
+| **Quantitative Success Metrics** | Acceptance criteria lack measurable KPIs (e.g., onboarding time reduction, architecture review cycle time, documentation drift frequency). | Silent |
+| **Interactive Feedback Loops** | No mechanism is defined for personas to submit corrections, flag inaccurate extractions, or request targeted re-scans. | Silent |
+| **Persona-Specific Output Formats** | Stories assume standardized markdown and diagrams suffice, but tailored exports, dashboards, or external collaboration hooks are unspecified. | Silent |
+| **Error Handling & Fallback Behaviors** | Pipeline disruption handling, retry mechanisms, and error routing for external service failures are not defined, impacting operator workflows. | Silent |
+| **Note-to-Section Mapping Rules** | The exact grouping, prioritization, and filtering logic for transforming intermediate extraction notes into final documentation sections is implied but not detailed. | Silent |

@@ -1,37 +1,26 @@
 # External-System Dependencies
 
-The system relies on a focused set of external services and infrastructure components to automate documentation generation. These dependencies are abstracted behind standardized interfaces to support runtime substitution and environment-agnostic execution.
+The system depends on a curated set of external services and infrastructure components to ingest, analyze, and transform source code into structured documentation. These dependencies are abstracted to support interchangeable implementations while maintaining consistent operational roles.
 
-### Generative AI & Semantic Inference Service
-The primary external dependency is a generative language model service that powers the core analysis and synthesis pipeline. This service handles:
-- **Semantic Extraction & Intent Analysis:** Interpreting source artifacts to identify technical boundaries, component relationships, and functional intent.
-- **Structured Data Generation:** Converting unstructured code and configuration files into schema-constrained data formats for downstream processing.
-- **Narrative Synthesis:** Transforming structured extraction results into coherent, domain-focused documentation sections.
-- **Diagram & Content Generation:** Producing visual representations and supplementary explanatory text based on pipeline outputs.
-
-The service is accessed through a provider abstraction layer, allowing the underlying inference backend to be swapped at runtime. Connection parameters—including provider type, model identifier, and host endpoint—are externalized for environment-specific configuration.
-
-### Structural Analysis & Classification Engine
-A dedicated semantic reasoning capability evaluates repository topology to guide the extraction pipeline. This service processes compressed directory summaries and manifest contents to:
-- Distinguish production-grade artifacts from auxiliary files, test suites, and build noise.
-- Infer the overarching system purpose and architectural boundaries.
-- Classify file types and module responsibilities before deep analysis begins.
-
-*Note: The notes indicate this classification capability operates alongside the generative service, but do not clarify whether it shares the same inference backend or relies on a separate analytical API. Further documentation is needed to confirm the architectural boundary between these two reasoning layers.*
-
-### File System & Traversal Infrastructure
-The pipeline depends on direct access to the local file system to read source artifacts and repository metadata. To ensure consistent behavior across different operating systems and version control configurations, the system relies on a standardized pattern-matching engine that:
-- Evaluates common ignore-file formats against file paths during directory traversal.
-- Determines inclusion or exclusion criteria to filter out irrelevant artifacts.
-- Provides deterministic rule-parsing semantics regardless of the host environment.
-
-### Dependency Summary
-| Dependency Category | Primary Role | Configuration & Abstraction |
+| Dependency Category | Primary Role | Key Responsibilities |
 |---|---|---|
-| Generative AI Service | Semantic analysis, structured extraction, narrative synthesis, diagram generation | Provider interface; configurable endpoint, model ID, and provider type |
-| Structural Classification Engine | Repository topology evaluation, noise filtering, system purpose inference | Integrated with traversal pipeline; backend origin unspecified |
-| File System & Pattern Engine | Source artifact access, ignore-rule evaluation, cross-platform traversal consistency | Standardized ignore-pattern semantics; OS-agnostic path resolution |
+| **Generative AI & Inference Services** | Core intelligence layer | Semantic analysis, intent extraction, code classification, narrative synthesis, and visual artifact generation. Supports both third-party APIs and locally hosted engines. |
+| **File System Access** | Source ingestion pipeline | Direct read access to target repositories for locating, parsing, and streaming raw source files into the analysis workflow. |
+| **Version Control Filtering Utilities** | Scope management | Pattern-matching logic aligned with standard ignore semantics to exclude build artifacts, dependencies, and non-essential directories. |
+| **Data Validation Frameworks** | Output integrity | Schema enforcement and structural validation to ensure all generated artifacts conform to expected formats before downstream processing. |
+| **Standardized Markup & Diagram Syntaxes** | Cross-platform rendering | Widely adopted documentation and visualization standards that guarantee consistent display across different consumption platforms and publishing pipelines. |
 
-**Gap & Ambiguity Notes:**
-- The provided notes heavily emphasize the generative AI dependency but lack explicit details regarding authentication mechanisms, rate-limiting strategies, or fallback behavior during external service unavailability.
-- The boundary between the generative inference service and the structural classification engine remains ambiguous. It is unclear whether these represent two distinct third-party APIs or two task-specific interfaces to the same underlying model provider.
+### Generative AI & Inference Services
+Acts as the primary cognitive engine for the documentation pipeline. These services process raw technical evidence to classify code, analyze repository structure, and synthesize domain-agnostic narratives. They manage prompt execution, maintain conversational context, and enforce strict output formatting constraints. The architecture supports both cloud-hosted third-party APIs and locally deployed inference engines, allowing deployment flexibility without altering core workflows.
+
+### File System Access
+Provides the foundational data pipeline by granting direct read access to the target codebase. This dependency enables the extraction engine to locate, open, and stream individual source files for analysis. It operates independently of specific storage backends, relying only on standard file system interfaces to ingest raw technical content.
+
+### Version Control Filtering Utilities
+Implements pattern-matching logic that mirrors standard version control ignore semantics. This dependency ensures the system respects project-defined exclusion rules, automatically filtering out build outputs, dependency directories, configuration files, and other non-essential assets. It reduces noise and focuses computational resources exclusively on relevant source material.
+
+### Data Validation Frameworks
+Guarantees structural integrity across all generated outputs. Before any artifact proceeds to aggregation or rendering, it is validated against predefined schemas. This dependency prevents malformed data from propagating downstream and ensures consistent field presence, type alignment, and hierarchical structure.
+
+### Standardized Markup & Diagram Syntaxes
+Ensures interoperability and consistent rendering across documentation consumers. The system relies on widely adopted markup and diagramming standards rather than proprietary formats. This dependency allows generated content to be seamlessly integrated into various publishing platforms, static site generators, and documentation viewers without requiring format conversion.

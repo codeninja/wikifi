@@ -1,18 +1,17 @@
 # Intent and Problem Space
 
-### Core Purpose & Problem Statement
-The system exists to automate the translation of raw source artifacts into structured, technology-agnostic documentation. It addresses the persistent overhead of manual documentation, which frequently leads to outdated references, fragmented knowledge, and steep onboarding curves. By treating source code as a primary carrier of developer intent, the system extracts, synthesizes, and organizes architectural and domain-level insights into cohesive, readable narratives.
+### Core Purpose
+This system exists to automate the transformation of raw source repositories into structured, navigable documentation. It addresses the persistent challenge of fragmented technical knowledge by extracting implicit intent from code artifacts and synthesizing them into a cohesive, technology-agnostic knowledge base. Rather than documenting implementation mechanics, the system focuses on capturing business purpose, user value, and architectural relationships.
 
-### Target Audience & Value Proposition
-Designed for engineering teams, maintainers, and new contributors, the system provides a reliable, high-level understanding of a codebase’s purpose and structure. It eliminates the need to parse implementation details, navigate scattered comments, or rely on tribal knowledge, delivering instead a standardized reference that focuses exclusively on what the system does and why.
+### Problem Space & Target Audience
+Manual documentation is labor-intensive, prone to drift, and often fails to reflect the actual behavior of a codebase. This system serves developers, maintainers, and technical stakeholders who need to understand what a project does, who it serves, and how its components interact—without manually tracing through every file or maintaining documentation that quickly becomes outdated. By treating source code as a repository of implicit intent, the system bridges the gap between fragmented technical artifacts and holistic system understanding.
 
-### Design Constraints & Architectural Principles
-Several foundational constraints shape the system’s design, ensuring it remains adaptable, reliable, and focused on intent rather than implementation:
-- **Technology Agnosticism:** All analysis abstracts away language-specific syntax, frameworks, and libraries. Observations are translated strictly into domain terms and architectural patterns.
-- **Signal-to-Noise Separation:** The system must reliably distinguish intent-bearing production artifacts from scaffolding, tests, dependencies, configuration, and generated outputs.
-- **Structural Stability:** Generated documentation adheres to a strict on-disk contract. This ensures that existing references remain readable and compatible across tool upgrades, repository reorganizations, or configuration changes.
-- **Provider Abstraction:** Underlying semantic analysis capabilities are isolated behind minimal, standardized interfaces. This allows analysis engines to be swapped, upgraded, or replaced without disrupting core synthesis workflows.
-- **Content Fidelity & Contract Enforcement:** Each documentation section must satisfy specific content contracts to guarantee relevance and accuracy. The system prioritizes factual alignment over speculative completeness.
+### Design Constraints
+The architecture is shaped by several non-negotiable constraints that ensure reliability and adaptability across diverse projects:
+- **Technology Agnosticism:** Analysis deliberately ignores implementation-specific details, focusing instead on functional contributions and user-centric narratives. This allows the system to operate across unknown or heterogeneous codebases without assuming specific languages, frameworks, or architectural patterns.
+- **Deterministic Processing:** The workflow follows a structured, stage-gated pipeline that adapts to repository complexity while maintaining predictable outputs. Intermediate analysis states are preserved to support incremental processing, debugging, and auditability.
+- **Decoupled Reasoning:** Core analytical logic is strictly separated from underlying inference services. This abstraction enables seamless substitution of reasoning backends without altering the system’s operational contract or output structure.
+- **Evidence Grounding:** High-level concepts, behavioral narratives, and architectural mappings are derived exclusively from aggregated code evidence. The system explicitly marks missing or contradictory information rather than fabricating content, preserving data integrity throughout the documentation lifecycle.
 
-### Handling Uncertainty & Fragmentation
-Codebases are rarely perfectly documented or consistently structured. The system is designed to operate effectively within this reality by making reproducible, structured decisions about which artifacts warrant detailed inspection. When source material is sparse, contradictory, or lacks clear intent signals, the system explicitly declares these gaps. Rather than inferring or fabricating purpose, it preserves raw analysis data and generates structured placeholders, ensuring that documentation remains a trustworthy reflection of the actual codebase state.
+### Operational Philosophy
+The system operates on the principle that documentation should emerge from actual system behavior, not assumptions. By systematically filtering non-essential artifacts, extracting semantic insights per file, aggregating findings into coherent sections, and deriving user-centric documentation, it eliminates manual overhead while maintaining technical accuracy. The result is a stable, upgrade-safe documentation contract that evolves alongside the codebase, ensuring that knowledge remains accessible, structured, and aligned with real-world usage.
