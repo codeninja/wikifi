@@ -26,6 +26,13 @@ class Settings(BaseSettings):
     request_timeout: float = Field(default=300.0, description="Per-request timeout in seconds")
     max_file_bytes: int = Field(default=200_000, description="Skip files larger than this during extraction")
     introspection_depth: int = Field(default=3, description="Tree depth fed to the introspection pass")
+    # Thinking mode for reasoning-capable models (Qwen3, DeepSeek-R1, etc.).
+    # Default 'low' — Qwen3 ignores `format=<schema>` constraints when
+    # thinking is fully disabled and emits free text instead, so we keep a
+    # short reasoning trace but cap it to the lowest available level.
+    # 'low' / 'medium' / 'high' for Qwen3-style; True for DeepSeek-style;
+    # False to opt out entirely (only safe with non-thinking models).
+    think: bool | str = Field(default="low", description="Thinking-mode level for reasoning models")
 
 
 @lru_cache

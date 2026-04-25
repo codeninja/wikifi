@@ -26,11 +26,8 @@ def _stub_chat_response(content: str) -> SimpleNamespace:
 def test_ollama_provider_complete_json_uses_schema_format(monkeypatch):
     captured: dict = {}
 
-    def fake_chat(*, model, messages, format=None, options=None):
-        captured["model"] = model
-        captured["messages"] = messages
-        captured["format"] = format
-        captured["options"] = options
+    def fake_chat(**kwargs):
+        captured.update(kwargs)
         return _stub_chat_response('{"value": "hello"}')
 
     provider = OllamaProvider(model="m", host="http://h")
@@ -43,6 +40,23 @@ def test_ollama_provider_complete_json_uses_schema_format(monkeypatch):
     assert captured["options"] == {"temperature": 0}
     assert captured["messages"][0] == {"role": "system", "content": "sys"}
     assert captured["messages"][1] == {"role": "user", "content": "usr"}
+    # Default think="low" is forwarded to the client (see provider docstring
+    # for why fully disabling thinking breaks Qwen3's schema enforcement).
+    assert captured["think"] == "low"
+
+
+def test_ollama_provider_forwards_custom_think_level(monkeypatch):
+    captured: dict = {}
+
+    def fake_chat(**kwargs):
+        captured.update(kwargs)
+        return _stub_chat_response('{"value": "x"}')
+
+    provider = OllamaProvider(model="m", host="http://h", think=False)
+    monkeypatch.setattr(provider._client, "chat", fake_chat)
+
+    provider.complete_json(system="s", user="u", schema=_Echo)
+    assert captured["think"] is False
 
 
 def test_ollama_provider_complete_text_returns_message_content(monkeypatch):

@@ -115,4 +115,5 @@ def _default_provider(settings: Settings) -> LLMProvider:
         model=settings.model,
         host=settings.ollama_host,
         timeout=settings.request_timeout,
+        think=settings.think,
     )
