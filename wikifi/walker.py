@@ -23,6 +23,7 @@ from pathspec import GitIgnoreSpec
 # and wikifi's own working dir. Add patterns conservatively; users can
 # override via `--include` later.
 DEFAULT_EXCLUDES: tuple[str, ...] = (
+    ".git",  # matches both the directory in normal checkouts and the gitdir pointer file in worktrees
     ".git/",
     ".hg/",
     ".svn/",
