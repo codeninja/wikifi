@@ -110,6 +110,11 @@ def walk(target: TargetArg = None) -> None:
         f"sections_written={report.aggregation.sections_written} "
         f"sections_empty={report.aggregation.sections_empty}",
     )
+    table.add_row(
+        "4. Derivation",
+        f"sections_derived={report.derivation.sections_derived} "
+        f"sections_skipped={report.derivation.sections_skipped}",
+    )
     console.print(table)
     console.print(f"\n[green]Done.[/green] Wiki at [bold]{target}/.wikifi/[/bold]")
 

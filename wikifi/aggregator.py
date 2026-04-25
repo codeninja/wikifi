@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from pydantic import BaseModel, Field
 
 from wikifi.providers.base import LLMProvider
-from wikifi.sections import SECTIONS, Section
+from wikifi.sections import PRIMARY_SECTIONS, Section
 from wikifi.wiki import WikiLayout, read_notes, write_section
 
 log = logging.getLogger("wikifi.aggregator")
@@ -52,9 +52,14 @@ class AggregationStats:
 
 
 def aggregate_all(*, layout: WikiLayout, provider: LLMProvider) -> AggregationStats:
-    """Aggregate every section in the taxonomy and write its markdown file."""
+    """Aggregate every primary section from its accumulated notes.
+
+    Derivative sections (personas, user stories, diagrams) are populated by
+    `wikifi.deriver.derive_all` after this stage — they have no per-file
+    notes to aggregate from.
+    """
     stats = AggregationStats()
-    for section in SECTIONS:
+    for section in PRIMARY_SECTIONS:
         notes = read_notes(layout, section)
         if not notes:
             write_section(layout, section, _empty_body(section))

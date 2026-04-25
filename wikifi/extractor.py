@@ -19,14 +19,18 @@ from pathlib import Path
 from pydantic import BaseModel, Field
 
 from wikifi.providers.base import LLMProvider
-from wikifi.sections import SECTION_IDS, SECTIONS
+from wikifi.sections import PRIMARY_SECTION_IDS, PRIMARY_SECTIONS
 from wikifi.wiki import WikiLayout, append_note
 
 log = logging.getLogger("wikifi.extractor")
 
 
-_SECTION_LIST = ", ".join(SECTION_IDS)
-_SECTION_BRIEFS = "\n".join(f"- {s.id}: {s.description}" for s in SECTIONS)
+# Per-file extraction targets *primary* sections only. Derivative sections
+# (personas, user stories, diagrams) emerge from the aggregate of primaries
+# and are produced in Stage 4 — asking the model to identify them at the
+# per-file level produces sparse, speculative findings.
+_SECTION_LIST = ", ".join(PRIMARY_SECTION_IDS)
+_SECTION_BRIEFS = "\n".join(f"- {s.id}: {s.description}" for s in PRIMARY_SECTIONS)
 
 
 EXTRACTION_SYSTEM_PROMPT = f"""\
@@ -41,8 +45,7 @@ If a file contributes nothing to a section, omit that section. If a file is \
 purely scaffolding (config, formatting, build, test fixtures) return an empty \
 findings list.
 
-Available section ids:
-{_SECTION_LIST}
+Only emit findings for these section ids: {_SECTION_LIST}
 
 Section briefs:
 {_SECTION_BRIEFS}
@@ -81,7 +84,7 @@ def extract_repo(
 ) -> ExtractionStats:
     """Walk the supplied files and append per-section findings to the notes store."""
     stats = ExtractionStats()
-    valid_ids = set(SECTION_IDS)
+    valid_ids = set(PRIMARY_SECTION_IDS)
 
     for rel in files:
         stats.files_seen += 1

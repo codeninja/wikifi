@@ -2,6 +2,7 @@ import pytest
 
 from wikifi.aggregator import SectionBody
 from wikifi.config import Settings
+from wikifi.deriver import DerivedSection
 from wikifi.extractor import FileFindings, SectionFinding
 from wikifi.introspection import IntrospectionResult
 from wikifi.orchestrator import _default_provider, init_wiki, run_walk
@@ -22,7 +23,7 @@ def test_init_wiki_scaffolds_layout(tmp_path):
     assert paths
 
 
-def test_run_walk_executes_all_three_stages(mini_target, mock_provider_factory):
+def test_run_walk_executes_all_four_stages(mini_target, mock_provider_factory):
     settings = _settings()
     introspection = IntrospectionResult(
         include=["src/"], exclude=[], primary_languages=["python"], likely_purpose="demo", rationale="ok"
@@ -38,6 +39,8 @@ def test_run_walk_executes_all_three_stages(mini_target, mock_provider_factory):
             )
         if schema is SectionBody:
             return SectionBody(body="Synthesized section body.")
+        if schema is DerivedSection:
+            return DerivedSection(body="Derived section body.")
         raise AssertionError(f"unexpected schema {schema}")
 
     provider = mock_provider_factory(json_factory=factory)
@@ -47,10 +50,14 @@ def test_run_walk_executes_all_three_stages(mini_target, mock_provider_factory):
     assert report.extraction.files_seen >= 2  # api.py + domain.py at least
     assert report.extraction.findings_total >= 2
     assert report.aggregation.sections_written >= 1
+    assert report.derivation.sections_derived >= 1
 
     layout = WikiLayout(root=mini_target)
     entities = layout.section_path("entities").read_text()
     assert "Synthesized section body." in entities
+    # personas is derivative; with entities populated it should derive successfully.
+    personas = layout.section_path("personas").read_text()
+    assert "Derived section body." in personas
 
 
 def test_run_walk_auto_inits_when_missing(mini_target, mock_provider_factory):
