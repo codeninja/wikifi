@@ -1,0 +1,18 @@
+[project]
+name = "wikifi-backend"
+version = "0.1.0"
+description = "Backend for Wikifi"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi",
+    "pydantic",
+    "pydantic-settings",
+    "sqlalchemy>=2",
+    "alembic",
+]
+
+[tool.pytest.ini_options]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
