@@ -25,6 +25,10 @@ class Settings(BaseSettings):
     ollama_host: str = Field(default="http://localhost:11434", description="Ollama HTTP endpoint")
     request_timeout: float = Field(default=300.0, description="Per-request timeout in seconds")
     max_file_bytes: int = Field(default=200_000, description="Skip files larger than this during extraction")
+    min_content_bytes: int = Field(
+        default=64,
+        description="Skip files whose stripped content is shorter than this (avoids thinking runaway on stubs)",
+    )
     introspection_depth: int = Field(default=3, description="Tree depth fed to the introspection pass")
     # Thinking mode for reasoning-capable models (Qwen3, DeepSeek-R1, etc.).
     # Default 'low' — Qwen3 ignores `format=<schema>` constraints when

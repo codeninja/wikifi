@@ -62,12 +62,18 @@ class WalkConfig:
 
     `extra_excludes` extends the always-on defaults with patterns supplied by
     Stage 1 (introspection's exclude list) or by the user.
+
+    `min_content_bytes` filters near-empty files (think `__init__.py` with
+    nothing but a version string). Empty inputs cause thinking-capable
+    models to wander for minutes producing speculative findings, so we
+    skip them before they ever hit the extractor.
     """
 
     root: Path
     extra_excludes: tuple[str, ...] = field(default_factory=tuple)
     respect_gitignore: bool = True
     max_file_bytes: int = 200_000
+    min_content_bytes: int = 64
 
 
 def build_spec(config: WalkConfig) -> GitIgnoreSpec:
@@ -84,17 +90,31 @@ def build_spec(config: WalkConfig) -> GitIgnoreSpec:
 def iter_files(config: WalkConfig) -> Iterator[Path]:
     """Yield repo-relative paths of files that should be analyzed.
 
-    Files larger than `max_file_bytes` are skipped — large files are usually
-    generated, vendored, or assets, none of which contribute to a tech-agnostic
-    wiki. The threshold is a soft heuristic; users can raise it.
+    Filters applied (in order, so cheapest checks fail fast):
+
+    1. Path matches a default-exclude / gitignore / introspection-exclude →
+       skip.
+    2. Size > ``max_file_bytes`` → skip (likely generated, vendored, or asset).
+    3. Stripped content < ``min_content_bytes`` → skip (likely a stub
+       ``__init__.py``, a one-liner config, or an empty file). Tiny inputs
+       cause thinking-capable models to invent findings or run away on the
+       reasoning trace; not worth analyzing either way.
     """
     spec = build_spec(config)
     for path in _walk(config.root, spec):
         try:
-            if path.stat().st_size > config.max_file_bytes:
-                continue
+            stat = path.stat()
         except OSError:
             continue
+        if stat.st_size > config.max_file_bytes:
+            continue
+        if config.min_content_bytes > 0:
+            try:
+                stripped = path.read_text(encoding="utf-8", errors="replace").strip()
+            except OSError:
+                continue
+            if len(stripped) < config.min_content_bytes:
+                continue
         yield path.relative_to(config.root)
 
 

@@ -70,6 +70,7 @@ def run_walk(
     base_config = WalkConfig(
         root=root,
         max_file_bytes=settings.max_file_bytes,
+        min_content_bytes=settings.min_content_bytes,
     )
 
     log.info("stage 1: introspecting repository structure")
@@ -79,6 +80,7 @@ def run_walk(
         root=root,
         extra_excludes=tuple(introspection.exclude),
         max_file_bytes=settings.max_file_bytes,
+        min_content_bytes=settings.min_content_bytes,
     )
 
     log.info("stage 2: extracting per-file findings")
