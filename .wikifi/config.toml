@@ -1,4 +1,0 @@
-# wikifi local config — overrides WIKIFI_* environment variables when present.
-provider = "ollama"
-model = "qwen3.6:27b"
-ollama_host = "http://localhost:11434"
