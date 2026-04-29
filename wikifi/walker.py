@@ -72,7 +72,12 @@ class WalkConfig:
     root: Path
     extra_excludes: tuple[str, ...] = field(default_factory=tuple)
     respect_gitignore: bool = True
-    max_file_bytes: int = 200_000
+    # Absolute upper bound — files above this are treated as vendored or
+    # generated noise and skipped entirely. Real source files (even
+    # monolithic ones) fit comfortably under the default; the extractor
+    # chunks anything that exceeds its per-call window rather than dropping
+    # it here.
+    max_file_bytes: int = 2_000_000
     min_content_bytes: int = 64
 
 
@@ -95,6 +100,8 @@ def iter_files(config: WalkConfig) -> Iterator[Path]:
     1. Path matches a default-exclude / gitignore / introspection-exclude →
        skip.
     2. Size > ``max_file_bytes`` → skip (likely generated, vendored, or asset).
+       Real source files — even monolithic ones — are expected to fit; the
+       extractor chunks anything bigger than its per-call window.
     3. Stripped content < ``min_content_bytes`` → skip (likely a stub
        ``__init__.py``, a one-liner config, or an empty file). Tiny inputs
        cause thinking-capable models to invent findings or run away on the

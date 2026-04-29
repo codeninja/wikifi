@@ -91,7 +91,8 @@ def run_walk(
         provider=provider,
         files=files,
         repo_root=root,
-        max_file_bytes=settings.max_file_bytes,
+        chunk_size_bytes=settings.chunk_size_bytes,
+        chunk_overlap_bytes=settings.chunk_overlap_bytes,
     )
 
     log.info("stage 3: aggregating primary sections")

@@ -24,7 +24,27 @@ class Settings(BaseSettings):
     model: str = Field(default="qwen3.6:27b", description="Model identifier passed to the provider")
     ollama_host: str = Field(default="http://localhost:11434", description="Ollama HTTP endpoint")
     request_timeout: float = Field(default=900.0, description="Per-request timeout in seconds")
-    max_file_bytes: int = Field(default=200_000, description="Skip files larger than this during extraction")
+    # Absolute skip threshold for the walker. Files larger than this are
+    # treated as vendored/generated noise and never read. Real source files —
+    # even monolithic ones — should fit comfortably under this; the extractor
+    # chunks anything bigger than ``chunk_size_bytes`` into overlapping
+    # windows rather than truncating.
+    max_file_bytes: int = Field(
+        default=2_000_000,
+        description="Walker skip threshold; files larger are dropped as noise",
+    )
+    # Per-LLM-call window size. Files larger than this are split into
+    # overlapping chunks (one call each). 150 KB fits comfortably in a 32K
+    # context model after prompt overhead while still consuming most source
+    # files in a single call.
+    chunk_size_bytes: int = Field(
+        default=150_000,
+        description="Per-LLM-call chunk size when splitting large files",
+    )
+    chunk_overlap_bytes: int = Field(
+        default=8_000,
+        description="Bytes shared between adjacent chunks to preserve cross-boundary context",
+    )
     min_content_bytes: int = Field(
         default=64,
         description="Skip files whose stripped content is shorter than this (avoids thinking runaway on stubs)",

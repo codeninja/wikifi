@@ -1,6 +1,6 @@
 # wikifi
 
-> A Python library that walks a codebase and produces a **technology-agnostic** wiki describing the system in migration-ready terms.
+> A Python library that walks a codebase and produces a **technology-agnostic** feature and domain extraction from the source suitable for reflection into a new modern implementaiton which retains it's previous functionality and delivered value to users.
 
 For the *why* behind wikifi and the design questions still to resolve, see [`VISION.md`](./VISION.md). For the development process, see [`CLAUDE.md`](./CLAUDE.md).
 
@@ -33,7 +33,7 @@ uv run wikifi init
 
 ## Tech stack
 - **Python 3.12+**, packaged with **`uv`**
-- **Local LLM via Ollama** as the default runtime; thinking-capable model (Qwen3 family or equivalent) at the highest available reasoning level.
+- **Local LLM via Ollama** as the default runtime; thinking-capable model (Qwen 3 27B) at the highest available reasoning level.
 - **Provider abstraction layer** — Ollama is the default, additional backends slot in without touching the rest of the system.
 - **`ruff`** as the single tool for lint and format
 - **`pytest` + `pytest-cov`** for tests
