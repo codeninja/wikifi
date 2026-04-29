@@ -93,9 +93,7 @@ def _render_user_prompt(section: Section, notes: list[dict]) -> str:
         finding = note.get("finding", "")
         lines.append(f"- [{file_ref}] (file role: {summary}) {finding}")
     lines.append("")
-    lines.append(
-        "Synthesize a coherent markdown body for this section. Follow the rules in the system prompt."
-    )
+    lines.append("Synthesize a coherent markdown body for this section. Follow the rules in the system prompt.")
     return "\n".join(lines)
 
 

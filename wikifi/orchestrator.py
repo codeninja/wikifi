@@ -65,7 +65,7 @@ def run_walk(
             ollama_host=settings.ollama_host,
         )
 
-    provider = provider or _default_provider(settings)
+    provider = provider or build_provider(settings)
 
     base_config = WalkConfig(
         root=root,
@@ -109,11 +109,10 @@ def run_walk(
     )
 
 
-def _default_provider(settings: Settings) -> LLMProvider:
+def build_provider(settings: Settings) -> LLMProvider:
+    """Construct the configured provider. Currently Ollama is the only backend."""
     if settings.provider != "ollama":
-        raise ValueError(
-            f"unknown provider {settings.provider!r}; only 'ollama' is supported in v1"
-        )
+        raise ValueError(f"unknown provider {settings.provider!r}; only 'ollama' is supported in v1")
     return OllamaProvider(
         model=settings.model,
         host=settings.ollama_host,

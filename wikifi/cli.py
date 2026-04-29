@@ -1,10 +1,10 @@
 """Typer-driven CLI for wikifi.
 
 Entry point: ``wikifi`` (declared in ``pyproject.toml`` ``[project.scripts]``).
-The two v1 commands are:
 
 - ``wikifi init`` — scaffold the ``.wikifi/`` directory in CWD
-- ``wikifi walk`` — run the full Stage 1→2→3 pipeline against CWD
+- ``wikifi walk`` — run the full Stage 1→2→3→4 pipeline against CWD
+- ``wikifi chat`` — interactive REPL with ``.wikifi/`` content as context
 """
 
 from __future__ import annotations
@@ -19,8 +19,10 @@ from rich.panel import Panel
 from rich.table import Table
 
 from wikifi import __version__
+from wikifi.chat import run_repl
 from wikifi.config import get_settings
-from wikifi.orchestrator import init_wiki, run_walk
+from wikifi.orchestrator import build_provider, init_wiki, run_walk
+from wikifi.wiki import WikiLayout
 
 app = typer.Typer(
     help="Walk a codebase and produce a technology-agnostic markdown wiki of its intent.",
@@ -107,16 +109,31 @@ def walk(target: TargetArg = None) -> None:
     )
     table.add_row(
         "3. Aggregation",
-        f"sections_written={report.aggregation.sections_written} "
-        f"sections_empty={report.aggregation.sections_empty}",
+        f"sections_written={report.aggregation.sections_written} sections_empty={report.aggregation.sections_empty}",
     )
     table.add_row(
         "4. Derivation",
-        f"sections_derived={report.derivation.sections_derived} "
-        f"sections_skipped={report.derivation.sections_skipped}",
+        f"sections_derived={report.derivation.sections_derived} sections_skipped={report.derivation.sections_skipped}",
     )
     console.print(table)
     console.print(f"\n[green]Done.[/green] Wiki at [bold]{target}/.wikifi/[/bold]")
+
+
+@app.command()
+def chat(target: TargetArg = None) -> None:
+    """Open an interactive REPL with .wikifi/ section content as context."""
+    target = target or Path.cwd()
+    layout = WikiLayout(root=target)
+    if not layout.wiki_dir.exists():
+        console.print(
+            f"[red]No .wikifi/ directory at {target}.[/red] "
+            "Run [bold]wikifi init[/bold] and [bold]wikifi walk[/bold] first."
+        )
+        raise typer.Exit(code=1)
+
+    settings = get_settings()
+    provider = build_provider(settings)
+    run_repl(layout=layout, provider=provider, console=console)
 
 
 def main() -> None:

@@ -164,9 +164,7 @@ def _validate() -> None:
             if upstream not in SECTIONS_BY_ID:
                 raise ValueError(f"section {section.id!r} references unknown upstream {upstream!r}")
             if upstream not in seen:
-                raise ValueError(
-                    f"section {section.id!r} depends on {upstream!r}, which appears later in SECTIONS"
-                )
+                raise ValueError(f"section {section.id!r} depends on {upstream!r}, which appears later in SECTIONS")
         seen.add(section.id)
 
 

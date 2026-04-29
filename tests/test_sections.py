@@ -53,9 +53,7 @@ def test_derivative_upstreams_appear_earlier_in_sections_tuple():
     seen: set[str] = set()
     for section in SECTIONS:
         for upstream_id in section.derived_from:
-            assert upstream_id in seen, (
-                f"{section.id} depends on {upstream_id}, which appears later in SECTIONS"
-            )
+            assert upstream_id in seen, f"{section.id} depends on {upstream_id}, which appears later in SECTIONS"
         seen.add(section.id)
 
 

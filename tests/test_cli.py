@@ -2,6 +2,7 @@ from typer.testing import CliRunner
 
 from wikifi import __version__
 from wikifi.cli import app
+from wikifi.wiki import WikiLayout, initialize
 
 
 def test_version_flag():
@@ -32,3 +33,40 @@ def test_no_subcommand_shows_help():
     # Click's no_args_is_help convention is exit 2 with usage on stderr/stdout.
     assert result.exit_code == 2
     assert "wikifi" in result.output.lower() or "Usage" in result.output
+
+
+def test_chat_command_is_registered():
+    runner = CliRunner()
+    result = runner.invoke(app, ["--help"])
+    assert result.exit_code == 0
+    assert "chat" in result.output
+
+
+def test_chat_command_errors_when_wiki_missing(tmp_path):
+    runner = CliRunner()
+    result = runner.invoke(app, ["chat", str(tmp_path)])
+    assert result.exit_code == 1
+    assert "No .wikifi/" in result.output
+
+
+def test_chat_command_runs_repl(tmp_path, monkeypatch):
+    layout = WikiLayout(root=tmp_path)
+    initialize(layout, model="m", provider="ollama", ollama_host="http://h")
+    layout.section_path("intent").write_text("# intent\n\nhello body\n")
+
+    captured: dict = {}
+
+    def fake_run_repl(*, layout, provider, console):
+        captured["layout"] = layout
+        captured["provider"] = provider
+
+    fake_provider = object()
+    monkeypatch.setattr("wikifi.cli.run_repl", fake_run_repl)
+    monkeypatch.setattr("wikifi.cli.build_provider", lambda _settings: fake_provider)
+
+    runner = CliRunner()
+    result = runner.invoke(app, ["chat", str(tmp_path)])
+
+    assert result.exit_code == 0, result.output
+    assert captured["layout"].root == tmp_path
+    assert captured["provider"] is fake_provider

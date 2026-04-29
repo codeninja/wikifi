@@ -70,3 +70,35 @@ def test_ollama_provider_complete_text_handles_none(monkeypatch):
     provider = OllamaProvider(model="m", host="http://h")
     monkeypatch.setattr(provider._client, "chat", lambda **kwargs: _stub_chat_response(None))
     assert provider.complete_text(system="s", user="u") == ""
+
+
+def test_ollama_provider_chat_prepends_system_and_returns_content(monkeypatch):
+    captured: dict = {}
+
+    def fake_chat(**kwargs):
+        captured.update(kwargs)
+        return _stub_chat_response("assistant reply")
+
+    provider = OllamaProvider(model="m", host="http://h")
+    monkeypatch.setattr(provider._client, "chat", fake_chat)
+
+    result = provider.chat(
+        system="ctx",
+        messages=[
+            {"role": "user", "content": "first"},
+            {"role": "assistant", "content": "first reply"},
+            {"role": "user", "content": "second"},
+        ],
+    )
+    assert result == "assistant reply"
+    assert captured["model"] == "m"
+    assert captured["messages"][0] == {"role": "system", "content": "ctx"}
+    assert captured["messages"][-1] == {"role": "user", "content": "second"}
+    assert len(captured["messages"]) == 4
+    assert captured["think"] == "high"
+
+
+def test_ollama_provider_chat_handles_none_content(monkeypatch):
+    provider = OllamaProvider(model="m", host="http://h")
+    monkeypatch.setattr(provider._client, "chat", lambda **kwargs: _stub_chat_response(None))
+    assert provider.chat(system="s", messages=[{"role": "user", "content": "hi"}]) == ""

@@ -33,15 +33,18 @@ class MockProvider:
         *,
         json_responses: dict[type[BaseModel], Iterable[BaseModel]] | None = None,
         text_responses: Iterable[str] | None = None,
+        chat_responses: Iterable[str] | None = None,
         json_factory: Callable[[type[BaseModel], str, str], BaseModel] | None = None,
     ) -> None:
         self._json_queues: dict[type[BaseModel], list[BaseModel]] = {
             cls: list(queue) for cls, queue in (json_responses or {}).items()
         }
         self._text_queue: list[str] = list(text_responses or [])
+        self._chat_queue: list[str] = list(chat_responses or [])
         self._json_factory = json_factory
         self.json_calls: list[tuple[type[BaseModel], str, str]] = []
         self.text_calls: list[tuple[str, str]] = []
+        self.chat_calls: list[tuple[str, list[dict]]] = []
 
     def complete_json(self, *, system: str, user: str, schema: type[T]) -> T:
         self.json_calls.append((schema, system, user))
@@ -57,6 +60,12 @@ class MockProvider:
         if not self._text_queue:
             raise AssertionError("MockProvider has no queued text response")
         return self._text_queue.pop(0)
+
+    def chat(self, *, system: str, messages: list[dict]) -> str:
+        self.chat_calls.append((system, list(messages)))
+        if not self._chat_queue:
+            raise AssertionError("MockProvider has no queued chat response")
+        return self._chat_queue.pop(0)
 
 
 @pytest.fixture
@@ -76,9 +85,7 @@ def mini_target(tmp_path: Path) -> Path:
     Used as the target of walker / introspection / orchestrator tests so the
     real codebase isn't a test dependency.
     """
-    (tmp_path / "pyproject.toml").write_text(
-        '[project]\nname = "fakeapp"\nversion = "0.0.1"\ndescription = "demo"\n'
-    )
+    (tmp_path / "pyproject.toml").write_text('[project]\nname = "fakeapp"\nversion = "0.0.1"\ndescription = "demo"\n')
     (tmp_path / "README.md").write_text("# fakeapp\n\nA demo target for tests.\n")
 
     src = tmp_path / "src" / "fakeapp"
@@ -91,8 +98,7 @@ def mini_target(tmp_path: Path) -> Path:
         "        self.items = items\n"
     )
     (src / "api.py").write_text(
-        "def place_order(customer, items):\n"
-        "    return {'customer': customer, 'items': items}\n"
+        "def place_order(customer, items):\n    return {'customer': customer, 'items': items}\n"
     )
 
     noise = tmp_path / "node_modules" / "leftpad"

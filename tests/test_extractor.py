@@ -202,8 +202,7 @@ def test_extract_repo_records_chunk_metadata_when_chunked(tmp_path, mock_provide
     (tmp_path / "tagged.py").write_text(body)
 
     findings_per_chunk = [
-        FileFindings(findings=[SectionFinding(section_id="entities", finding=f"chunk-{i}-entity")])
-        for i in range(50)
+        FileFindings(findings=[SectionFinding(section_id="entities", finding=f"chunk-{i}-entity")]) for i in range(50)
     ]
 
     iterator = iter(findings_per_chunk)
@@ -291,7 +290,7 @@ def test_chunk_text_falls_back_to_byte_split_on_monolithic_input():
 
 
 def test_chunk_text_overlap_appears_between_adjacent_chunks():
-    text = ("line\n" * 200)  # 1000 bytes
+    text = "line\n" * 200  # 1000 bytes
     chunks = _chunk_text(text, chunk_size=200, overlap=40)
     assert len(chunks) >= 2
     assert all(len(c) <= 200 for c in chunks)

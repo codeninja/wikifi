@@ -36,6 +36,8 @@ from typing import TypeVar
 from ollama import Client
 from pydantic import BaseModel
 
+from wikifi.providers.base import ChatMessage
+
 T = TypeVar("T", bound=BaseModel)
 
 ThinkLevel = bool | str | None
@@ -77,6 +79,14 @@ class OllamaProvider:
                 {"role": "system", "content": system},
                 {"role": "user", "content": user},
             ],
+            think=self.think,
+        )
+        return response.message.content or ""
+
+    def chat(self, *, system: str, messages: list[ChatMessage]) -> str:
+        response = self._client.chat(
+            model=self.model,
+            messages=[{"role": "system", "content": system}, *messages],
             think=self.think,
         )
         return response.message.content or ""

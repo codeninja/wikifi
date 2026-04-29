@@ -5,7 +5,7 @@ from wikifi.config import Settings
 from wikifi.deriver import DerivedSection
 from wikifi.extractor import FileFindings, SectionFinding
 from wikifi.introspection import IntrospectionResult
-from wikifi.orchestrator import _default_provider, init_wiki, run_walk
+from wikifi.orchestrator import build_provider, init_wiki, run_walk
 from wikifi.providers.ollama_provider import OllamaProvider
 from wikifi.sections import SECTIONS
 from wikifi.wiki import WikiLayout
@@ -80,12 +80,12 @@ def test_run_walk_auto_inits_when_missing(mini_target, mock_provider_factory):
         assert layout.section_path(section).exists()
 
 
-def test_default_provider_returns_ollama_for_ollama_settings():
-    provider = _default_provider(_settings(provider="ollama", model="m", ollama_host="http://localhost:11434"))
+def test_build_provider_returns_ollama_for_ollama_settings():
+    provider = build_provider(_settings(provider="ollama", model="m", ollama_host="http://localhost:11434"))
     assert isinstance(provider, OllamaProvider)
     assert provider.model == "m"
 
 
-def test_default_provider_rejects_unknown():
+def test_build_provider_rejects_unknown():
     with pytest.raises(ValueError):
-        _default_provider(_settings(provider="other"))
+        build_provider(_settings(provider="other"))

@@ -22,7 +22,7 @@ uv run wikifi init
 - `ask` — natural language queries against the wiki content, with optional context injection from the target codebase.
 - `chat` — interactive REPL for iterative exploration of the wiki content and the target codebase.
 
-## Architecture (sketch)
+## Architecture
 - **`wikifi/` package** — the library, with the CLI entry point exposed via `[project.scripts] wikifi = "wikifi.cli:main"` in `pyproject.toml`.
 - **Repository introspection** — before walking, the agent reviews the target's root structure (manifests, top-level layout, gitignore signals) and decides which paths carry production source worth analyzing. The walk that follows is deterministic — the agent does not re-pick scope mid-walk.
 - **Per-file extraction** — for each in-scope file, the agent extracts contributions to each *primary* capture section (see `VISION.md`) into structured findings.
