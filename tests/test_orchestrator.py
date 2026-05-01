@@ -103,6 +103,27 @@ def test_build_provider_returns_anthropic_when_selected(monkeypatch):
     assert provider.model.startswith("claude-")
 
 
+def test_build_provider_returns_openai_when_selected(monkeypatch):
+    """``provider='openai'`` dispatches to OpenAIProvider with a GPT default."""
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    settings = _settings(provider="openai", model="m")  # non-gpt id
+    provider = build_provider(settings)
+    from wikifi.providers.openai_provider import OpenAIProvider
+
+    assert isinstance(provider, OpenAIProvider)
+    # Falls back to gpt-4o rather than 404'ing on "m".
+    assert provider.model.startswith("gpt-")
+
+
+def test_build_provider_preserves_explicit_openai_model(monkeypatch):
+    """A user-supplied gpt/o-series model id is passed through unchanged."""
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    for model in ("gpt-4o", "o3-mini", "gpt-5"):
+        settings = _settings(provider="openai", model=model)
+        provider = build_provider(settings)
+        assert provider.model == model
+
+
 def test_run_walk_persists_cache_for_resumability(mini_target, mock_provider_factory):
     """A second walk reuses the cache and skips the LLM call for unchanged files."""
     settings = _settings()

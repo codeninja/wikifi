@@ -159,8 +159,9 @@ def run_walk(
 def build_provider(settings: Settings) -> LLMProvider:
     """Construct the configured provider.
 
-    Local Ollama is the default. Hosted Anthropic is opt-in via
-    ``WIKIFI_PROVIDER=anthropic`` and an ``ANTHROPIC_API_KEY``.
+    Local Ollama is the default. Hosted backends are opt-in via
+    ``WIKIFI_PROVIDER=anthropic`` (plus ``ANTHROPIC_API_KEY``) or
+    ``WIKIFI_PROVIDER=openai`` (plus ``OPENAI_API_KEY``).
     """
     if settings.provider == "ollama":
         return OllamaProvider(
@@ -183,4 +184,25 @@ def build_provider(settings: Settings) -> LLMProvider:
             max_tokens=settings.anthropic_max_tokens,
             think=settings.think,
         )
-    raise ValueError(f"unknown provider {settings.provider!r}; expected 'ollama' or 'anthropic'")
+    if settings.provider == "openai":
+        from wikifi.providers.openai_provider import OpenAIProvider
+
+        # Same default-swap guard as the Anthropic path: a user opting
+        # in to OpenAI shouldn't 404 because the Ollama model id is
+        # still in their config.
+        model = settings.model if _looks_like_openai_model(settings.model) else "gpt-4o"
+        return OpenAIProvider(
+            model=model,
+            api_key=settings.openai_api_key,
+            base_url=settings.openai_base_url,
+            timeout=settings.request_timeout,
+            max_tokens=settings.openai_max_tokens,
+            think=settings.think,
+        )
+    raise ValueError(f"unknown provider {settings.provider!r}; expected 'ollama', 'anthropic', or 'openai'")
+
+
+def _looks_like_openai_model(model: str) -> bool:
+    """Heuristic — covers gpt-*, o1/o3/o4 reasoning, and ft: variants."""
+    lowered = model.lower()
+    return lowered.startswith(("gpt-", "o1", "o3", "o4", "ft:"))

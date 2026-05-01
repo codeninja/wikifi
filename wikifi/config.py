@@ -3,8 +3,9 @@
 Defaults assume a local Ollama server with qwen3.6:27b. Override any field via
 WIKIFI_* env vars or a .env file in the target project's CWD.
 
-The hosted Anthropic provider is selected via ``WIKIFI_PROVIDER=anthropic``
-(plus ``ANTHROPIC_API_KEY`` from env).
+Hosted providers are opt-in:
+- ``WIKIFI_PROVIDER=anthropic`` (plus ``ANTHROPIC_API_KEY``)
+- ``WIKIFI_PROVIDER=openai`` (plus ``OPENAI_API_KEY``)
 """
 
 from __future__ import annotations
@@ -23,7 +24,10 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    provider: str = Field(default="ollama", description="LLM provider id; 'ollama' (default) or 'anthropic'")
+    provider: str = Field(
+        default="ollama",
+        description="LLM provider id; 'ollama' (default), 'anthropic', or 'openai'",
+    )
     model: str = Field(default="qwen3.6:27b", description="Model identifier passed to the provider")
     ollama_host: str = Field(default="http://localhost:11434", description="Ollama HTTP endpoint")
     request_timeout: float = Field(default=900.0, description="Per-request timeout in seconds")
@@ -104,6 +108,21 @@ class Settings(BaseSettings):
     anthropic_max_tokens: int = Field(
         default=16_000,
         description="Per-call output token cap for the Anthropic provider.",
+    )
+
+    # ----- OpenAI provider knobs -----
+
+    openai_api_key: str | None = Field(
+        default=None,
+        description=("Explicit OpenAI API key. Falls back to OPENAI_API_KEY in the environment when unset."),
+    )
+    openai_base_url: str | None = Field(
+        default=None,
+        description=("Explicit OpenAI base URL (for Azure-OpenAI / proxies). Defaults to api.openai.com."),
+    )
+    openai_max_tokens: int = Field(
+        default=16_000,
+        description="Per-call output token cap for the OpenAI provider.",
     )
 
 

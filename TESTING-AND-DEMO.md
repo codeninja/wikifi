@@ -204,9 +204,13 @@ findings count, body size, score, headline gap):
 
 (Unit evidence: `tests/test_report.py`.)
 
-### 9. Anthropic provider with prompt caching
+### 9. Hosted providers with prompt caching
 
-Set the API key and switch the provider for a walk:
+Two opt-in hosted backends share the same provider abstraction.
+
+**Anthropic.** Sets `cache_control: {"type": "ephemeral"}` on the system
+prompt block; subsequent per-file extraction calls read the cache for
+~10% of the input price.
 
 ```bash
 export ANTHROPIC_API_KEY=sk-ant-...
@@ -215,13 +219,6 @@ WIKIFI_PROVIDER=anthropic uv run wikifi walk
 uv run wikifi walk --provider anthropic
 ```
 
-The provider sets `cache_control: {"type": "ephemeral"}` on the system
-prompt block. After the first per-file extraction call writes the
-cache, subsequent calls within the cache window read it for ~10% of
-the input price.
-
-To verify caching is active in the wild, intercept the SDK's response:
-
 ```python
 from wikifi.providers.anthropic_provider import AnthropicProvider
 provider = AnthropicProvider(model="claude-opus-4-7", think="high")
@@ -229,11 +226,42 @@ provider = AnthropicProvider(model="claude-opus-4-7", think="high")
 # response.usage.cache_read_input_tokens > 0
 ```
 
+**OpenAI.** Relies on OpenAI's automatic prefix caching — no marker
+required, prefixes ≥ 1024 tokens are cached for ~5–10 minutes. The
+provider also routes the `think` knob to `reasoning_effort` on
+reasoning-capable models (`o*`, `gpt-5`):
+
+```bash
+export OPENAI_API_KEY=sk-...
+WIKIFI_PROVIDER=openai uv run wikifi walk
+# or, with a reasoning model:
+WIKIFI_PROVIDER=openai WIKIFI_MODEL=o3-mini uv run wikifi walk
+# or via flag:
+uv run wikifi walk --provider openai
+```
+
+```python
+from wikifi.providers.openai_provider import OpenAIProvider
+provider = OpenAIProvider(model="gpt-4o", think="high")
+# Reasoning routing:
+# OpenAIProvider(model="o3-mini", think="medium") → forwards reasoning_effort
+# OpenAIProvider(model="gpt-4o",  think="medium") → no reasoning_effort
+```
+
+For Azure-OpenAI or a corporate proxy, set
+`WIKIFI_OPENAI_BASE_URL` (or pass `base_url=...` directly to the
+constructor).
+
 (Unit evidence: `tests/test_anthropic_provider.py` locks in the
 `cache_control` placement, the `messages.parse` structured-output
 contract, the thinking → effort translation, and the APIError →
+RuntimeError mapping. `tests/test_openai_provider.py` covers the
+`chat.completions.parse` structured-output contract, the
+reasoning-effort routing for `o*`/`gpt-5` vs plain models, the
+`max_tokens` vs `max_completion_tokens` swap, and the same APIError →
 RuntimeError mapping. `test_build_provider_returns_anthropic_when_selected`
-in `tests/test_orchestrator.py` covers dispatch.)
+and `test_build_provider_returns_openai_when_selected` in
+`tests/test_orchestrator.py` cover dispatch.)
 
 ## Tearing down
 

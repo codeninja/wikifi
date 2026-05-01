@@ -94,7 +94,10 @@ def walk(
     ] = False,
     provider: Annotated[
         str | None,
-        typer.Option("--provider", help="Override the configured provider for this walk ('ollama' | 'anthropic')."),
+        typer.Option(
+            "--provider",
+            help="Override the configured provider for this walk ('ollama' | 'anthropic' | 'openai').",
+        ),
     ] = None,
 ) -> None:
     """Walk the target codebase and populate every wiki section."""

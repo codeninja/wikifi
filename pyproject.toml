@@ -15,6 +15,7 @@ dependencies = [
     "rich>=13.7",
     "pathspec>=0.12",
     "anthropic>=0.40",
+    "openai>=1.50",
 ]
 
 [project.scripts]
