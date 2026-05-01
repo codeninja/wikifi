@@ -2,6 +2,9 @@
 
 Defaults assume a local Ollama server with qwen3.6:27b. Override any field via
 WIKIFI_* env vars or a .env file in the target project's CWD.
+
+The hosted Anthropic provider is selected via ``WIKIFI_PROVIDER=anthropic``
+(plus ``ANTHROPIC_API_KEY`` from env).
 """
 
 from __future__ import annotations
@@ -20,7 +23,7 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    provider: str = Field(default="ollama", description="LLM provider id; only 'ollama' in v1")
+    provider: str = Field(default="ollama", description="LLM provider id; 'ollama' (default) or 'anthropic'")
     model: str = Field(default="qwen3.6:27b", description="Model identifier passed to the provider")
     ollama_host: str = Field(default="http://localhost:11434", description="Ollama HTTP endpoint")
     request_timeout: float = Field(default=900.0, description="Per-request timeout in seconds")
@@ -50,18 +53,68 @@ class Settings(BaseSettings):
         description="Skip files whose stripped content is shorter than this (avoids thinking runaway on stubs)",
     )
     introspection_depth: int = Field(default=3, description="Tree depth fed to the introspection pass")
-    # Thinking mode for reasoning-capable models (Qwen3, DeepSeek-R1, etc.).
+    # Thinking mode for reasoning-capable models (Qwen3, DeepSeek-R1, Anthropic).
     # Default 'high' — wikifi prioritizes wiki quality over walk wall-time.
-    # Higher thinking levels produce noticeably better domain abstraction and
-    # cleaner Gherkin in the derivative pass; expect 1–3 minutes per real
-    # file on a local 27B model. The min_content_bytes guard keeps the
-    # thinking-runaway-on-stubs failure mode at bay.
-    # Accepted values: 'low' / 'medium' / 'high' (Qwen3-style); True
-    # (DeepSeek-style); False to opt out entirely (only safe with non-
-    # thinking models — Qwen3 ignores `format=<schema>` when thinking is off).
+    # On Anthropic, this maps to adaptive thinking + the equivalent
+    # ``effort`` level (low/medium/high/max).
     think: bool | str = Field(default="high", description="Thinking-mode level for reasoning models")
+
+    # ----- Premium pipeline knobs -----
+
+    use_cache: bool = Field(
+        default=True,
+        description=(
+            "Reuse the per-file extraction + per-section aggregation caches across walks. "
+            "Disable to force a clean re-walk."
+        ),
+    )
+    use_graph: bool = Field(
+        default=True,
+        description=(
+            "Build an import/reference graph and feed each file's neighborhood into the "
+            "extraction prompt. Disable to fall back to per-file isolated extraction."
+        ),
+    )
+    use_specialized_extractors: bool = Field(
+        default=True,
+        description=(
+            "Route schema files (SQL, OpenAPI, Protobuf, GraphQL, migrations) through "
+            "deterministic extractors that bypass the LLM."
+        ),
+    )
+    review_derivatives: bool = Field(
+        default=False,
+        description=(
+            "Run the critic + reviser loop on derivative sections (personas, user stories, "
+            "diagrams). Adds 2 LLM calls per derivative section but materially improves "
+            "groundedness. Off by default to keep walk wall-time predictable."
+        ),
+    )
+    review_min_score: int = Field(
+        default=7,
+        description="Minimum critic score below which the reviser is invoked.",
+    )
+
+    # ----- Anthropic provider knobs -----
+
+    anthropic_api_key: str | None = Field(
+        default=None,
+        description=("Explicit Anthropic API key. Falls back to ANTHROPIC_API_KEY in the environment when unset."),
+    )
+    anthropic_max_tokens: int = Field(
+        default=16_000,
+        description="Per-call output token cap for the Anthropic provider.",
+    )
 
 
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
+
+
+def reset_settings_cache() -> None:
+    """Drop the cached :class:`Settings` instance so env changes take effect.
+
+    Used by tests that mutate ``WIKIFI_*`` env vars between cases.
+    """
+    get_settings.cache_clear()

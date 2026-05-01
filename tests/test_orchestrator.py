@@ -89,3 +89,79 @@ def test_build_provider_returns_ollama_for_ollama_settings():
 def test_build_provider_rejects_unknown():
     with pytest.raises(ValueError):
         build_provider(_settings(provider="other"))
+
+
+def test_build_provider_returns_anthropic_when_selected(monkeypatch):
+    """``provider='anthropic'`` dispatches to AnthropicProvider with a Claude model default."""
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+    settings = _settings(provider="anthropic", model="m")  # non-claude model id
+    provider = build_provider(settings)
+    from wikifi.providers.anthropic_provider import AnthropicProvider
+
+    assert isinstance(provider, AnthropicProvider)
+    # Falls back to a sane Claude default rather than 404'ing on "m".
+    assert provider.model.startswith("claude-")
+
+
+def test_run_walk_persists_cache_for_resumability(mini_target, mock_provider_factory):
+    """A second walk reuses the cache and skips the LLM call for unchanged files."""
+    settings = _settings()
+    introspection = IntrospectionResult(
+        include=["src/"], exclude=[], primary_languages=["python"], likely_purpose="demo", rationale="ok"
+    )
+
+    extraction_calls = {"n": 0}
+
+    def factory(schema, system, user):
+        if schema is IntrospectionResult:
+            return introspection
+        if schema is FileFindings:
+            extraction_calls["n"] += 1
+            return FileFindings(
+                summary="role",
+                findings=[SectionFinding(section_id="entities", finding="Order entity inferred.")],
+            )
+        if schema is SectionBody:
+            return SectionBody(body="Synthesized.")
+        if schema is DerivedSection:
+            return DerivedSection(body="Derived.")
+        raise AssertionError(f"unexpected {schema}")
+
+    provider = mock_provider_factory(json_factory=factory)
+    run_walk(root=mini_target, settings=settings, provider=provider)
+    first = extraction_calls["n"]
+    assert first >= 2
+
+    # Second walk against the same target with the same content: cache reuses
+    # the per-file findings, so extraction calls do not increase.
+    run_walk(root=mini_target, settings=settings, provider=provider)
+    assert extraction_calls["n"] == first
+
+
+def test_run_walk_review_flag_invokes_critic(mini_target, mock_provider_factory):
+    """With ``review_derivatives=True`` the deriver runs the critic loop."""
+    from wikifi.critic import Critique
+
+    settings = _settings(review_derivatives=True)
+    introspection = IntrospectionResult(
+        include=["src/"], exclude=[], primary_languages=["python"], likely_purpose="demo", rationale="ok"
+    )
+    critic_called = {"n": 0}
+
+    def factory(schema, system, user):
+        if schema is IntrospectionResult:
+            return introspection
+        if schema is FileFindings:
+            return FileFindings(findings=[SectionFinding(section_id="entities", finding="Order.")])
+        if schema is SectionBody:
+            return SectionBody(body="Synthesized.")
+        if schema is DerivedSection:
+            return DerivedSection(body="Derived.")
+        if schema is Critique:
+            critic_called["n"] += 1
+            return Critique(score=9, summary="ok")
+        raise AssertionError(f"unexpected {schema}")
+
+    provider = mock_provider_factory(json_factory=factory)
+    run_walk(root=mini_target, settings=settings, provider=provider)
+    assert critic_called["n"] >= 1

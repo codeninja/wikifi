@@ -5,6 +5,7 @@ Entry point: ``wikifi`` (declared in ``pyproject.toml`` ``[project.scripts]``).
 - ``wikifi init`` — scaffold the ``.wikifi/`` directory in CWD
 - ``wikifi walk`` — run the full Stage 1→2→3→4 pipeline against CWD
 - ``wikifi chat`` — interactive REPL with ``.wikifi/`` content as context
+- ``wikifi report`` — coverage + quality report on the wiki
 """
 
 from __future__ import annotations
@@ -15,13 +16,16 @@ from typing import Annotated
 
 import typer
 from rich.console import Console
+from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.table import Table
 
 from wikifi import __version__
+from wikifi.cache import reset as reset_cache
 from wikifi.chat import run_repl
 from wikifi.config import get_settings
 from wikifi.orchestrator import build_provider, init_wiki, run_walk
+from wikifi.report import build_report
 from wikifi.wiki import WikiLayout
 
 app = typer.Typer(
@@ -79,13 +83,38 @@ def init(target: TargetArg = None) -> None:
 
 
 @app.command()
-def walk(target: TargetArg = None) -> None:
+def walk(
+    target: TargetArg = None,
+    no_cache: Annotated[
+        bool, typer.Option("--no-cache", help="Force a clean re-walk; drop the on-disk cache.")
+    ] = False,
+    review: Annotated[
+        bool,
+        typer.Option("--review/--no-review", help="Run the critic + reviser loop on derivative sections."),
+    ] = False,
+    provider: Annotated[
+        str | None,
+        typer.Option("--provider", help="Override the configured provider for this walk ('ollama' | 'anthropic')."),
+    ] = None,
+) -> None:
     """Walk the target codebase and populate every wiki section."""
     target = target or Path.cwd()
     settings = get_settings()
+    if no_cache:
+        settings = settings.model_copy(update={"use_cache": False})
+        reset_cache(WikiLayout(root=target))
+    if review:
+        settings = settings.model_copy(update={"review_derivatives": True})
+    if provider:
+        settings = settings.model_copy(update={"provider": provider})
+
     console.print(
         Panel.fit(
-            f"[bold]wikifi walk[/bold] — target=[cyan]{target}[/cyan] model=[cyan]{settings.model}[/cyan]",
+            f"[bold]wikifi walk[/bold] — target=[cyan]{target}[/cyan] "
+            f"provider=[cyan]{settings.provider}[/cyan] model=[cyan]{settings.model}[/cyan]\n"
+            f"cache=[cyan]{settings.use_cache}[/cyan] graph=[cyan]{settings.use_graph}[/cyan] "
+            f"specialized=[cyan]{settings.use_specialized_extractors}[/cyan] "
+            f"review=[cyan]{settings.review_derivatives}[/cyan]",
             title="starting",
         )
     )
@@ -100,21 +129,27 @@ def walk(target: TargetArg = None) -> None:
         f"exclude={len(report.introspection.exclude)} "
         f"langs={', '.join(report.introspection.primary_languages) or '?'}",
     )
-    table.add_row(
-        "2. Extraction",
+    extraction_row = (
         f"seen={report.extraction.files_seen} "
         f"contributed={report.extraction.files_with_findings} "
         f"findings={report.extraction.findings_total} "
-        f"skipped={report.extraction.files_skipped}",
+        f"skipped={report.extraction.files_skipped} "
+        f"cache_hits={report.extraction.cache_hits} "
+        f"specialized={report.extraction.specialized_files}"
     )
+    table.add_row("2. Extraction", extraction_row)
     table.add_row(
         "3. Aggregation",
-        f"sections_written={report.aggregation.sections_written} sections_empty={report.aggregation.sections_empty}",
+        f"sections_written={report.aggregation.sections_written} "
+        f"sections_empty={report.aggregation.sections_empty} "
+        f"sections_cached={report.aggregation.sections_cached}",
     )
-    table.add_row(
-        "4. Derivation",
-        f"sections_derived={report.derivation.sections_derived} sections_skipped={report.derivation.sections_skipped}",
+    derivation_row = (
+        f"sections_derived={report.derivation.sections_derived} "
+        f"sections_skipped={report.derivation.sections_skipped} "
+        f"sections_revised={report.derivation.sections_revised}"
     )
+    table.add_row("4. Derivation", derivation_row)
     console.print(table)
     console.print(f"\n[green]Done.[/green] Wiki at [bold]{target}/.wikifi/[/bold]")
 
@@ -134,6 +169,30 @@ def chat(target: TargetArg = None) -> None:
     settings = get_settings()
     provider = build_provider(settings)
     run_repl(layout=layout, provider=provider, console=console)
+
+
+@app.command()
+def report(
+    target: TargetArg = None,
+    score: Annotated[
+        bool,
+        typer.Option("--score/--no-score", help="Run the critic on every populated section for quality scoring."),
+    ] = False,
+) -> None:
+    """Print a coverage + quality report for the wiki at ``target``."""
+    target = target or Path.cwd()
+    layout = WikiLayout(root=target)
+    if not layout.wiki_dir.exists():
+        console.print(
+            f"[red]No .wikifi/ directory at {target}.[/red] "
+            "Run [bold]wikifi init[/bold] and [bold]wikifi walk[/bold] first."
+        )
+        raise typer.Exit(code=1)
+
+    settings = get_settings()
+    provider = build_provider(settings) if score else None
+    wiki_report = build_report(layout=layout, provider=provider, score=score)
+    console.print(Markdown(wiki_report.render()))
 
 
 def main() -> None:

@@ -18,10 +18,11 @@ the derivative section's brief, and writes the resulting markdown.
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from pydantic import BaseModel, Field
 
+from wikifi.critic import ReviewOutcome, review_section
 from wikifi.providers.base import LLMProvider
 from wikifi.sections import DERIVATIVE_SECTIONS, SECTIONS_BY_ID, Section
 from wikifi.wiki import WikiLayout, write_section
@@ -60,10 +61,24 @@ class DerivedSection(BaseModel):
 class DerivationStats:
     sections_derived: int = 0
     sections_skipped: int = 0
+    sections_revised: int = 0
+    review_outcomes: list[ReviewOutcome] = field(default_factory=list)
 
 
-def derive_all(*, layout: WikiLayout, provider: LLMProvider) -> DerivationStats:
-    """Synthesize every derivative section from its upstream primary sections."""
+def derive_all(
+    *,
+    layout: WikiLayout,
+    provider: LLMProvider,
+    review: bool = False,
+    review_min_score: int = 7,
+) -> DerivationStats:
+    """Synthesize every derivative section from its upstream primary sections.
+
+    With ``review=True`` each derivative is run through the critic +
+    reviser loop after synthesis. The critic loop is the highest-leverage
+    quality lever for derivative sections — personas and Gherkin stories
+    are exactly where single-shot synthesis tends to hallucinate.
+    """
     stats = DerivationStats()
     for section in DERIVATIVE_SECTIONS:
         upstream_bodies = _collect_upstream(layout, section)
@@ -85,6 +100,20 @@ def derive_all(*, layout: WikiLayout, provider: LLMProvider) -> DerivationStats:
         except Exception as exc:
             log.warning("derivation failed for %s: %s", section.id, exc)
             body = _fallback_body(section, upstream_bodies, error=str(exc))
+
+        if review:
+            outcome = review_section(
+                section=section,
+                body=body,
+                upstream_evidence=upstream_bodies,
+                provider=provider,
+                min_score=review_min_score,
+            )
+            body = outcome.body
+            stats.review_outcomes.append(outcome)
+            if outcome.revised:
+                stats.sections_revised += 1
+
         write_section(layout, section, body)
         stats.sections_derived += 1
     return stats

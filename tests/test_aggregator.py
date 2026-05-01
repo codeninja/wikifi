@@ -1,6 +1,12 @@
-from wikifi.aggregator import SectionBody, aggregate_all
+from wikifi.aggregator import (
+    AggregatedClaim,
+    AggregatedContradiction,
+    SectionBody,
+    aggregate_all,
+)
+from wikifi.cache import WalkCache, hash_section_notes
 from wikifi.sections import PRIMARY_SECTIONS
-from wikifi.wiki import WikiLayout, append_note, initialize
+from wikifi.wiki import WikiLayout, append_note, initialize, read_notes
 
 
 def _setup(tmp_path):
@@ -68,3 +74,88 @@ def test_aggregate_falls_back_when_provider_raises(tmp_path, mock_provider_facto
     body = layout.section_path(section).read_text()
     assert "Aggregation failed" in body
     assert "Order line item." in body  # raw notes preserved
+
+
+def test_aggregate_renders_citations_and_contradictions(tmp_path, mock_provider_factory):
+    layout = _setup(tmp_path)
+    section = PRIMARY_SECTIONS[0]
+    append_note(
+        layout,
+        section,
+        {
+            "file": "a.py",
+            "summary": "domain",
+            "finding": "Tax computed at order time.",
+            "sources": [{"file": "src/order.py", "lines": [10, 25], "fingerprint": "abc"}],
+        },
+    )
+    append_note(
+        layout,
+        section,
+        {
+            "file": "b.py",
+            "summary": "domain",
+            "finding": "Tax computed at invoice time.",
+            "sources": [{"file": "src/invoice.py", "lines": [5, 12], "fingerprint": "def"}],
+        },
+    )
+
+    structured = SectionBody(
+        body="The system computes tax somewhere.",
+        claims=[AggregatedClaim(text="Tax computation lives at the boundary.", source_indices=[1, 2])],
+        contradictions=[
+            AggregatedContradiction(
+                summary="Where tax is computed.",
+                positions=[
+                    AggregatedClaim(text="At order time.", source_indices=[1]),
+                    AggregatedClaim(text="At invoice time.", source_indices=[2]),
+                ],
+            )
+        ],
+    )
+
+    provider = mock_provider_factory(
+        json_factory=lambda schema, system, user: structured,
+    )
+    aggregate_all(layout=layout, provider=provider)
+    body = layout.section_path(section).read_text()
+    assert "Conflicts in source" in body
+    assert "src/order.py:10-25" in body
+    assert "src/invoice.py:5-12" in body
+    assert "## Sources" in body
+
+
+def test_aggregate_uses_cache_to_skip_unchanged_notes(tmp_path, mock_provider_factory):
+    layout = _setup(tmp_path)
+    section = PRIMARY_SECTIONS[0]
+    append_note(layout, section, {"file": "a.py", "summary": "x", "finding": "Order entity."})
+
+    cache = WalkCache()
+    notes_hash = hash_section_notes(read_notes(layout, section))
+    cache.record_aggregation(
+        section.id,
+        notes_hash=notes_hash,
+        body="Cached body for the section.",
+        claims=[],
+        contradictions=[],
+    )
+
+    provider = mock_provider_factory()  # no responses queued — must not be called
+    stats = aggregate_all(layout=layout, provider=provider, cache=cache)
+
+    body = layout.section_path(section).read_text()
+    assert "Cached body for the section." in body
+    assert stats.sections_cached == 1
+
+
+def test_aggregate_records_cache_entry_after_synthesis(tmp_path, mock_provider_factory):
+    layout = _setup(tmp_path)
+    section = PRIMARY_SECTIONS[0]
+    append_note(layout, section, {"file": "a.py", "summary": "x", "finding": "Order."})
+
+    cache = WalkCache()
+    provider = mock_provider_factory(
+        json_factory=lambda schema, system, user: SectionBody(body="Synthesized body."),
+    )
+    aggregate_all(layout=layout, provider=provider, cache=cache)
+    assert section.id in cache.aggregation
