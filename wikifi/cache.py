@@ -30,14 +30,33 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from wikifi.wiki import WikiLayout
+from wikifi.wiki import CACHE_DIRNAME, WikiLayout
 
 log = logging.getLogger("wikifi.cache")
 
-CACHE_DIRNAME = ".cache"
 EXTRACTION_CACHE_FILENAME = "extraction.json"
 AGGREGATION_CACHE_FILENAME = "aggregation.json"
 CACHE_VERSION = 1  # bump to invalidate every cache entry across upgrades
+
+# Re-exposed for callers that already import ``CACHE_DIRNAME`` from this
+# module; the constant itself lives in :mod:`wikifi.wiki` next to the
+# other layout names.
+__all__ = [
+    "CACHE_DIRNAME",
+    "AGGREGATION_CACHE_FILENAME",
+    "EXTRACTION_CACHE_FILENAME",
+    "CACHE_VERSION",
+    "CachedFindings",
+    "CachedSection",
+    "WalkCache",
+    "aggregation_cache_path",
+    "cache_dir",
+    "extraction_cache_path",
+    "hash_section_notes",
+    "load",
+    "reset",
+    "save",
+]
 
 
 @dataclass
@@ -140,7 +159,7 @@ class WalkCache:
 
 
 def cache_dir(layout: WikiLayout) -> Path:
-    return layout.wiki_dir / CACHE_DIRNAME
+    return layout.cache_dir
 
 
 def extraction_cache_path(layout: WikiLayout) -> Path:
