@@ -139,3 +139,50 @@ def test_cache_version_is_pinned():
     """Bumps to CACHE_VERSION should be intentional — guard against drift."""
     assert isinstance(CACHE_VERSION, int)
     assert CACHE_VERSION >= 1
+
+
+def test_hash_section_notes_changes_when_sources_change():
+    """The aggregation cache key must reflect each note's `sources`.
+
+    Two notes with identical finding text but different source line
+    ranges or fingerprints describe different evidence; reusing the
+    same cached body would replay stale citations against new code.
+    """
+    base = [
+        {
+            "file": "a.py",
+            "summary": "role",
+            "finding": "Order entity.",
+            "sources": [{"file": "a.py", "lines": [1, 30], "fingerprint": "abc1234"}],
+        }
+    ]
+    same = [
+        {
+            "file": "a.py",
+            "summary": "role",
+            "finding": "Order entity.",
+            "sources": [{"file": "a.py", "lines": (1, 30), "fingerprint": "abc1234"}],
+        }
+    ]
+    moved_lines = [
+        {
+            "file": "a.py",
+            "summary": "role",
+            "finding": "Order entity.",
+            "sources": [{"file": "a.py", "lines": [42, 70], "fingerprint": "abc1234"}],
+        }
+    ]
+    new_fingerprint = [
+        {
+            "file": "a.py",
+            "summary": "role",
+            "finding": "Order entity.",
+            "sources": [{"file": "a.py", "lines": [1, 30], "fingerprint": "deadbee"}],
+        }
+    ]
+    # Tuple vs list line range: same logical evidence, identical hash.
+    assert hash_section_notes(base) == hash_section_notes(same)
+    # Lines moved → new evidence → cache must miss.
+    assert hash_section_notes(base) != hash_section_notes(moved_lines)
+    # File contents changed (fingerprint shifted) → cache must miss.
+    assert hash_section_notes(base) != hash_section_notes(new_fingerprint)

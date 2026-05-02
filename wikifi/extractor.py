@@ -37,7 +37,7 @@ from wikifi.fingerprint import hash_file
 from wikifi.providers.base import LLMProvider
 from wikifi.repograph import FileKind, RepoGraph, classify
 from wikifi.sections import PRIMARY_SECTION_IDS, PRIMARY_SECTIONS
-from wikifi.specialized import select as select_specialized
+from wikifi.specialized.dispatch import select as select_specialized
 from wikifi.wiki import WikiLayout, append_note
 
 log = logging.getLogger("wikifi.extractor")
@@ -134,6 +134,7 @@ def extract_repo(
     cache: WalkCache | None = None,
     graph: RepoGraph | None = None,
     persist_cache: Callable[[], None] | None = None,
+    use_specialized_extractors: bool = True,
 ) -> ExtractionStats:
     """Walk the supplied files and append per-section findings to the notes store.
 
@@ -185,7 +186,7 @@ def extract_repo(
                 continue
 
         # ---- specialized routing ----
-        specialized_fn = select_specialized(kind)
+        specialized_fn = select_specialized(kind, rel_path=rel.as_posix()) if use_specialized_extractors else None
         if specialized_fn is not None:
             stats.specialized_files += 1
             try:

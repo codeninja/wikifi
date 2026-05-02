@@ -11,7 +11,7 @@ from __future__ import annotations
 import re
 
 from wikifi.evidence import SourceRef
-from wikifi.specialized import SpecializedFinding, SpecializedResult
+from wikifi.specialized.models import SpecializedFinding, SpecializedResult
 
 _MESSAGE_RE = re.compile(r"^\s*message\s+(\w+)\s*\{", re.MULTILINE)
 _SERVICE_RE = re.compile(r"^\s*service\s+(\w+)\s*\{", re.MULTILINE)
@@ -62,8 +62,14 @@ def extract(rel_path: str, text: str) -> SpecializedResult:
             )
         )
 
-    for service_name, line in services:
-        related = [r for r in rpcs if line <= r[5]]
+    # Each service owns the RPCs declared between its opening ``{`` and
+    # the matching ``}``. The previous "every RPC at or after my line"
+    # filter would attribute every later service's RPCs to the first
+    # service block in a multi-service file, inflating the integration
+    # inventory. Bound each service by its block-end line instead.
+    service_spans = _service_spans(text, services)
+    for (service_name, start_line), (_, end_line) in zip(services, service_spans, strict=True):
+        related = [r for r in rpcs if start_line <= r[5] <= end_line]
         bullets = "\n".join(
             f"  - `{name}({_arrow(in_msg, in_stream)}) -> {_arrow(out_msg, out_stream)}`"
             for name, in_msg, out_msg, in_stream, out_stream, _ in related[:25]
@@ -75,7 +81,7 @@ def extract(rel_path: str, text: str) -> SpecializedResult:
                     f"Service **{service_name}** exposes the following RPCs:\n"
                     + (bullets if bullets else "  - (no RPCs detected)")
                 ),
-                sources=[SourceRef(file=rel_path, lines=(line, line))],
+                sources=[SourceRef(file=rel_path, lines=(start_line, end_line))],
             )
         )
     if services:
@@ -104,3 +110,32 @@ def _arrow(name: str, stream: bool) -> str:
 
 def _line(text: str, offset: int) -> int:
     return text.count("\n", 0, offset) + 1
+
+
+def _service_spans(text: str, services: list[tuple[str, int]]) -> list[tuple[str, int]]:
+    """For each (service_name, start_line) return (service_name, end_line).
+
+    ``end_line`` is the line carrying the brace that closes the service
+    block, found by walking forward and counting brace depth so nested
+    blocks (``oneof``, message-in-service) don't terminate the scan.
+    If the closing brace is missing the span runs to EOF.
+    """
+    lines = text.splitlines()
+    spans: list[tuple[str, int]] = []
+    last_line = len(lines)
+    for name, start_line in services:
+        depth = 0
+        started = False
+        end_line = last_line
+        for i in range(start_line - 1, last_line):
+            ln = lines[i]
+            opens = ln.count("{")
+            closes = ln.count("}")
+            depth += opens - closes
+            if not started and opens:
+                started = True
+            if started and depth <= 0:
+                end_line = i + 1
+                break
+        spans.append((name, end_line))
+    return spans

@@ -106,8 +106,15 @@ class Settings(BaseSettings):
         description=("Explicit Anthropic API key. Falls back to ANTHROPIC_API_KEY in the environment when unset."),
     )
     anthropic_max_tokens: int = Field(
-        default=16_000,
-        description="Per-call output token cap for the Anthropic provider.",
+        default=32_000,
+        description=(
+            "Per-call output token cap for the Anthropic provider. "
+            "Adaptive thinking at ``effort=high`` can consume substantial "
+            "output budget; 32K leaves comfortable headroom for the wiki "
+            "section schemas while staying under the SDK's non-streaming "
+            "HTTP timeout guard. Premium-effort callers (xhigh/max) "
+            "should bump higher and enable streaming."
+        ),
     )
 
     # ----- OpenAI provider knobs -----

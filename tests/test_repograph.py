@@ -83,3 +83,53 @@ def test_build_graph_skips_unreadable_files(tmp_path: Path):
     node = graph.get("ghost.py")
     assert node is not None
     assert node.imports == ()
+
+
+def test_build_graph_python_relative_imports(tmp_path: Path):
+    """`from .b import x` resolves to a sibling within the same package.
+
+    Without this the regex skips the leading-dot form entirely and
+    intra-package edges silently disappear from the graph, so per-file
+    neighbor context for Python codebases is incomplete.
+    """
+    pkg = tmp_path / "pkg"
+    pkg.mkdir()
+    (pkg / "__init__.py").write_text("")
+    (pkg / "a.py").write_text("from .b import thing\nfrom . import helpers\n")
+    (pkg / "b.py").write_text("def thing(): return 1\n")
+    (pkg / "helpers.py").write_text("VALUE = 1\n")
+
+    files = [
+        Path("pkg/__init__.py"),
+        Path("pkg/a.py"),
+        Path("pkg/b.py"),
+        Path("pkg/helpers.py"),
+    ]
+    graph = build_graph(repo_root=tmp_path, files=files)
+
+    a_node = graph.get("pkg/a.py")
+    assert a_node is not None
+    assert "pkg/b.py" in a_node.imports
+    assert "pkg/helpers.py" in a_node.imports
+
+
+def test_build_graph_python_double_dot_relative_import(tmp_path: Path):
+    """`from ..sibling import x` walks one level up before resolving."""
+    sub = tmp_path / "pkg" / "sub"
+    sub.mkdir(parents=True)
+    (tmp_path / "pkg" / "__init__.py").write_text("")
+    (sub / "__init__.py").write_text("")
+    (sub / "leaf.py").write_text("from ..sibling import thing\n")
+    (tmp_path / "pkg" / "sibling.py").write_text("def thing(): return 1\n")
+
+    files = [
+        Path("pkg/__init__.py"),
+        Path("pkg/sibling.py"),
+        Path("pkg/sub/__init__.py"),
+        Path("pkg/sub/leaf.py"),
+    ]
+    graph = build_graph(repo_root=tmp_path, files=files)
+
+    leaf = graph.get("pkg/sub/leaf.py")
+    assert leaf is not None
+    assert "pkg/sibling.py" in leaf.imports

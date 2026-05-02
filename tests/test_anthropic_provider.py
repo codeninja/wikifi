@@ -166,3 +166,32 @@ def test_cache_system_prompt_off_returns_plain_string():
     provider = AnthropicProvider(client=client, cache_system_prompt=False)
     provider.complete_text(system="SYS", user="u")
     assert client.create_calls[0]["system"] == "SYS"
+
+
+def test_complete_json_raises_diagnostic_on_fully_empty_response():
+    """Empty parsed_output AND empty text → emit a diagnostic with knobs.
+
+    Locks in the user-reported failure mode where adaptive thinking
+    consumes the entire ``max_tokens`` budget and the structured
+    output block never lands. The replacement RuntimeError must
+    surface ``stop_reason``, ``output_tokens``, and ``max_tokens`` so
+    operators see which knob to turn (raise max_tokens, lower think
+    effort) instead of the original cryptic "Invalid JSON: EOF"
+    pydantic validation error.
+    """
+    response = SimpleNamespace(
+        parsed_output=None,
+        content=[],
+        stop_reason="max_tokens",
+        usage=SimpleNamespace(output_tokens=16_000),
+    )
+    client = _StubClient(parse_response=response)
+    provider = AnthropicProvider(client=client, max_tokens=16_000)
+    with pytest.raises(RuntimeError) as info:
+        provider.complete_json(system="s", user="u", schema=_Echo)
+    msg = str(info.value)
+    # Operator-facing diagnostic — names the knobs, not the SDK internals.
+    assert "max_tokens=16000" in msg
+    assert "output_tokens=16000" in msg
+    assert "stop_reason='max_tokens'" in msg
+    assert "raise max_tokens" in msg.lower() or "lower think" in msg.lower()

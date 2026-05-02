@@ -501,3 +501,35 @@ def test_extract_repo_drops_derivative_section_findings(tmp_path, mock_provider_
 
     assert len(read_notes(layout, "entities")) == 1
     assert read_notes(layout, derivative_id) == []
+
+
+def test_extract_repo_use_specialized_extractors_false_falls_back_to_llm(tmp_path, mock_provider_factory):
+    """`use_specialized_extractors=False` keeps schema files on the LLM path.
+
+    Lock in the `use_specialized_extractors` setting wired through from
+    config — without this the knob would be silently ignored and SQL/
+    GraphQL/Protobuf/OpenAPI files would always bypass the LLM regardless
+    of the user's explicit opt-out.
+    """
+    layout = _layout(tmp_path)
+    (tmp_path / "schema.sql").write_text("CREATE TABLE customer (id INTEGER PRIMARY KEY);")
+
+    seen: list[str] = []
+
+    def factory(schema, system, user):
+        seen.append(user)
+        return FileFindings(findings=[SectionFinding(section_id="entities", finding="Routed to LLM.")])
+
+    provider = mock_provider_factory(json_factory=factory)
+    stats = extract_repo(
+        layout=layout,
+        provider=provider,
+        files=[Path("schema.sql")],
+        repo_root=tmp_path,
+        use_specialized_extractors=False,
+    )
+
+    assert seen, "LLM should have been called when specialized extractors are disabled"
+    assert stats.specialized_files == 0
+    notes = read_notes(layout, "entities")
+    assert any("Routed to LLM." in n["finding"] for n in notes)

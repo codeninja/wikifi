@@ -37,7 +37,7 @@ from typing import Any, TypeVar
 
 from pydantic import BaseModel
 
-from wikifi.providers.base import ChatMessage
+from wikifi.providers.base import ChatMessage, LLMProvider
 
 try:  # the dep is declared in pyproject.toml, but importing lazily yields
     # a clearer error if a user installs without extras.
@@ -58,17 +58,21 @@ log = logging.getLogger("wikifi.providers.anthropic")
 # `.wikifi/config.toml`.
 DEFAULT_MODEL = "claude-opus-4-7"
 
-# Default per-call max output tokens. Wikifi's structured findings are
-# small relative to the input; 16K is comfortable headroom for any of
-# the section schemas without crossing the SDK's non-streaming HTTP
-# timeout guard.
-DEFAULT_MAX_TOKENS = 16_000
+# Default per-call max output tokens. Adaptive thinking at ``effort=high``
+# can consume substantial output budget on its own; if ``max_tokens`` is too
+# tight, the model burns its allowance on the thinking trace and the
+# structured-output block comes back empty (``parsed_output is None`` and
+# no text content). 32K leaves comfortable headroom for any of the wiki
+# section schemas while staying under the SDK's non-streaming HTTP timeout
+# guard. Premium-effort callers ("xhigh"/"max") should bump higher and
+# enable streaming — see Anthropic's Opus 4.7 migration notes.
+DEFAULT_MAX_TOKENS = 32_000
 
 
 ThinkLevel = bool | str | None
 
 
-class AnthropicProvider:
+class AnthropicProvider(LLMProvider):
     """Hosted-Claude implementation of the wikifi provider protocol."""
 
     name = "anthropic"
@@ -119,20 +123,27 @@ class AnthropicProvider:
                 **self._thinking_kwargs(),
             )
         except anthropic.APIError as exc:
-            raise RuntimeError(_format_api_error(exc)) from exc
+            raise RuntimeError(self.format_api_error(self.name, exc)) from exc
 
         parsed = getattr(response, "parsed_output", None)
-        if parsed is None:
-            # Defensive: if the model refused or the SDK couldn't parse,
-            # fall back to schema-validating the response text. This
-            # keeps the protocol's ``raise on failure`` contract intact
-            # rather than returning a None.
-            text = _first_text(response)
+        if parsed is not None:
+            return parsed  # type: ignore[return-value]
+        # The SDK couldn't parse a structured instance. Try the raw text
+        # block (covers refusals where the model emitted text rather than
+        # the structured form) before raising.
+        text = _first_text(response)
+        if text:
             try:
                 return schema.model_validate_json(text)
             except Exception as exc:  # pragma: no cover - defensive path
-                raise RuntimeError(f"anthropic provider: empty parsed_output and parse fallback failed: {exc}") from exc
-        return parsed  # type: ignore[return-value]
+                raise RuntimeError(
+                    f"anthropic provider: parsed_output missing and JSON validation of response text failed: {exc}"
+                ) from exc
+        # No parsed output and no text — typically the thinking trace
+        # consumed the entire output budget. Surface stop_reason and
+        # usage so the caller knows whether to raise ``max_tokens``,
+        # lower ``effort``, or look at a refusal.
+        raise RuntimeError(_empty_response_message(response, self.max_tokens))
 
     def complete_text(self, *, system: str, user: str) -> str:
         """Return the model's free-text response."""
@@ -145,7 +156,7 @@ class AnthropicProvider:
                 **self._thinking_kwargs(),
             )
         except anthropic.APIError as exc:
-            raise RuntimeError(_format_api_error(exc)) from exc
+            raise RuntimeError(self.format_api_error(self.name, exc)) from exc
         return _first_text(response) or ""
 
     def chat(self, *, system: str, messages: list[ChatMessage]) -> str:
@@ -162,7 +173,7 @@ class AnthropicProvider:
                 **self._thinking_kwargs(),
             )
         except anthropic.APIError as exc:
-            raise RuntimeError(_format_api_error(exc)) from exc
+            raise RuntimeError(self.format_api_error(self.name, exc)) from exc
         return _first_text(response) or ""
 
     # ------------------------------------------------------------------
@@ -226,10 +237,25 @@ def _first_text(response: Any) -> str:
     return ""
 
 
-def _format_api_error(exc: Exception) -> str:
-    """Render an APIError with the request id, when present, for diagnostics."""
-    request_id = getattr(exc, "request_id", None)
-    msg = getattr(exc, "message", None) or str(exc)
-    if request_id:
-        return f"anthropic provider failed ({request_id}): {msg}"
-    return f"anthropic provider failed: {msg}"
+def _empty_response_message(response: Any, max_tokens: int) -> str:
+    """Diagnose an empty structured response with stop_reason + usage.
+
+    The dominant cause is adaptive thinking consuming the entire
+    ``max_tokens`` budget before the structured output block is
+    produced. Surface the operational knobs (``max_tokens``,
+    ``effort``) so the caller sees the fix at the failure site.
+    """
+    stop_reason = getattr(response, "stop_reason", None)
+    usage = getattr(response, "usage", None)
+    output_tokens = getattr(usage, "output_tokens", None) if usage is not None else None
+    parts = [
+        "anthropic provider: empty structured response (no parsed_output, no text block)",
+        f"stop_reason={stop_reason!r}",
+        f"output_tokens={output_tokens}",
+        f"max_tokens={max_tokens}",
+    ]
+    if stop_reason == "max_tokens" or (output_tokens is not None and output_tokens >= max_tokens):
+        parts.append("hint: thinking likely consumed the budget — raise max_tokens or lower think/effort")
+    elif stop_reason == "refusal":
+        parts.append("hint: model refused; the input may need rewording")
+    return " | ".join(parts)

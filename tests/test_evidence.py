@@ -76,3 +76,48 @@ def test_coalesce_refs_dedupes_by_render():
     out = coalesce_refs(refs)
     assert len(out) == 2
     assert {r.render() for r in out} == {"a.py:1-10", "b.py"}
+
+
+def test_render_section_body_inserts_claim_markers_inline():
+    """Each supported claim's text in the body picks up its `[N]` marker.
+
+    Without inline markers the reader has the source list at the bottom
+    of the section but no way to tell which sentence each source backs.
+    """
+    bundle = EvidenceBundle(
+        body="Orders carry line items. Tax is computed downstream.",
+        claims=[
+            Claim(text="Orders carry line items.", sources=[SourceRef(file="src/order.py", lines=(1, 30))]),
+            Claim(text="Tax is computed downstream.", sources=[SourceRef(file="src/billing.py", lines=(40, 60))]),
+        ],
+    )
+    out = render_section_body(bundle)
+    # Markers are appended next to the matching sentences, in source order.
+    assert "Orders carry line items.[1]" in out
+    assert "Tax is computed downstream.[2]" in out
+    # Sources footer still enumerates the distinct refs.
+    assert "1. `src/order.py:1-30`" in out
+    assert "2. `src/billing.py:40-60`" in out
+
+
+def test_render_section_body_paraphrased_claims_listed_as_supporting():
+    """Claims whose text doesn't appear verbatim go in a Supporting list.
+
+    A conservative inline match avoids attaching markers to the wrong
+    sentence when the aggregator paraphrased — the claim still gets a
+    citation, just out-of-line.
+    """
+    bundle = EvidenceBundle(
+        body="The system tracks orders end-to-end.",
+        claims=[
+            Claim(
+                text="Order state transitions are persisted on every change.",
+                sources=[SourceRef(file="src/order.py", lines=(80, 95))],
+            ),
+        ],
+    )
+    out = render_section_body(bundle)
+    assert "## Supporting claims" in out
+    assert "Order state transitions are persisted on every change." in out
+    assert "[1]" in out  # marker still attached to the supporting-claim entry
+    assert "1. `src/order.py:80-95`" in out

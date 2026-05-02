@@ -17,7 +17,7 @@ import re
 from typing import Any
 
 from wikifi.evidence import SourceRef
-from wikifi.specialized import SpecializedFinding, SpecializedResult
+from wikifi.specialized.models import SpecializedFinding, SpecializedResult
 
 log = logging.getLogger("wikifi.specialized.openapi")
 

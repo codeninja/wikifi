@@ -263,9 +263,13 @@ def _load_json(path: Path) -> dict[str, Any] | None:
 def hash_section_notes(notes: list[dict[str, Any]]) -> str:
     """Stable digest of a section's note payload for aggregation cache keys.
 
-    The hash spans only the *content* fields the aggregator actually reads
-    (file ref, summary, finding) — not timestamps or per-walk debug fields —
-    so regenerating identical notes on a fresh walk reuses the cached body.
+    The hash spans the *content* fields the aggregator and renderer
+    actually rely on — file ref, summary, finding text, and the
+    structured ``sources`` list (file/lines/fingerprint per source).
+    Including ``sources`` is what keeps citation freshness honest:
+    when a referenced file's lines move or its fingerprint changes,
+    the cache misses and we re-aggregate against the new evidence
+    instead of replaying stale citations.
     """
     from wikifi.fingerprint import hash_text
 
@@ -274,7 +278,44 @@ def hash_section_notes(notes: list[dict[str, Any]]) -> str:
             "file": n.get("file", ""),
             "summary": n.get("summary", ""),
             "finding": n.get("finding", ""),
+            "sources": _normalize_sources(n.get("sources")),
         }
         for n in notes
     ]
     return hash_text(json.dumps(payload, ensure_ascii=False, sort_keys=True))
+
+
+def _normalize_sources(sources: Any) -> list[dict[str, Any]]:
+    """Render the ``sources`` list into a stable dict shape for hashing.
+
+    Notes vary in how ``sources`` is stored — a list of dicts from the
+    JSONL store, a list of Pydantic models from in-memory paths, or
+    missing entirely on legacy notes. Coerce each entry to the same
+    ``{file, lines, fingerprint}`` shape so the hash is stable across
+    code paths.
+    """
+    if not sources:
+        return []
+    out: list[dict[str, Any]] = []
+    for src in sources:
+        if isinstance(src, dict):
+            file = src.get("file", "")
+            lines = src.get("lines")
+            fingerprint = src.get("fingerprint", "")
+        else:
+            file = getattr(src, "file", "")
+            lines = getattr(src, "lines", None)
+            fingerprint = getattr(src, "fingerprint", "")
+        # Tuples and lists both serialize the same in JSON, but coerce
+        # to a list so two notes with identical (start, end) ranges
+        # produce identical bytes regardless of representation.
+        normalized_lines: list[int] | None
+        if lines is None:
+            normalized_lines = None
+        else:
+            try:
+                normalized_lines = [int(lines[0]), int(lines[1])]
+            except (TypeError, ValueError, IndexError):
+                normalized_lines = None
+        out.append({"file": file, "lines": normalized_lines, "fingerprint": fingerprint or ""})
+    return out

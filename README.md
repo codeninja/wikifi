@@ -21,7 +21,7 @@ uv run wikifi init
 - `walk` — main entry point. Walks the target codebase and produces the wiki content.
   - `--no-cache` — force a clean re-walk; drops the on-disk extraction + aggregation caches.
   - `--review` — run the critic + reviser loop on derivative sections (personas, user stories, diagrams).
-  - `--provider {ollama|anthropic}` — override the configured provider for this walk.
+  - `--provider {ollama|anthropic|openai}` — override the configured provider for this walk.
 - `report` — print a coverage + quality report (per-section file counts, findings, body sizes).
   - `--score` — additionally run the critic on every populated section for a 0-10 quality score.
 - `ask` — natural language queries against the wiki content, with optional context injection from the target codebase.

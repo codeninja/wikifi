@@ -89,13 +89,25 @@ def build_report(
     is run through the critic for a quality score. Without that, the
     report is purely structural — useful in CI without an LLM.
     """
-    files_total, files_with_findings = _coverage_from_cache(layout)
     findings_per_section: dict[str, int] = {}
     files_per_section: dict[str, int] = {}
+    contributing_files: set[str] = set()
     for section in PRIMARY_SECTIONS:
         notes = read_notes(layout, section)
         findings_per_section[section.id] = len(notes)
-        files_per_section[section.id] = len({n.get("file") for n in notes if n.get("file")})
+        section_files = {n.get("file") for n in notes if n.get("file")}
+        files_per_section[section.id] = len(section_files)
+        contributing_files.update(f for f in section_files if isinstance(f, str))
+
+    # Coverage is derived from the on-disk notes first so a walk run with
+    # ``--no-cache`` (or one whose cache was deleted) still reports
+    # accurate counts. When notes are present they're authoritative; we
+    # only fall back to the cache when no notes have been written yet.
+    if contributing_files:
+        files_with_findings = len(contributing_files)
+        files_total = max(files_with_findings, _files_total_from_cache(layout))
+    else:
+        files_total, files_with_findings = _coverage_from_cache(layout)
 
     coverage = CoverageStats(
         files_total=files_total,
@@ -143,6 +155,12 @@ def _coverage_from_cache(layout: WikiLayout) -> tuple[int, int]:
     files_total = len(cache.extraction)
     files_with_findings = sum(1 for entry in cache.extraction.values() if entry.findings)
     return files_total, files_with_findings
+
+
+def _files_total_from_cache(layout: WikiLayout) -> int:
+    """Return the cache's seen-files count if available; ``0`` otherwise."""
+    cache: WalkCache = load(layout)
+    return len(cache.extraction)
 
 
 def _collect_upstream(layout: WikiLayout, section: Section) -> dict[str, str]:

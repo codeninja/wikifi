@@ -71,3 +71,29 @@ def test_build_report_marks_unpopulated_sections(tmp_path: Path):
     save(layout, WalkCache())
     report = build_report(layout=layout, provider=None, score=False)
     assert any(entry.is_empty for entry in report.sections)
+
+
+def test_build_report_uses_notes_when_cache_is_empty(tmp_path: Path):
+    """`wikifi report` after `walk --no-cache` must still report coverage.
+
+    Coverage was previously derived from the cache only; with caching
+    disabled or the cache deleted, every walk reported `0%` even though
+    notes and section bodies were present on disk. Pulling
+    ``files_with_findings`` from the JSONL notes restores accuracy.
+    """
+    layout = _layout(tmp_path)
+    # No cache written — emulates `walk --no-cache` or a manual cache wipe.
+    append_note(layout, "entities", {"file": "src/order.py", "summary": "x", "finding": "Order"})
+    append_note(layout, "entities", {"file": "src/customer.py", "summary": "y", "finding": "Customer"})
+    append_note(layout, "capabilities", {"file": "src/order.py", "summary": "x", "finding": "Place order"})
+    write_section(layout, "entities", "Body for entities.")
+
+    report = build_report(layout=layout, provider=None, score=False)
+
+    # Two distinct files contributed — coverage reflects them, not 0.
+    assert report.coverage.files_with_findings == 2
+    assert report.coverage.files_total >= 2
+    assert report.coverage.coverage_pct() > 0
+    # Per-section counts still come from the notes themselves.
+    assert report.coverage.findings_per_section["entities"] == 2
+    assert report.coverage.findings_per_section["capabilities"] == 1

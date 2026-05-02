@@ -3,6 +3,11 @@
 Pulls types, inputs, queries, mutations, and subscriptions. Maps them to
 ``entities`` (types/inputs) and ``capabilities`` + ``integrations``
 (query/mutation/subscription roots).
+
+Modular GraphQL schemas often split root types across files using
+``extend type Query`` / ``extend type Mutation``; we treat those exactly
+like the base declaration so capabilities don't disappear when a schema
+is composed from many files.
 """
 
 from __future__ import annotations
@@ -10,9 +15,12 @@ from __future__ import annotations
 import re
 
 from wikifi.evidence import SourceRef
-from wikifi.specialized import SpecializedFinding, SpecializedResult
+from wikifi.specialized.models import SpecializedFinding, SpecializedResult
 
 _TYPE_RE = re.compile(r"^\s*type\s+(\w+)\s*(?:implements\s+[^\{]+)?\{", re.MULTILINE)
+# ``extend type Query { ... }`` is the standard way to add fields to a
+# root from a separate SDL file; treat it as a same-named root.
+_EXTEND_TYPE_RE = re.compile(r"^\s*extend\s+type\s+(\w+)\s*(?:implements\s+[^\{]+)?\{", re.MULTILINE)
 _INPUT_RE = re.compile(r"^\s*input\s+(\w+)\s*\{", re.MULTILINE)
 _INTERFACE_RE = re.compile(r"^\s*interface\s+(\w+)\s*\{", re.MULTILINE)
 _ENUM_RE = re.compile(r"^\s*enum\s+(\w+)\s*\{", re.MULTILINE)
@@ -23,13 +31,22 @@ def extract(rel_path: str, text: str) -> SpecializedResult:
     findings: list[SpecializedFinding] = []
     summary_bits: list[str] = []
 
-    types = [(m.group(1), _line(text, m.start())) for m in _TYPE_RE.finditer(text)]
-    inputs = [(m.group(1), _line(text, m.start())) for m in _INPUT_RE.finditer(text)]
-    interfaces = [(m.group(1), _line(text, m.start())) for m in _INTERFACE_RE.finditer(text)]
-    enums = [(m.group(1), _line(text, m.start())) for m in _ENUM_RE.finditer(text)]
+    # Anchor line numbers on the captured *name* offset, not the match
+    # start. The leading ``^\s*`` in each pattern can consume the
+    # preceding newline (``\s`` is newline-aware by default), which
+    # would otherwise put the line number one above the actual
+    # declaration and confuse :func:`_block_after`.
+    types = [(m.group(1), _line(text, m.start(1))) for m in _TYPE_RE.finditer(text)]
+    extensions = [(m.group(1), _line(text, m.start(1))) for m in _EXTEND_TYPE_RE.finditer(text)]
+    inputs = [(m.group(1), _line(text, m.start(1))) for m in _INPUT_RE.finditer(text)]
+    interfaces = [(m.group(1), _line(text, m.start(1))) for m in _INTERFACE_RE.finditer(text)]
+    enums = [(m.group(1), _line(text, m.start(1))) for m in _ENUM_RE.finditer(text)]
 
-    domain_types = [t for t in types if t[0] not in {"Query", "Mutation", "Subscription"}]
-    root_types = [t for t in types if t[0] in {"Query", "Mutation", "Subscription"}]
+    root_names = {"Query", "Mutation", "Subscription"}
+    domain_types = [t for t in types if t[0] not in root_names]
+    # Root declarations come from both ``type Query { ... }`` and
+    # ``extend type Query { ... }`` forms.
+    root_types = [t for t in types if t[0] in root_names] + [t for t in extensions if t[0] in root_names]
 
     if domain_types:
         summary_bits.append(f"{len(domain_types)} type(s)")
@@ -79,7 +96,9 @@ def extract(rel_path: str, text: str) -> SpecializedResult:
 
     if root_types:
         # Pull each root's fields by scanning the snippet between its
-        # declaration line and the next ``}``.
+        # declaration line and the matching closing brace. Multiple
+        # root declarations (the file may contain ``extend type Query``
+        # blocks) get one finding each.
         for name, line in root_types:
             block = _block_after(text, line)
             fields = _SCHEMA_FIELD_RE.findall(block)
@@ -92,7 +111,13 @@ def extract(rel_path: str, text: str) -> SpecializedResult:
                     sources=[SourceRef(file=rel_path, lines=(line, line))],
                 )
             )
-        summary_bits.append(", ".join(name for name, _ in root_types) + " roots")
+        # Deduped name list for the summary (Query/Mutation likely repeat
+        # across base + extend blocks).
+        seen_root_names: list[str] = []
+        for name, _ in root_types:
+            if name not in seen_root_names:
+                seen_root_names.append(name)
+        summary_bits.append(", ".join(seen_root_names) + " roots")
 
     return SpecializedResult(
         findings=findings,
@@ -105,16 +130,33 @@ def _line(text: str, offset: int) -> int:
 
 
 def _block_after(text: str, line: int) -> str:
-    """Return the text between line ``line`` and the next top-level ``}``.
+    """Return the body lines between ``line`` and the matching ``}``.
 
-    Approximate: enough to read field declarations for a GraphQL root
-    type. Matches ``}`` that appears at column 0.
+    Walks the source brace-depth-aware so an indented closing brace
+    (``  }``) ends the block — many SDL formatters indent the closing
+    brace, and a column-0-only check would consume every type that
+    follows.
     """
     lines = text.splitlines()
-    start = max(0, line - 1)
+    start_index = max(0, line - 1)
     out: list[str] = []
-    for ln in lines[start:]:
-        if ln.startswith("}"):
+    depth = 0
+    started = False
+    for ln in lines[start_index:]:
+        opens = ln.count("{")
+        closes = ln.count("}")
+        if not started:
+            # The declaration line carries the opening ``{``; record it
+            # but don't emit the declaration itself as a body line.
+            depth += opens - closes
+            started = True
+            if depth <= 0:
+                # ``type X {}`` on a single line — empty body.
+                break
+            continue
+        if closes and depth - closes <= 0:
+            # The line that closes the block — stop before consuming it.
             break
+        depth += opens - closes
         out.append(ln)
     return "\n".join(out)

@@ -17,7 +17,7 @@ import re
 from dataclasses import dataclass, field
 
 from wikifi.evidence import SourceRef
-from wikifi.specialized import SpecializedFinding, SpecializedResult
+from wikifi.specialized.models import SpecializedFinding, SpecializedResult
 
 # Line-number tracking is precise to "the line containing the matched
 # keyword" — that's specific enough for citations and avoids the cost
@@ -65,6 +65,7 @@ def extract_migration(rel_path: str, text: str) -> SpecializedResult:
 def _extract(rel_path: str, text: str, *, migration: bool) -> SpecializedResult:
     findings: list[SpecializedFinding] = []
     tables: list[_TableHit] = []
+    altered_tables: set[str] = set()
 
     for match in _CREATE_TABLE_RE.finditer(text):
         name = _strip_ident(match.group(1))
@@ -112,6 +113,7 @@ def _extract(rel_path: str, text: str, *, migration: bool) -> SpecializedResult:
         line = _line_of(text, match.start())
         target = _strip_ident(match.group(1))
         action = match.group(2).strip()
+        altered_tables.add(target)
         prefix = "Migration alters" if migration else "Alters"
         findings.append(
             SpecializedFinding(
@@ -136,7 +138,15 @@ def _extract(rel_path: str, text: str, *, migration: bool) -> SpecializedResult:
             )
         )
 
-    summary = f"Migration touches {len(tables)} table(s)." if migration else f"Schema for {len(tables)} table(s)."
+    if migration:
+        # Count both newly-created tables AND tables targeted by ALTER —
+        # a migration that only ALTERs still touches its targets, and
+        # a "0 table(s)" summary on an ALTER-only file misled callers
+        # browsing the report.
+        touched = len({hit.name for hit in tables} | altered_tables)
+        summary = f"Migration touches {touched} table(s)."
+    else:
+        summary = f"Schema for {len(tables)} table(s)."
     return SpecializedResult(findings=findings, summary=summary)
 
 

@@ -33,7 +33,7 @@ from typing import Any, TypeVar
 
 from pydantic import BaseModel
 
-from wikifi.providers.base import ChatMessage
+from wikifi.providers.base import ChatMessage, LLMProvider
 
 try:
     import openai
@@ -70,7 +70,7 @@ _REASONING_MODEL_RE = re.compile(r"^(o\d|gpt-5)", re.IGNORECASE)
 ThinkLevel = bool | str | None
 
 
-class OpenAIProvider:
+class OpenAIProvider(LLMProvider):
     """Hosted-OpenAI implementation of the wikifi provider protocol."""
 
     name = "openai"
@@ -126,7 +126,7 @@ class OpenAIProvider:
                 **self._reasoning_kwargs(),
             )
         except openai.APIError as exc:
-            raise RuntimeError(_format_api_error(exc)) from exc
+            raise RuntimeError(self.format_api_error(self.name, exc)) from exc
 
         parsed = _first_parsed(response)
         if parsed is None:
@@ -154,7 +154,7 @@ class OpenAIProvider:
                 **self._reasoning_kwargs(),
             )
         except openai.APIError as exc:
-            raise RuntimeError(_format_api_error(exc)) from exc
+            raise RuntimeError(self.format_api_error(self.name, exc)) from exc
         return _first_text(response) or ""
 
     def chat(self, *, system: str, messages: list[ChatMessage]) -> str:
@@ -168,7 +168,7 @@ class OpenAIProvider:
                 **self._reasoning_kwargs(),
             )
         except openai.APIError as exc:
-            raise RuntimeError(_format_api_error(exc)) from exc
+            raise RuntimeError(self.format_api_error(self.name, exc)) from exc
         return _first_text(response) or ""
 
     # ------------------------------------------------------------------
@@ -230,12 +230,3 @@ def _first_text(response: Any) -> str:
     if content is None and isinstance(message, dict):
         content = message.get("content")
     return content or ""
-
-
-def _format_api_error(exc: Exception) -> str:
-    """Render an APIError with the request id, when present, for diagnostics."""
-    request_id = getattr(exc, "request_id", None)
-    msg = getattr(exc, "message", None) or str(exc)
-    if request_id:
-        return f"openai provider failed ({request_id}): {msg}"
-    return f"openai provider failed: {msg}"

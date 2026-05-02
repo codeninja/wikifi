@@ -130,6 +130,7 @@ def run_walk(
         cache=cache,
         graph=graph,
         persist_cache=_persist if cache is not None else None,
+        use_specialized_extractors=settings.use_specialized_extractors,
     )
 
     log.info("stage 3: aggregating primary sections")

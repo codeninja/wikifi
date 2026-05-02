@@ -192,9 +192,18 @@ class RepoGraph:
 
 # Per-language import patterns. Each pattern captures the imported module
 # path/identifier; resolution to a real file is handled by a separate
-# heuristic.
+# heuristic. The Python pattern allows leading dots so relative imports
+# (``from .foo import bar`` / ``from .. import baz``) survive the scan —
+# without that, intra-package edges silently disappear from the graph.
+# A second pattern (``_PY_FROM_DOT_IMPORT``) handles ``from . import X``,
+# where the regex above only captures the bare dot prefix and would lose
+# the ``X`` symbol that names the actual sibling module.
 _PY_IMPORT = re.compile(
-    r"^\s*(?:from\s+([A-Za-z_][\w.]*)\s+import|import\s+([A-Za-z_][\w.]*))",
+    r"^\s*(?:from\s+(\.+[\w.]*|[A-Za-z_][\w.]*)\s+import|import\s+([A-Za-z_][\w.]*))",
+    re.MULTILINE,
+)
+_PY_FROM_DOT_IMPORT = re.compile(
+    r"^\s*from\s+(\.+)\s+import\s+([\w*][\w,\s]*)",
     re.MULTILINE,
 )
 _JS_IMPORT = re.compile(
@@ -306,6 +315,16 @@ def _resolve_imports(
     if suffix == ".py":
         for match in _PY_IMPORT.finditer(text):
             raw_targets.append(match.group(1) or match.group(2))
+        # ``from . import a, b`` adds an edge to each *named* sibling
+        # rather than to the package's ``__init__.py``. The base regex
+        # above only captures the dot prefix, so we expand the symbol
+        # list here and synthesize one ``.symbol`` raw target per name.
+        for match in _PY_FROM_DOT_IMPORT.finditer(text):
+            dots = match.group(1)
+            for symbol in match.group(2).split(","):
+                symbol = symbol.strip()
+                if symbol and symbol != "*" and symbol.isidentifier():
+                    raw_targets.append(f"{dots}{symbol}")
     elif suffix in {".js", ".jsx", ".ts", ".tsx", ".mjs", ".cjs"}:
         for match in _JS_IMPORT.finditer(text):
             raw_targets.append(next((g for g in match.groups() if g), ""))
@@ -345,15 +364,24 @@ def _candidates_for(
     file_set: set[str],
     modules: dict[str, list[str]],
 ) -> list[str]:
-    # Relative imports (``./foo``, ``../bar``) — resolve within the repo.
-    # Path.resolve() would expand against the CWD; we want the result
-    # relative to the repo root so it can match file_set entries.
-    if raw.startswith((".", "/")):
+    # Python relative imports (``from .foo import bar``, ``from .. import baz``)
+    # use leading dots, NOT path-style ``./`` or ``../``. JS/TS relative
+    # imports use the path style and are handled below. Treat the two
+    # syntaxes separately so a ``.foo`` from Python doesn't get joined as
+    # ``parent/.foo`` (a hidden-file path that won't match any module).
+    if source.suffix.lower() == ".py" and raw.startswith("."):
+        return _python_relative_candidates(raw, source=source, file_set=file_set)
+
+    # Path-style relative imports (``./foo``, ``../bar``) and absolute
+    # paths — resolve within the repo. Path.resolve() would expand
+    # against the CWD; we want the result relative to the repo root so
+    # it can match file_set entries.
+    if raw.startswith(("./", "../", "/")):
         target = source.parent / raw
         normalized = _normalize_relative(target)
         return [p for p in _try_path_variants(normalized) if p in file_set]
 
-    # Strip leading dots from Python relative-from imports
+    # Strip leading dots from any other dotted form (defensive).
     stripped = raw.lstrip(".")
     matches = modules.get(stripped, [])
     matches += modules.get(stripped.split(".")[-1], [])
@@ -366,6 +394,28 @@ def _candidates_for(
             seen.add(path)
             out.append(path)
     return out
+
+
+def _python_relative_candidates(raw: str, *, source: Path, file_set: set[str]) -> list[str]:
+    """Resolve a Python ``from .foo`` style import against the repo.
+
+    Each leading dot pops one level from the source's package directory:
+    a single dot is the package itself, two dots is the parent package,
+    and so on. Whatever follows is a dotted module path inside the
+    resolved package (``a.b`` → ``a/b``), which we attempt with the
+    standard ``.py`` and ``__init__.py`` variants.
+    """
+    leading = len(raw) - len(raw.lstrip("."))
+    remainder = raw[leading:]
+    # ``source.parent`` is the directory the source file lives in,
+    # which corresponds to the *current* package (one dot's worth).
+    base = source.parent
+    for _ in range(leading - 1):
+        if not base.parts:
+            return []
+        base = base.parent
+    target = base / Path(*remainder.split(".")) if remainder else base
+    return [p for p in _try_path_variants(target) if p in file_set]
 
 
 def _normalize_relative(path: Path) -> Path:
