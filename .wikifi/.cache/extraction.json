@@ -1,0 +1,4568 @@
+{
+  "version": 1,
+  "saved_at": "2026-05-02T02:17:19.874633+00:00",
+  "entries": {
+    ".env.example": {
+      "fingerprint": "2e493dbd2d87",
+      "summary": "Example environment configuration exposing all tuneable runtime parameters for the wikifi documentation-generation system.",
+      "chunks_processed": 1,
+      "findings": [
+        {
+          "section_id": "intent",
+          "finding": "wikifi is a tool that generates wiki documentation from source codebases using a local large-language model. It is designed to prioritise documentation quality over processing speed, and includes guards to prevent runaway behaviour on near-empty or oversized files.",
+          "sources": [
+            {
+              "file": ".env.example",
+              "lines": [
+                1,
+                2
+              ],
+              "fingerprint": "2e493dbd2d87"
+            }
+          ]
+        },
+        {
+          "section_id": "capabilities",
+          "finding": "The system processes source files through at least two pipeline stages: a Stage 1 introspection pass (which receives a configurable directory-tree depth) and a per-file extraction pass. Files outside configurable size bounds are skipped to avoid wasting model inference time.",
+          "sources": [
+            {
+              "file": ".env.example",
+              "lines": [
+                20,
+                29
+              ],
+              "fingerprint": "2e493dbd2d87"
+            }
+          ]
+        },
+        {
+          "section_id": "external_dependencies",
+          "finding": "Ollama is the sole supported LLM provider in version 1, serving models locally over HTTP (default endpoint http://localhost:11434). The system is designed to work with reasoning-capable models such as Qwen3 and DeepSeek-R1, which support a 'thinking mode' that trades latency for output depth.",
+          "sources": [
+            {
+              "file": ".env.example",
+              "lines": [
+                7,
+                14
+              ],
+              "fingerprint": "2e493dbd2d87"
+            }
+          ]
+        },
+        {
+          "section_id": "cross_cutting",
+          "finding": "Per-request timeouts (default 900 seconds) are set to accommodate high-thinking model runs on real source files. Minimum and maximum file-size thresholds act as integrity guards: the minimum prevents thinking-mode runaway on stub files, while the maximum prevents processing files too large to be useful.",
+          "sources": [
+            {
+              "file": ".env.example",
+              "lines": [
+                16,
+                29
+              ],
+              "fingerprint": "2e493dbd2d87"
+            }
+          ]
+        },
+        {
+          "section_id": "hard_specifications",
+          "finding": "Only the 'ollama' provider is supported in v1. The default request timeout is 900 seconds (15 minutes). Fully disabling thinking mode ('false') is documented as unsafe with Qwen3 models because those models ignore the JSON-schema output constraint and emit free text instead.",
+          "sources": [
+            {
+              "file": ".env.example",
+              "lines": [
+                7,
+                44
+              ],
+              "fingerprint": "2e493dbd2d87"
+            }
+          ]
+        }
+      ]
+    },
+    ".gitignore": {
+      "fingerprint": "493b2310ee7c",
+      "summary": "Standard version-control ignore file for a full-stack project with backend and frontend components.",
+      "chunks_processed": 1,
+      "findings": []
+    },
+    ".mcp.json": {
+      "fingerprint": "b6b856cb3fe2",
+      "summary": "MCP server configuration wiring together several external tool/API integrations used during development or runtime.",
+      "chunks_processed": 1,
+      "findings": [
+        {
+          "section_id": "external_dependencies",
+          "finding": "A locally-running web-crawling service is depended upon at a fixed local address (port 3002), requiring no API key, suggesting an self-hosted crawling capability used by the system.",
+          "sources": [
+            {
+              "file": ".mcp.json",
+              "lines": [
+                14,
+                20
+              ],
+              "fingerprint": "b6b856cb3fe2"
+            }
+          ]
+        },
+        {
+          "section_id": "external_dependencies",
+          "finding": "Google's AI/generative API is consumed under the key named GOOGLE_API_KEY, used by at least two registered server integrations (nano-banana and stitch).",
+          "sources": [
+            {
+              "file": ".mcp.json",
+              "lines": [
+                4,
+                8
+              ],
+              "fingerprint": "b6b856cb3fe2"
+            }
+          ]
+        },
+        {
+          "section_id": "external_dependencies",
+          "finding": "An external documentation/context lookup service (context7) is called over HTTP using a dedicated API key, likely to enrich prompts or retrieve up-to-date library documentation.",
+          "sources": [
+            {
+              "file": ".mcp.json",
+              "lines": [
+                22,
+                28
+              ],
+              "fingerprint": "b6b856cb3fe2"
+            }
+          ]
+        },
+        {
+          "section_id": "external_dependencies",
+          "finding": "A Google-hosted MCP-compatible service called 'stitch' is consumed over HTTP, authenticated via the Google API key, purpose not fully specified but likely an orchestration or data-stitching capability.",
+          "sources": [
+            {
+              "file": ".mcp.json",
+              "lines": [
+                29,
+                35
+              ],
+              "fingerprint": "b6b856cb3fe2"
+            }
+          ]
+        },
+        {
+          "section_id": "integrations",
+          "finding": "Four tool-server integrations are declared: a local banana/AI utility, a local web crawler, a remote documentation context service, and a remote Google stitching service — suggesting the system acts as an MCP client that fans out to multiple capability providers.",
+          "sources": [
+            {
+              "file": ".mcp.json",
+              "lines": [
+                2,
+                36
+              ],
+              "fingerprint": "b6b856cb3fe2"
+            }
+          ]
+        }
+      ]
+    },
+    "CLAUDE.md": {
+      "fingerprint": "ac9698d91de6",
+      "summary": "Developer and agent operating guide for the wikifi CLI library, capturing tooling rules, code constraints, architectural invariants, and workflow conventions.",
+      "chunks_processed": 1,
+      "findings": [
+        {
+          "section_id": "intent",
+          "finding": "wikifi exists to describe what a legacy system does — producing a technology-agnostic wiki of its capabilities and domain model — so that migration teams can consume that knowledge without the tool itself prescribing any target architecture, language, or framework.",
+          "sources": [
+            {
+              "file": "CLAUDE.md",
+              "lines": [
+                73,
+                75
+              ],
+              "fingerprint": "ac9698d91de6"
+            }
+          ]
+        },
+        {
+          "section_id": "capabilities",
+          "finding": "The system exposes two primary commands: `init` (initialise wiki scaffolding against a repository) and `walk` (traverse the repository, extract per-file findings, and synthesise wiki sections). The walk is responsible for repository introspection, empty-file filtering, deterministic per-file extraction, and multi-file synthesis — in that order.",
+          "sources": [
+            {
+              "file": "CLAUDE.md",
+              "lines": [
+                60,
+                72
+              ],
+              "fingerprint": "ac9698d91de6"
+            }
+          ]
+        },
+        {
+          "section_id": "hard_specifications",
+          "finding": "The system must run against a local LLM out of the box with no cloud dependency required; hosted backends (Anthropic, OpenAI, custom) are valid additional options but never the default.",
+          "sources": [
+            {
+              "file": "CLAUDE.md",
+              "lines": [
+                51,
+                52
+              ],
+              "fingerprint": "ac9698d91de6"
+            }
+          ]
+        },
+        {
+          "section_id": "hard_specifications",
+          "finding": "Provider abstraction is mandatory: swapping the LLM backend must not require changes outside the provider boundary.",
+          "sources": [
+            {
+              "file": "CLAUDE.md",
+              "lines": [
+                53,
+                54
+              ],
+              "fingerprint": "ac9698d91de6"
+            }
+          ]
+        },
+        {
+          "section_id": "hard_specifications",
+          "finding": "When the chosen model exposes a reasoning or thinking level, the system must run at the highest available setting; lower reasoning levels are opt-in only.",
+          "sources": [
+            {
+              "file": "CLAUDE.md",
+              "lines": [
+                55,
+                56
+              ],
+              "fingerprint": "ac9698d91de6"
+            }
+          ]
+        },
+        {
+          "section_id": "hard_specifications",
+          "finding": "Test coverage target is ≥ 85%; every feature must ship with tests.",
+          "sources": [
+            {
+              "file": "CLAUDE.md",
+              "lines": [
+                45,
+                46
+              ],
+              "fingerprint": "ac9698d91de6"
+            }
+          ]
+        },
+        {
+          "section_id": "hard_specifications",
+          "finding": "wikifi is strictly a feature-extraction tool: it describes what the legacy system does and must never transform source into any target architecture, language, or framework shape.",
+          "sources": [
+            {
+              "file": "CLAUDE.md",
+              "lines": [
+                73,
+                75
+              ],
+              "fingerprint": "ac9698d91de6"
+            }
+          ]
+        },
+        {
+          "section_id": "hard_specifications",
+          "finding": "Derivative wiki sections (personas, user stories, diagrams) must be produced only after primary content sections are complete and must never be inferred from a single file.",
+          "sources": [
+            {
+              "file": "CLAUDE.md",
+              "lines": [
+                66,
+                72
+              ],
+              "fingerprint": "ac9698d91de6"
+            }
+          ]
+        },
+        {
+          "section_id": "external_dependencies",
+          "finding": "A local LLM runtime (e.g. Ollama) is the default inference backend, requiring no external network dependency for core operation.",
+          "sources": [
+            {
+              "file": "CLAUDE.md",
+              "lines": [
+                51,
+                52
+              ],
+              "fingerprint": "ac9698d91de6"
+            }
+          ]
+        },
+        {
+          "section_id": "external_dependencies",
+          "finding": "Hosted Anthropic and hosted OpenAI are supported as optional alternative inference backends, reachable through the mandatory provider abstraction layer.",
+          "sources": [
+            {
+              "file": "CLAUDE.md",
+              "lines": [
+                53,
+                54
+              ],
+              "fingerprint": "ac9698d91de6"
+            }
+          ]
+        },
+        {
+          "section_id": "cross_cutting",
+          "finding": "A pre-commit hook auto-fixes lint and re-stages changed files; a pre-push hook runs the full test suite and gates the push, ensuring the main branch remains deployable at all times.",
+          "sources": [
+            {
+              "file": "CLAUDE.md",
+              "lines": [
+                47,
+                48
+              ],
+              "fingerprint": "ac9698d91de6"
+            }
+          ]
+        },
+        {
+          "section_id": "cross_cutting",
+          "finding": "A mandatory provider abstraction layer insulates all LLM calls, so observability, retry logic, and backend-switching concerns are centralised at that boundary rather than scattered across extraction logic.",
+          "sources": [
+            {
+              "file": "CLAUDE.md",
+              "lines": [
+                53,
+                54
+              ],
+              "fingerprint": "ac9698d91de6"
+            }
+          ]
+        }
+      ]
+    },
+    "CODE-FORMAT.md": {
+      "fingerprint": "b5e0603faf44",
+      "summary": "Project conventions and tooling guide defining how software is built, structured, tested, and deployed — serves as the single source of truth for agents and humans working on any project.",
+      "chunks_processed": 1,
+      "findings": []
+    },
+    "README.md": {
+      "fingerprint": "996c401d036d",
+      "summary": "Top-level README describing wikifi's purpose, CLI surface, architecture, and configuration as a codebase analysis tool that produces technology-agnostic domain and feature wikis.",
+      "chunks_processed": 1,
+      "findings": [
+        {
+          "section_id": "intent",
+          "finding": "wikifi exists to walk an arbitrary codebase and produce a technology-agnostic extraction of its features, domains, and delivered value — so that a new modern implementation can be built that fully retains the functionality and value the original system provides to its users.",
+          "sources": [
+            {
+              "file": "README.md",
+              "lines": [
+                3,
+                3
+              ],
+              "fingerprint": "996c401d036d"
+            }
+          ]
+        },
+        {
+          "section_id": "domains",
+          "finding": "The core domain is codebase knowledge extraction: ingesting source files, classifying them, extracting domain findings per file, and synthesising those findings into structured wiki sections. Subdomains include repository introspection, static import-graph analysis, LLM-backed extraction, section synthesis, quality critique, and coverage reporting.",
+          "sources": [
+            {
+              "file": "README.md",
+              "lines": [
+                28,
+                52
+              ],
+              "fingerprint": "996c401d036d"
+            }
+          ]
+        },
+        {
+          "section_id": "capabilities",
+          "finding": "The system can initialise a wiki workspace for a target project, walk the target codebase to extract per-file domain findings, synthesise primary wiki sections from accumulated findings, and then derive higher-level artefacts (personas, user stories, architecture diagrams) from the primary content.",
+          "sources": [
+            {
+              "file": "README.md",
+              "lines": [
+                14,
+                24
+              ],
+              "fingerprint": "996c401d036d"
+            }
+          ]
+        },
+        {
+          "section_id": "capabilities",
+          "finding": "Users can force a clean re-walk, run an opt-in quality critique and revision loop on derivative sections, and override the configured LLM provider at invocation time.",
+          "sources": [
+            {
+              "file": "README.md",
+              "lines": [
+                16,
+                20
+              ],
+              "fingerprint": "996c401d036d"
+            }
+          ]
+        },
+        {
+          "section_id": "capabilities",
+          "finding": "A coverage and quality report shows per-section file counts, finding counts, body sizes, and optionally critic-derived quality scores for every populated section.",
+          "sources": [
+            {
+              "file": "README.md",
+              "lines": [
+                21,
+                23
+              ],
+              "fingerprint": "996c401d036d"
+            }
+          ]
+        },
+        {
+          "section_id": "capabilities",
+          "finding": "Natural-language querying and an interactive chat REPL allow iterative exploration of the extracted wiki content alongside the target codebase.",
+          "sources": [
+            {
+              "file": "README.md",
+              "lines": [
+                24,
+                25
+              ],
+              "fingerprint": "996c401d036d"
+            }
+          ]
+        },
+        {
+          "section_id": "capabilities",
+          "finding": "Schema files (SQL, OpenAPI, Protobuf, GraphQL, migrations) are processed through deterministic parsers rather than an LLM, producing the same structured findings as LLM extraction without consuming model tokens.",
+          "sources": [
+            {
+              "file": "README.md",
+              "lines": [
+                34,
+                36
+              ],
+              "fingerprint": "996c401d036d"
+            }
+          ]
+        },
+        {
+          "section_id": "external_dependencies",
+          "finding": "A local Ollama server is the default LLM runtime, used for all per-file extraction and synthesis calls; the default model is a thinking-capable model run at the highest available reasoning level.",
+          "sources": [
+            {
+              "file": "README.md",
+              "lines": [
+                56,
+                57
+              ],
+              "fingerprint": "996c401d036d"
+            }
+          ]
+        },
+        {
+          "section_id": "external_dependencies",
+          "finding": "Anthropic's hosted API is an opt-in LLM backend; it uses prompt caching with ephemeral cache-control markers on the system prompt so the large extraction prompt is paid for only once across hundreds of per-file calls.",
+          "sources": [
+            {
+              "file": "README.md",
+              "lines": [
+                48,
+                49
+              ],
+              "fingerprint": "996c401d036d"
+            }
+          ]
+        },
+        {
+          "section_id": "external_dependencies",
+          "finding": "OpenAI's hosted API is an opt-in LLM backend; it relies on automatic prefix caching and routes a 'think' knob to reasoning-effort on reasoning-capable models.",
+          "sources": [
+            {
+              "file": "README.md",
+              "lines": [
+                50,
+                51
+              ],
+              "fingerprint": "996c401d036d"
+            }
+          ]
+        },
+        {
+          "section_id": "external_dependencies",
+          "finding": "GitHub Actions provides the continuous integration pipeline.",
+          "sources": [
+            {
+              "file": "README.md",
+              "lines": [
+                61,
+                61
+              ],
+              "fingerprint": "996c401d036d"
+            }
+          ]
+        },
+        {
+          "section_id": "integrations",
+          "finding": "wikifi is distributed as a library installed into a target project and invoked as a CLI from that project's root; it reads the target's source tree and writes its output into a `.wikifi/` directory within that project.",
+          "sources": [
+            {
+              "file": "README.md",
+              "lines": [
+                8,
+                12
+              ],
+              "fingerprint": "996c401d036d"
+            }
+          ]
+        },
+        {
+          "section_id": "integrations",
+          "finding": "The LLM backend is reached through a provider abstraction; Ollama, Anthropic, and OpenAI backends slot in without changing the rest of the pipeline, selectable via an environment variable or a per-invocation flag.",
+          "sources": [
+            {
+              "file": "README.md",
+              "lines": [
+                46,
+                51
+              ],
+              "fingerprint": "996c401d036d"
+            }
+          ]
+        },
+        {
+          "section_id": "cross_cutting",
+          "finding": "Extraction results are content-addressed: each file's findings are keyed by the combination of its relative path and the SHA-256 hash of its bytes, so re-walks skip unchanged files automatically and the walk is resumable after a crash.",
+          "sources": [
+            {
+              "file": "README.md",
+              "lines": [
+                40,
+                43
+              ],
+              "fingerprint": "996c401d036d"
+            }
+          ]
+        },
+        {
+          "section_id": "cross_cutting",
+          "finding": "Aggregation bodies are keyed by a hash of the section's notes payload, so synthesis is also skipped when inputs have not changed.",
+          "sources": [
+            {
+              "file": "README.md",
+              "lines": [
+                40,
+                43
+              ],
+              "fingerprint": "996c401d036d"
+            }
+          ]
+        },
+        {
+          "section_id": "cross_cutting",
+          "finding": "Input filtering discards unstructured, near-empty, or machine-generated files before they reach the LLM; an invariant is that empty input must never stall a walk.",
+          "sources": [
+            {
+              "file": "README.md",
+              "lines": [
+                44,
+                46
+              ],
+              "fingerprint": "996c401d036d"
+            }
+          ]
+        },
+        {
+          "section_id": "entities",
+          "finding": "A per-file finding captures a single file's contribution to one wiki section and carries a structured source reference (file path, line range, content fingerprint) for downstream citation.",
+          "sources": [
+            {
+              "file": "README.md",
+              "lines": [
+                37,
+                39
+              ],
+              "fingerprint": "996c401d036d"
+            }
+          ]
+        },
+        {
+          "section_id": "entities",
+          "finding": "An EvidenceBundle is the output of section synthesis: it contains the section body, the supporting claims, and any contradictions found across source findings; the renderer uses it to thread numbered citations and a conflicts block into the final markdown.",
+          "sources": [
+            {
+              "file": "README.md",
+              "lines": [
+                46,
+                48
+              ],
+              "fingerprint": "996c401d036d"
+            }
+          ]
+        },
+        {
+          "section_id": "entities",
+          "finding": "FileKind classifies each in-scope file as one of: application code, SQL, OpenAPI, Protobuf, GraphQL, migration, or other; this classification drives routing to LLM extraction or a deterministic parser.",
+          "sources": [
+            {
+              "file": "README.md",
+              "lines": [
+                31,
+                33
+              ],
+              "fingerprint": "996c401d036d"
+            }
+          ]
+        },
+        {
+          "section_id": "hard_specifications",
+          "finding": "The critic-reviser loop must only accept a revised section if its quality score is at least as high as the score of the original; downgrades are rejected.",
+          "sources": [
+            {
+              "file": "README.md",
+              "lines": [
+                53,
+                55
+              ],
+              "fingerprint": "996c401d036d"
+            }
+          ]
+        },
+        {
+          "section_id": "hard_specifications",
+          "finding": "Empty or near-empty input files must never stall the walk; the walker is required to filter them out before any LLM call is made.",
+          "sources": [
+            {
+              "file": "README.md",
+              "lines": [
+                44,
+                45
+              ],
+              "fingerprint": "996c401d036d"
+            }
+          ]
+        },
+        {
+          "section_id": "hard_specifications",
+          "finding": "Every per-file finding must carry a structured SourceRef (file, line range, content fingerprint) to support citation in the rendered wiki.",
+          "sources": [
+            {
+              "file": "README.md",
+              "lines": [
+                37,
+                39
+              ],
+              "fingerprint": "996c401d036d"
+            }
+          ]
+        }
+      ]
+    },
+    "TESTING-AND-DEMO.md": {
+      "fingerprint": "3b93f710ebca",
+      "summary": "Developer-facing documentation covering how to test and demonstrate the premium pipeline features of the wikifi wiki-generation tool, including setup, feature verification steps, and teardown instructions.",
+      "chunks_processed": 1,
+      "findings": [
+        {
+          "section_id": "intent",
+          "finding": "The system exists to automatically generate technology-agnostic wiki documentation from a source-code repository. It extracts domain knowledge, entities, capabilities, and cross-cutting concerns from code files using a combination of deterministic parsers and language-model-based extraction, then aggregates and refines the results into committed markdown sections.",
+          "sources": [
+            {
+              "file": "TESTING-AND-DEMO.md",
+              "lines": [
+                1,
+                6
+              ],
+              "fingerprint": "3b93f710ebca"
+            }
+          ]
+        },
+        {
+          "section_id": "capabilities",
+          "finding": "The system performs incremental, content-addressed extraction walks over a repository, serving previously processed files from a persistent cache and skipping redundant language-model calls. A walk can be interrupted and resumed without losing progress, since the cache is flushed after every completed file.",
+          "sources": [
+            {
+              "file": "TESTING-AND-DEMO.md",
+              "lines": [
+                67,
+                88
+              ],
+              "fingerprint": "3b93f710ebca"
+            }
+          ]
+        },
+        {
+          "section_id": "capabilities",
+          "finding": "Each generated wiki section carries source-traceable citations (file path and line range) so readers can verify where each claim originates. Where the aggregation step detects disagreement across files, the section also renders a Conflicts block enumerating each conflicting position alongside its sources.",
+          "sources": [
+            {
+              "file": "TESTING-AND-DEMO.md",
+              "lines": [
+                40,
+                66
+              ],
+              "fingerprint": "3b93f710ebca"
+            }
+          ]
+        },
+        {
+          "section_id": "capabilities",
+          "finding": "The walker builds an import graph across the repository and injects a Neighbor files block into each extraction prompt, giving the language model cross-file context about which modules a file imports from and which modules depend on it.",
+          "sources": [
+            {
+              "file": "TESTING-AND-DEMO.md",
+              "lines": [
+                90,
+                114
+              ],
+              "fingerprint": "3b93f710ebca"
+            }
+          ]
+        },
+        {
+          "section_id": "capabilities",
+          "finding": "Specialized, deterministic parsers handle structured schema files (SQL DDL, Protobuf, GraphQL, OpenAPI YAML/JSON, and migration scripts) without invoking a language model, producing findings for entities, integrations, and cross-cutting invariants directly from the schema syntax.",
+          "sources": [
+            {
+              "file": "TESTING-AND-DEMO.md",
+              "lines": [
+                116,
+                149
+              ],
+              "fingerprint": "3b93f710ebca"
+            }
+          ]
+        },
+        {
+          "section_id": "capabilities",
+          "finding": "An optional critic-and-reviser pass evaluates derivative sections (personas, user stories, diagrams) against a quality threshold and rewrites any that fall below it, accepting the revision only when it scores at least as well as the original.",
+          "sources": [
+            {
+              "file": "TESTING-AND-DEMO.md",
+              "lines": [
+                151,
+                164
+              ],
+              "fingerprint": "3b93f710ebca"
+            }
+          ]
+        },
+        {
+          "section_id": "capabilities",
+          "finding": "A report command produces a markdown table summarising every wiki section by contributing file count, finding count, body size, critic-derived quality score (0–10), and the highest-priority content gap identified by the critic.",
+          "sources": [
+            {
+              "file": "TESTING-AND-DEMO.md",
+              "lines": [
+                166,
+                186
+              ],
+              "fingerprint": "3b93f710ebca"
+            }
+          ]
+        },
+        {
+          "section_id": "external_dependencies",
+          "finding": "Ollama serves as the default local language-model backend; the model is configured via the repository's config file (defaulting to qwen3.6:27b). No external service or API key is required to use this path.",
+          "sources": [
+            {
+              "file": "TESTING-AND-DEMO.md",
+              "lines": [
+                27,
+                32
+              ],
+              "fingerprint": "3b93f710ebca"
+            }
+          ]
+        },
+        {
+          "section_id": "external_dependencies",
+          "finding": "The Anthropic API is an opt-in hosted language-model backend. The system sets an ephemeral cache-control marker on the system-prompt block so that repeated per-file extraction calls read the cached prompt at roughly 10% of the normal input token price.",
+          "sources": [
+            {
+              "file": "TESTING-AND-DEMO.md",
+              "lines": [
+                188,
+                209
+              ],
+              "fingerprint": "3b93f710ebca"
+            }
+          ]
+        },
+        {
+          "section_id": "external_dependencies",
+          "finding": "The OpenAI API is a second opt-in hosted backend. It relies on OpenAI's automatic prefix caching (no explicit marker required; prefixes of at least 1024 tokens are cached for approximately 5–10 minutes). The integration also routes a 'think' intensity knob to the reasoning_effort parameter on reasoning-capable models (o-series and gpt-5), while omitting that parameter for standard models.",
+          "sources": [
+            {
+              "file": "TESTING-AND-DEMO.md",
+              "lines": [
+                210,
+                236
+              ],
+              "fingerprint": "3b93f710ebca"
+            }
+          ]
+        },
+        {
+          "section_id": "integrations",
+          "finding": "Azure OpenAI deployments and corporate reverse-proxy endpoints are supported by overriding the base URL for the OpenAI provider, either via an environment variable or a constructor parameter, with no other changes to the calling code.",
+          "sources": [
+            {
+              "file": "TESTING-AND-DEMO.md",
+              "lines": [
+                232,
+                235
+              ],
+              "fingerprint": "3b93f710ebca"
+            }
+          ]
+        },
+        {
+          "section_id": "cross_cutting",
+          "finding": "Extraction results are persisted in a content-addressed cache under .wikifi/.cache/ and are written after every individual file completes. This ensures that a process crash or manual interruption at any point does not require re-processing already-completed files.",
+          "sources": [
+            {
+              "file": "TESTING-AND-DEMO.md",
+              "lines": [
+                67,
+                88
+              ],
+              "fingerprint": "3b93f710ebca"
+            }
+          ]
+        },
+        {
+          "section_id": "cross_cutting",
+          "finding": "The full pipeline state is isolated to the .wikifi/ directory: committed markdown sections live at the root of that directory, per-section JSONL findings are stored in .notes/ (gitignored), and extraction/aggregation caches are stored in .cache/ (gitignored). Deleting .cache/ forces a full re-walk; deleting the entire directory resets all state.",
+          "sources": [
+            {
+              "file": "TESTING-AND-DEMO.md",
+              "lines": [
+                249,
+                265
+              ],
+              "fingerprint": "3b93f710ebca"
+            }
+          ]
+        },
+        {
+          "section_id": "hard_specifications",
+          "finding": "The test suite must include exactly 156 passing tests with total line coverage at or above 93%. Every new module must individually reach at least 86% coverage, and each premium-pipeline module (fingerprint, cache, evidence, critic, report, repograph, specialized parsers, and the Anthropic provider) must carry a dedicated test file.",
+          "sources": [
+            {
+              "file": "TESTING-AND-DEMO.md",
+              "lines": [
+                20,
+                30
+              ],
+              "fingerprint": "3b93f710ebca"
+            }
+          ]
+        },
+        {
+          "section_id": "hard_specifications",
+          "finding": "The Anthropic provider must place cache_control of type 'ephemeral' on the system-prompt block, use the messages.parse structured-output contract, translate the 'think' intensity setting to an effort level, and map API errors to a RuntimeError. These behaviors are locked in by the provider's dedicated test file.",
+          "sources": [
+            {
+              "file": "TESTING-AND-DEMO.md",
+              "lines": [
+                237,
+                242
+              ],
+              "fingerprint": "3b93f710ebca"
+            }
+          ]
+        },
+        {
+          "section_id": "hard_specifications",
+          "finding": "The OpenAI provider must use the chat.completions.parse structured-output contract, route reasoning_effort only to o-series and gpt-5 models (not standard models), swap max_tokens for max_completion_tokens on reasoning models, and map API errors to RuntimeError. OpenAI's automatic prefix caching applies to prefixes of at least 1024 tokens and lasts approximately 5–10 minutes.",
+          "sources": [
+            {
+              "file": "TESTING-AND-DEMO.md",
+              "lines": [
+                215,
+                230
+              ],
+              "fingerprint": "3b93f710ebca"
+            }
+          ]
+        },
+        {
+          "section_id": "hard_specifications",
+          "finding": "The critic-reviser loop must only accept a revised derivative section if the revision scores at least as well as the original; a revision that scores lower must be discarded.",
+          "sources": [
+            {
+              "file": "TESTING-AND-DEMO.md",
+              "lines": [
+                158,
+                163
+              ],
+              "fingerprint": "3b93f710ebca"
+            }
+          ]
+        }
+      ]
+    },
+    "VISION.md": {
+      "fingerprint": "10651b456a64",
+      "summary": "VISION.md defines wikifi's purpose, scope, operational requirements, and success criteria as a technology-agnostic codebase-to-wiki extraction tool for legacy migration teams.",
+      "chunks_processed": 1,
+      "findings": [
+        {
+          "section_id": "intent",
+          "finding": "wikifi exists because the intent of legacy systems is locked inside their implementation choices. A migration team needs a description of *what the system does and why*, decoupled from *how it currently does it*, so they can re-implement on a fresh stack without recreating the legacy system's structure. The goal is to make legacy intent explicit, complete, and portable.",
+          "sources": [
+            {
+              "file": "VISION.md",
+              "lines": [
+                3,
+                9
+              ],
+              "fingerprint": "10651b456a64"
+            }
+          ]
+        },
+        {
+          "section_id": "intent",
+          "finding": "wikifi is explicitly a feature-extraction tool, not a transposition tool — it surfaces what a legacy system does and leaves the act of reshaping it to a target architecture entirely to the migration team.",
+          "sources": [
+            {
+              "file": "VISION.md",
+              "lines": [
+                86,
+                89
+              ],
+              "fingerprint": "10651b456a64"
+            }
+          ]
+        },
+        {
+          "section_id": "capabilities",
+          "finding": "wikifi walks a target codebase, uses an AI agent to extract domain knowledge from each source file, and writes a technology-agnostic wiki covering DDD domains, intent, capabilities, external dependencies, integrations, cross-cutting concerns, core entities, and hard specifications.",
+          "sources": [
+            {
+              "file": "VISION.md",
+              "lines": [
+                6,
+                8
+              ],
+              "fingerprint": "10651b456a64"
+            }
+          ]
+        },
+        {
+          "section_id": "capabilities",
+          "finding": "After primary per-file capture is complete, wikifi performs a derivative synthesis pass that produces user personas (with intent, needs, pain points, and usage patterns), Gherkin-style user stories keyed to those personas, and aggregate system diagrams — none of which can be inferred from any single source file.",
+          "sources": [
+            {
+              "file": "VISION.md",
+              "lines": [
+                53,
+                63
+              ],
+              "fingerprint": "10651b456a64"
+            }
+          ]
+        },
+        {
+          "section_id": "capabilities",
+          "finding": "wikifi exposes a CLI interface for interacting with the generated wiki; an MCP interface is identified as in-scope for a follow-up release.",
+          "sources": [
+            {
+              "file": "VISION.md",
+              "lines": [
+                79,
+                80
+              ],
+              "fingerprint": "10651b456a64"
+            }
+          ]
+        },
+        {
+          "section_id": "cross_cutting",
+          "finding": "The agent must run against a local LLM by default with no cloud dependency; hosted backends are valid additional options but not the default. The LLM backend must be reachable through a provider abstraction layer so it can be swapped (local Ollama, hosted Anthropic, hosted OpenAI, or custom) without changes outside the provider boundary.",
+          "sources": [
+            {
+              "file": "VISION.md",
+              "lines": [
+                92,
+                96
+              ],
+              "fingerprint": "10651b456a64"
+            }
+          ]
+        },
+        {
+          "section_id": "cross_cutting",
+          "finding": "When the chosen model exposes a thinking/reasoning level, the agent runs at the highest available setting, prioritising wiki quality over walk speed.",
+          "sources": [
+            {
+              "file": "VISION.md",
+              "lines": [
+                97,
+                98
+              ],
+              "fingerprint": "10651b456a64"
+            }
+          ]
+        },
+        {
+          "section_id": "cross_cutting",
+          "finding": "The walker must recognise and skip files carrying no extractable intent (stub init files, empty fixtures, generated lockfiles, and similar) before they reach the agent; a single empty or unstructured file must never stall the walk.",
+          "sources": [
+            {
+              "file": "VISION.md",
+              "lines": [
+                99,
+                100
+              ],
+              "fingerprint": "10651b456a64"
+            }
+          ]
+        },
+        {
+          "section_id": "hard_specifications",
+          "finding": "The generated wiki must at minimum contain: DDD domains and subdomains, system intent, domain-level capabilities, external-system dependencies, internal and external integrations, cross-cutting concerns, core entities and their structures, and hard specifications — regardless of the on-disk layout chosen by the implementor.",
+          "sources": [
+            {
+              "file": "VISION.md",
+              "lines": [
+                26,
+                47
+              ],
+              "fingerprint": "10651b456a64"
+            }
+          ]
+        },
+        {
+          "section_id": "hard_specifications",
+          "finding": "Derivative wiki sections (user personas, user stories, aggregate diagrams) must be produced in a step that runs *after* primary capture and must never be inferred from a single source file.",
+          "sources": [
+            {
+              "file": "VISION.md",
+              "lines": [
+                50,
+                63
+              ],
+              "fingerprint": "10651b456a64"
+            }
+          ]
+        },
+        {
+          "section_id": "hard_specifications",
+          "finding": "Wiki content is stored in the target project's `.wikifi/` directory; the contract is the content the wiki conveys, not its on-disk shape or file structure within that directory.",
+          "sources": [
+            {
+              "file": "VISION.md",
+              "lines": [
+                73,
+                76
+              ],
+              "fingerprint": "10651b456a64"
+            }
+          ]
+        },
+        {
+          "section_id": "hard_specifications",
+          "finding": "Success is defined as: a migration team working from the wiki alone — without reference to the original codebase — can deliver a microservice re-implementation that preserves the original system's personas, problem space, integrations, cross-cutting concerns, entities, data patterns, and user value.",
+          "sources": [
+            {
+              "file": "VISION.md",
+              "lines": [
+                103,
+                105
+              ],
+              "fingerprint": "10651b456a64"
+            }
+          ]
+        },
+        {
+          "section_id": "domains",
+          "finding": "wikifi's core domain is legacy-system knowledge extraction: capturing business intent, domain structure, and operational behaviour from an existing codebase and representing it as a technology-agnostic wiki. A secondary domain is wiki authoring and organisation, governing how extracted knowledge is structured and stored for consumption by a migration team.",
+          "sources": [
+            {
+              "file": "VISION.md",
+              "lines": [
+                3,
+                20
+              ],
+              "fingerprint": "10651b456a64"
+            }
+          ]
+        }
+      ]
+    },
+    "wikifi/aggregator.py": {
+      "fingerprint": "c5f76cb7c4a3",
+      "summary": "Stage 3 of the wiki-generation pipeline: synthesises per-section wiki content from accumulated file-level notes using an LLM, attaches structured evidence (citations + contradictions), and writes the final section body.",
+      "chunks_processed": 1,
+      "findings": [
+        {
+          "section_id": "intent",
+          "finding": "The aggregator exists to turn many small, file-scoped observations into a coherent, tech-agnostic wiki section — while refusing to silently hide disagreements between sources. The system prompt makes explicit that contradictions across files must be surfaced as named conflicts rather than merged away, and that every claim must trace back to the specific source files that justified it.",
+          "sources": [
+            {
+              "file": "wikifi/aggregator.py",
+              "lines": [
+                1,
+                15
+              ],
+              "fingerprint": "c5f76cb7c4a3"
+            }
+          ]
+        },
+        {
+          "section_id": "capabilities",
+          "finding": "The system synthesises notes collected from individual source files into readable markdown bodies for each primary wiki section, with every asserted claim backed by numbered citations pointing to the originating files and optional line ranges.",
+          "sources": [
+            {
+              "file": "wikifi/aggregator.py",
+              "lines": [
+                1,
+                15
+              ],
+              "fingerprint": "c5f76cb7c4a3"
+            }
+          ]
+        },
+        {
+          "section_id": "capabilities",
+          "finding": "When two or more files make incompatible assertions about the same domain topic, the system surfaces the conflict explicitly under a 'Conflicts in source' heading rather than silently choosing one position — a deliberate feature for legacy codebases where tribal knowledge hides in inconsistencies.",
+          "sources": [
+            {
+              "file": "wikifi/aggregator.py",
+              "lines": [
+                9,
+                14
+              ],
+              "fingerprint": "c5f76cb7c4a3"
+            }
+          ]
+        },
+        {
+          "section_id": "capabilities",
+          "finding": "A section-level cache compares a digest of the current note payload against the previous walk; if the notes are unchanged, the prior rendered body and evidence bundle are reused without re-invoking the LLM, saving cost and latency on incremental runs.",
+          "sources": [
+            {
+              "file": "wikifi/aggregator.py",
+              "lines": [
+                15,
+                17
+              ],
+              "fingerprint": "c5f76cb7c4a3"
+            }
+          ]
+        },
+        {
+          "section_id": "capabilities",
+          "finding": "When LLM synthesis fails, the system falls back to emitting the raw notes directly in the section body, preserving information at the cost of polish and providing the error message inline.",
+          "sources": [
+            {
+              "file": "wikifi/aggregator.py",
+              "lines": [
+                272,
+                285
+              ],
+              "fingerprint": "c5f76cb7c4a3"
+            }
+          ]
+        },
+        {
+          "section_id": "entities",
+          "finding": "An `AggregatedClaim` pairs a single prose assertion with the 1-based indices of the input notes that support it. A `SectionBody` groups a markdown body string with a list of such claims and a list of `AggregatedContradiction` records, each contradiction holding a one-sentence summary and multiple conflicting claim positions.",
+          "sources": [
+            {
+              "file": "wikifi/aggregator.py",
+              "lines": [
+                74,
+                101
+              ],
+              "fingerprint": "c5f76cb7c4a3"
+            }
+          ]
+        },
+        {
+          "section_id": "entities",
+          "finding": "An `AggregationStats` record tracks how many sections were written fresh, skipped due to empty notes, or served from cache during a single aggregation run.",
+          "sources": [
+            {
+              "file": "wikifi/aggregator.py",
+              "lines": [
+                103,
+                107
+              ],
+              "fingerprint": "c5f76cb7c4a3"
+            }
+          ]
+        },
+        {
+          "section_id": "entities",
+          "finding": "A `SourceRef` links a claim back to a specific file, optionally scoped to a line range. Multiple `SourceRef` values are coalesced before being attached to a `Claim`; a `Claim` is the evidence-layer representation of one assertion with its resolved file sources. An `EvidenceBundle` carries the final body, claims, and contradictions for a section.",
+          "sources": [
+            {
+              "file": "wikifi/aggregator.py",
+              "lines": [
+                166,
+                186
+              ],
+              "fingerprint": "c5f76cb7c4a3"
+            }
+          ]
+        },
+        {
+          "section_id": "cross_cutting",
+          "finding": "Section-level caching uses a deterministic digest of the note payload; hits reuse the stored body and evidence bundle without any LLM call, and misses record the fresh result back to the cache for the next walk.",
+          "sources": [
+            {
+              "file": "wikifi/aggregator.py",
+              "lines": [
+                126,
+                155
+              ],
+              "fingerprint": "c5f76cb7c4a3"
+            }
+          ]
+        },
+        {
+          "section_id": "cross_cutting",
+          "finding": "All aggregation failures are logged at WARNING level and produce a fallback body that preserves the raw notes, ensuring a section is always written even when the LLM call fails.",
+          "sources": [
+            {
+              "file": "wikifi/aggregator.py",
+              "lines": [
+                143,
+                152
+              ],
+              "fingerprint": "c5f76cb7c4a3"
+            }
+          ]
+        },
+        {
+          "section_id": "cross_cutting",
+          "finding": "The aggregator enforces a tech-agnostic invariant at the prompt level: the LLM is explicitly instructed never to name languages, frameworks, or libraries in the synthesised output, translating all observations into domain terms.",
+          "sources": [
+            {
+              "file": "wikifi/aggregator.py",
+              "lines": [
+                54,
+                67
+              ],
+              "fingerprint": "c5f76cb7c4a3"
+            }
+          ]
+        },
+        {
+          "section_id": "integrations",
+          "finding": "The aggregator reads accumulated per-file notes from the wiki layout store (via `read_notes`) and writes finished section bodies back to it (via `write_section`), acting as the bridge between the extraction and rendering stages.",
+          "sources": [
+            {
+              "file": "wikifi/aggregator.py",
+              "lines": [
+                109,
+                160
+              ],
+              "fingerprint": "c5f76cb7c4a3"
+            }
+          ]
+        },
+        {
+          "section_id": "integrations",
+          "finding": "The aggregator calls the LLM provider's structured-JSON completion endpoint, passing a system prompt and a rendered user prompt, and expects the response to conform to the `SectionBody` schema.",
+          "sources": [
+            {
+              "file": "wikifi/aggregator.py",
+              "lines": [
+                136,
+                141
+              ],
+              "fingerprint": "c5f76cb7c4a3"
+            }
+          ]
+        },
+        {
+          "section_id": "integrations",
+          "finding": "Derivative sections (personas, user stories, diagrams) are explicitly excluded from this stage and are instead populated by a separate deriver stage that runs afterwards, indicating a two-stage downstream pipeline.",
+          "sources": [
+            {
+              "file": "wikifi/aggregator.py",
+              "lines": [
+                111,
+                116
+              ],
+              "fingerprint": "c5f76cb7c4a3"
+            }
+          ]
+        },
+        {
+          "section_id": "hard_specifications",
+          "finding": "Contradictions between source notes must never be silently resolved: any incompatible claims must produce a `contradictions[]` entry naming each position and the note indices that support it. This is stated as a hard rule in the LLM system prompt and enforced structurally via the `AggregatedContradiction` schema.",
+          "sources": [
+            {
+              "file": "wikifi/aggregator.py",
+              "lines": [
+                61,
+                63
+              ],
+              "fingerprint": "c5f76cb7c4a3"
+            }
+          ]
+        },
+        {
+          "section_id": "hard_specifications",
+          "finding": "Wiki section bodies must be tech-agnostic: no mention of specific languages, frameworks, or libraries is permitted in synthesised output; every observation must be translated into domain terms.",
+          "sources": [
+            {
+              "file": "wikifi/aggregator.py",
+              "lines": [
+                57,
+                59
+              ],
+              "fingerprint": "c5f76cb7c4a3"
+            }
+          ]
+        },
+        {
+          "section_id": "hard_specifications",
+          "finding": "Note indices presented to the LLM are 1-based, and the resolution logic subtracts 1 before indexing into the notes list — an off-by-one invariant that must be preserved if the prompting scheme changes.",
+          "sources": [
+            {
+              "file": "wikifi/aggregator.py",
+              "lines": [
+                167,
+                173
+              ],
+              "fingerprint": "c5f76cb7c4a3"
+            }
+          ]
+        }
+      ]
+    },
+    "wikifi/cache.py": {
+      "fingerprint": "1ba541fe863d",
+      "summary": "Implements a two-scope content-addressed cache that lets the documentation walk pipeline skip unchanged files and unchanged section aggregations, providing both speed and resumability for large codebases.",
+      "chunks_processed": 1,
+      "findings": [
+        {
+          "section_id": "intent",
+          "finding": "The system is designed to handle very large legacy codebases (example cited: 50,000 files) where regenerating documentation on every run would take hours. The cache layer reduces repeat runs to processing only changed files, and provides free resumability so an interrupted walk restarts from the last completed file rather than from scratch.",
+          "sources": [
+            {
+              "file": "wikifi/cache.py",
+              "lines": [
+                1,
+                21
+              ],
+              "fingerprint": "1ba541fe863d"
+            }
+          ]
+        },
+        {
+          "section_id": "capabilities",
+          "finding": "The pipeline caches per-file extraction results keyed by the combination of relative file path and a content fingerprint, so files whose bytes have not changed since the last run reuse their previous structured findings without incurring an AI extraction call.",
+          "sources": [
+            {
+              "file": "wikifi/cache.py",
+              "lines": [
+                5,
+                8
+              ],
+              "fingerprint": "1ba541fe863d"
+            }
+          ]
+        },
+        {
+          "section_id": "capabilities",
+          "finding": "The pipeline also caches per-section aggregation results keyed by a stable digest of the section's notes payload. If all contributing file findings are identical to the previous run, the cached rendered section body is reused without re-invoking the aggregator.",
+          "sources": [
+            {
+              "file": "wikifi/cache.py",
+              "lines": [
+                9,
+                12
+              ],
+              "fingerprint": "1ba541fe863d"
+            }
+          ]
+        },
+        {
+          "section_id": "capabilities",
+          "finding": "Interrupted walks are automatically resumable: because per-file results are persisted incrementally, a walk that fails partway through resumes from the last unprocessed file on the next invocation.",
+          "sources": [
+            {
+              "file": "wikifi/cache.py",
+              "lines": [
+                14,
+                18
+              ],
+              "fingerprint": "1ba541fe863d"
+            }
+          ]
+        },
+        {
+          "section_id": "capabilities",
+          "finding": "Stale cache entries for files that are no longer in scope can be pruned, and the entire cache can be reset (e.g., via a `--no-cache` flag) to force a full fresh walk.",
+          "sources": [
+            {
+              "file": "wikifi/cache.py",
+              "lines": [
+                105,
+                113
+              ],
+              "fingerprint": "1ba541fe863d"
+            }
+          ]
+        },
+        {
+          "section_id": "cross_cutting",
+          "finding": "Cache writes are performed atomically by writing to a temporary file then renaming it into place, preventing corrupt cache state from a partial write.",
+          "sources": [
+            {
+              "file": "wikifi/cache.py",
+              "lines": [
+                189,
+                193
+              ],
+              "fingerprint": "1ba541fe863d"
+            }
+          ]
+        },
+        {
+          "section_id": "cross_cutting",
+          "finding": "A monotonically increasing cache version number is embedded in every persisted cache file; any version mismatch causes the entire cache to be silently discarded and rebuilt, providing a controlled invalidation mechanism across software upgrades.",
+          "sources": [
+            {
+              "file": "wikifi/cache.py",
+              "lines": [
+                38,
+                38
+              ],
+              "fingerprint": "1ba541fe863d"
+            }
+          ]
+        },
+        {
+          "section_id": "cross_cutting",
+          "finding": "Malformed individual cache entries are logged as warnings and silently dropped rather than causing a hard failure, so a partially corrupt cache degrades gracefully to a fresh extraction for only the affected entries.",
+          "sources": [
+            {
+              "file": "wikifi/cache.py",
+              "lines": [
+                196,
+                222
+              ],
+              "fingerprint": "1ba541fe863d"
+            }
+          ]
+        },
+        {
+          "section_id": "cross_cutting",
+          "finding": "Cache files are stored under a dedicated hidden subdirectory within the wiki output directory so they inherit the same version-control ignore rules as the rest of the tool's working state, keeping generated documentation commits clean.",
+          "sources": [
+            {
+              "file": "wikifi/cache.py",
+              "lines": [
+                19,
+                21
+              ],
+              "fingerprint": "1ba541fe863d"
+            }
+          ]
+        },
+        {
+          "section_id": "entities",
+          "finding": "A `CachedFindings` entity represents the extraction result for a single file: it holds the file's content fingerprint, the list of structured findings produced, a one-sentence summary, and a count of how many chunks were processed.",
+          "sources": [
+            {
+              "file": "wikifi/cache.py",
+              "lines": [
+                44,
+                51
+              ],
+              "fingerprint": "1ba541fe863d"
+            }
+          ]
+        },
+        {
+          "section_id": "entities",
+          "finding": "A `CachedSection` entity represents the aggregation result for a single wiki section: it holds the hash of the notes payload that produced it, the rendered markdown body, and lists of claims and contradictions identified during aggregation.",
+          "sources": [
+            {
+              "file": "wikifi/cache.py",
+              "lines": [
+                54,
+                60
+              ],
+              "fingerprint": "1ba541fe863d"
+            }
+          ]
+        },
+        {
+          "section_id": "entities",
+          "finding": "A `WalkCache` entity is the in-memory container for both caches, tracking extraction and aggregation entries alongside hit and miss counters for observability into cache effectiveness.",
+          "sources": [
+            {
+              "file": "wikifi/cache.py",
+              "lines": [
+                63,
+                70
+              ],
+              "fingerprint": "1ba541fe863d"
+            }
+          ]
+        },
+        {
+          "section_id": "hard_specifications",
+          "finding": "The aggregation cache key is computed only over content-bearing fields (file reference, summary, finding text) and explicitly excludes timestamps and per-walk debug fields, ensuring that regenerating identical notes on a fresh walk always produces a cache hit.",
+          "sources": [
+            {
+              "file": "wikifi/cache.py",
+              "lines": [
+                238,
+                251
+              ],
+              "fingerprint": "1ba541fe863d"
+            }
+          ]
+        },
+        {
+          "section_id": "hard_specifications",
+          "finding": "Cache files must reside at `.wikifi/.cache/extraction.json` and `.wikifi/.cache/aggregation.json` relative to the wiki directory root.",
+          "sources": [
+            {
+              "file": "wikifi/cache.py",
+              "lines": [
+                33,
+                36
+              ],
+              "fingerprint": "1ba541fe863d"
+            }
+          ]
+        },
+        {
+          "section_id": "integrations",
+          "finding": "This module depends on the fingerprinting service (imported from `wikifi/fingerprint.py`) to compute content hashes used as cache keys for both extraction and aggregation scopes.",
+          "sources": [
+            {
+              "file": "wikifi/cache.py",
+              "lines": [
+                244,
+                246
+              ],
+              "fingerprint": "1ba541fe863d"
+            }
+          ]
+        },
+        {
+          "section_id": "integrations",
+          "finding": "The cache is consumed by the extractor, aggregator, and orchestrator (all neighbor files) to gate whether AI calls are needed; the wiki layout structure (from `wikifi/wiki.py`) determines where cache files are persisted on disk.",
+          "sources": [
+            {
+              "file": "wikifi/cache.py",
+              "lines": [
+                30,
+                30
+              ],
+              "fingerprint": "1ba541fe863d"
+            }
+          ]
+        }
+      ]
+    },
+    "wikifi/chat.py": {
+      "fingerprint": "0333e700a046",
+      "summary": "Implements an interactive multi-turn chat session grounded in the populated wiki sections of a target project, allowing users to query the wiki content conversationally.",
+      "chunks_processed": 1,
+      "findings": [
+        {
+          "section_id": "intent",
+          "finding": "The chat module exists so that users can hold a natural-language conversation about a codebase's wiki, with every answer grounded in the extracted wiki sections rather than invented detail. It explicitly instructs the assistant to cite section names and admit gaps rather than fabricate information.",
+          "sources": [
+            {
+              "file": "wikifi/chat.py",
+              "lines": [
+                1,
+                32
+              ],
+              "fingerprint": "0333e700a046"
+            }
+          ]
+        },
+        {
+          "section_id": "capabilities",
+          "finding": "Users can launch an interactive session that loads all populated wiki sections as context, then send multi-turn messages and receive responses grounded in that context. The session supports conversation history reset (clearing turns while keeping wiki context), listing which sections are loaded, and graceful exit — all via slash commands.",
+          "sources": [
+            {
+              "file": "wikifi/chat.py",
+              "lines": [
+                88,
+                130
+              ],
+              "fingerprint": "0333e700a046"
+            }
+          ]
+        },
+        {
+          "section_id": "capabilities",
+          "finding": "The system filters out unpopulated or placeholder wiki sections before building the context bundle, ensuring the assistant is only grounded in meaningful content.",
+          "sources": [
+            {
+              "file": "wikifi/chat.py",
+              "lines": [
+                63,
+                82
+              ],
+              "fingerprint": "0333e700a046"
+            }
+          ]
+        },
+        {
+          "section_id": "entities",
+          "finding": "A `ChatSession` entity holds the LLM provider reference, the frozen system prompt built from wiki sections, and the accumulated conversation history (ordered list of role/content message pairs). It supports appending user and assistant turns and clearing history while retaining the wiki context.",
+          "sources": [
+            {
+              "file": "wikifi/chat.py",
+              "lines": [
+                46,
+                57
+              ],
+              "fingerprint": "0333e700a046"
+            }
+          ]
+        },
+        {
+          "section_id": "entities",
+          "finding": "A `LoadedSection` entity pairs a wiki Section descriptor with its markdown body text, representing a single populated section ready for inclusion in a chat context.",
+          "sources": [
+            {
+              "file": "wikifi/chat.py",
+              "lines": [
+                42,
+                45
+              ],
+              "fingerprint": "0333e700a046"
+            }
+          ]
+        },
+        {
+          "section_id": "integrations",
+          "finding": "The chat session delegates all LLM inference to the configured provider via a `chat` call, passing the system prompt and accumulated message history. The provider abstraction is sourced from `wikifi/providers/base.py`, keeping the chat logic decoupled from any specific LLM service.",
+          "sources": [
+            {
+              "file": "wikifi/chat.py",
+              "lines": [
+                52,
+                55
+              ],
+              "fingerprint": "0333e700a046"
+            }
+          ]
+        },
+        {
+          "section_id": "integrations",
+          "finding": "Wiki section content is read directly from the `.wikifi/` directory on disk using the layout abstraction from `wikifi/wiki.py`, and section metadata is sourced from `wikifi/sections.py`.",
+          "sources": [
+            {
+              "file": "wikifi/chat.py",
+              "lines": [
+                63,
+                82
+              ],
+              "fingerprint": "0333e700a046"
+            }
+          ]
+        },
+        {
+          "section_id": "cross_cutting",
+          "finding": "Provider failures during a chat turn are caught and surfaced as inline error messages rather than crashing the REPL, ensuring a single failed inference call does not terminate the session.",
+          "sources": [
+            {
+              "file": "wikifi/chat.py",
+              "lines": [
+                120,
+                125
+              ],
+              "fingerprint": "0333e700a046"
+            }
+          ]
+        },
+        {
+          "section_id": "cross_cutting",
+          "finding": "The system prompt instructs the assistant to explicitly acknowledge when the wiki does not cover a topic, enforcing a data-integrity constraint that responses must be grounded in extracted content rather than hallucinated.",
+          "sources": [
+            {
+              "file": "wikifi/chat.py",
+              "lines": [
+                27,
+                31
+              ],
+              "fingerprint": "0333e700a046"
+            }
+          ]
+        }
+      ]
+    },
+    "wikifi/cli.py": {
+      "fingerprint": "f326383c7da1",
+      "summary": "The command-line entry point for wikifi, exposing four subcommands (init, walk, chat, report) that drive the full pipeline from codebase introspection through wiki generation and interactive querying.",
+      "chunks_processed": 1,
+      "findings": [
+        {
+          "section_id": "intent",
+          "finding": "wikifi exists to walk a codebase and produce a technology-agnostic markdown wiki of its intent — translating implementation details into domain-level documentation for whoever needs to understand what the system does rather than how it is built.",
+          "sources": [
+            {
+              "file": "wikifi/cli.py",
+              "lines": [
+                1,
+                8
+              ],
+              "fingerprint": "f326383c7da1"
+            }
+          ]
+        },
+        {
+          "section_id": "capabilities",
+          "finding": "Users can initialise a wiki workspace in any project directory, run a full multi-stage extraction-and-aggregation pipeline against that codebase, query the resulting wiki through an interactive conversational interface, and obtain a coverage and quality report on how completely the wiki sections have been populated.",
+          "sources": [
+            {
+              "file": "wikifi/cli.py",
+              "lines": [
+                60,
+                220
+              ],
+              "fingerprint": "f326383c7da1"
+            }
+          ]
+        },
+        {
+          "section_id": "capabilities",
+          "finding": "The walk pipeline supports opt-in cache invalidation (forcing a clean re-walk), an optional critic-and-reviser review loop on derivative sections, and runtime override of the AI provider, giving operators fine-grained control over cost and quality trade-offs.",
+          "sources": [
+            {
+              "file": "wikifi/cli.py",
+              "lines": [
+                88,
+                112
+              ],
+              "fingerprint": "f326383c7da1"
+            }
+          ]
+        },
+        {
+          "section_id": "capabilities",
+          "finding": "The report command can optionally invoke a critic against every populated wiki section to produce quality scores, in addition to its baseline coverage summary.",
+          "sources": [
+            {
+              "file": "wikifi/cli.py",
+              "lines": [
+                185,
+                205
+              ],
+              "fingerprint": "f326383c7da1"
+            }
+          ]
+        },
+        {
+          "section_id": "domains",
+          "finding": "Two core domains are visible: codebase introspection (discovering and classifying source files) and wiki generation (extracting findings, aggregating them into sections, and deriving higher-level content). A supporting subdomain covers interactive knowledge retrieval against the generated wiki.",
+          "sources": [
+            {
+              "file": "wikifi/cli.py",
+              "lines": [
+                1,
+                8
+              ],
+              "fingerprint": "f326383c7da1"
+            }
+          ]
+        },
+        {
+          "section_id": "entities",
+          "finding": "A WikiLayout entity represents the on-disk structure of a wiki workspace rooted at a project directory; it tracks the presence of the .wikifi/ directory and organises the paths that other pipeline stages read and write.",
+          "sources": [
+            {
+              "file": "wikifi/cli.py",
+              "lines": [
+                166,
+                172
+              ],
+              "fingerprint": "f326383c7da1"
+            }
+          ]
+        },
+        {
+          "section_id": "entities",
+          "finding": "A walk report entity carries structured metrics for each of the four pipeline stages: introspection (included/excluded file counts, detected languages), extraction (files seen, files with findings, total findings, skipped files, cache hits, specialised-extractor files), aggregation (sections written/empty/cached), and derivation (sections derived/skipped/revised).",
+          "sources": [
+            {
+              "file": "wikifi/cli.py",
+              "lines": [
+                118,
+                153
+              ],
+              "fingerprint": "f326383c7da1"
+            }
+          ]
+        },
+        {
+          "section_id": "cross_cutting",
+          "finding": "Verbose mode activates debug-level structured logging across all subcommands via a shared callback, providing a consistent observability toggle for the entire pipeline.",
+          "sources": [
+            {
+              "file": "wikifi/cli.py",
+              "lines": [
+                51,
+                60
+              ],
+              "fingerprint": "f326383c7da1"
+            }
+          ]
+        },
+        {
+          "section_id": "cross_cutting",
+          "finding": "An on-disk cache is used by the walk pipeline to avoid redundant re-processing; it can be explicitly invalidated at runtime, and cache hit counts are surfaced in the walk report.",
+          "sources": [
+            {
+              "file": "wikifi/cli.py",
+              "lines": [
+                90,
+                97
+              ],
+              "fingerprint": "f326383c7da1"
+            }
+          ]
+        },
+        {
+          "section_id": "integrations",
+          "finding": "The CLI integrates with configurable AI providers (ollama, anthropic, openai) at runtime; the provider and model are resolved from settings but can be overridden per-walk invocation, and the same provider instance is reused for both the chat REPL and quality scoring in the report command.",
+          "sources": [
+            {
+              "file": "wikifi/cli.py",
+              "lines": [
+                98,
+                101
+              ],
+              "fingerprint": "f326383c7da1"
+            }
+          ]
+        },
+        {
+          "section_id": "hard_specifications",
+          "finding": "The tool's entry point must be declared as `wikifi` in the project's script configuration and must delegate directly to the Typer application; this contract ties the installed command name to the main() function in this module.",
+          "sources": [
+            {
+              "file": "wikifi/cli.py",
+              "lines": [
+                210,
+                215
+              ],
+              "fingerprint": "f326383c7da1"
+            }
+          ]
+        }
+      ]
+    },
+    "wikifi/config.py": {
+      "fingerprint": "8cd2ca53c957",
+      "summary": "Runtime configuration module that declares all tunable settings for the wiki-generation pipeline, loaded from environment variables or a .env file.",
+      "chunks_processed": 1,
+      "findings": [
+        {
+          "section_id": "intent",
+          "finding": "wikifi exists to generate technology-agnostic wiki documentation by walking source repositories, extracting structured findings from each file via language models, and assembling them into coherent wiki sections. The configuration reveals the system prioritizes wiki quality over processing speed, and is designed to handle arbitrarily large codebases through chunking and caching.",
+          "sources": [
+            {
+              "file": "wikifi/config.py",
+              "lines": [
+                1,
+                8
+              ],
+              "fingerprint": "8cd2ca53c957"
+            }
+          ]
+        },
+        {
+          "section_id": "capabilities",
+          "finding": "The pipeline can route schema files (SQL, OpenAPI, Protobuf, GraphQL, migrations) through deterministic extractors that bypass the language model entirely, providing faster and more reliable handling of structured file types.",
+          "sources": [
+            {
+              "file": "wikifi/config.py",
+              "lines": [
+                75,
+                81
+              ],
+              "fingerprint": "8cd2ca53c957"
+            }
+          ]
+        },
+        {
+          "section_id": "capabilities",
+          "finding": "The system builds an import/reference graph of the codebase and feeds each file's neighborhood into the extraction prompt, enabling context-aware extraction that understands cross-file relationships rather than treating each file in isolation.",
+          "sources": [
+            {
+              "file": "wikifi/config.py",
+              "lines": [
+                69,
+                74
+              ],
+              "fingerprint": "8cd2ca53c957"
+            }
+          ]
+        },
+        {
+          "section_id": "capabilities",
+          "finding": "A critic-and-reviser loop can be applied to derivative wiki sections (personas, user stories, diagrams), invoking a revision pass whenever a quality score falls below a configurable threshold, improving groundedness at the cost of additional processing.",
+          "sources": [
+            {
+              "file": "wikifi/config.py",
+              "lines": [
+                83,
+                94
+              ],
+              "fingerprint": "8cd2ca53c957"
+            }
+          ]
+        },
+        {
+          "section_id": "capabilities",
+          "finding": "Per-file extraction results and per-section aggregation results are cached across walks, allowing incremental re-runs that only reprocess changed files.",
+          "sources": [
+            {
+              "file": "wikifi/config.py",
+              "lines": [
+                63,
+                68
+              ],
+              "fingerprint": "8cd2ca53c957"
+            }
+          ]
+        },
+        {
+          "section_id": "external_dependencies",
+          "finding": "A locally-hosted Ollama inference server (defaulting to localhost:11434) serves as the default language model provider, with qwen3:27b as the default model.",
+          "sources": [
+            {
+              "file": "wikifi/config.py",
+              "lines": [
+                31,
+                32
+              ],
+              "fingerprint": "8cd2ca53c957"
+            }
+          ]
+        },
+        {
+          "section_id": "external_dependencies",
+          "finding": "Anthropic's hosted API is an opt-in language model provider, authenticated via an API key, with a configurable per-call output token cap.",
+          "sources": [
+            {
+              "file": "wikifi/config.py",
+              "lines": [
+                100,
+                106
+              ],
+              "fingerprint": "8cd2ca53c957"
+            }
+          ]
+        },
+        {
+          "section_id": "external_dependencies",
+          "finding": "OpenAI's API (or compatible proxies such as Azure OpenAI) is an opt-in language model provider, authenticated via an API key and configurable base URL, with a configurable per-call output token cap.",
+          "sources": [
+            {
+              "file": "wikifi/config.py",
+              "lines": [
+                108,
+                117
+              ],
+              "fingerprint": "8cd2ca53c957"
+            }
+          ]
+        },
+        {
+          "section_id": "cross_cutting",
+          "finding": "File processing enforces a hard size ceiling (default 2 MB) above which files are silently skipped as vendored or generated noise; files below the ceiling but above 150 KB are split into overlapping windows (8 KB overlap) so each language model call stays within a comfortable context budget.",
+          "sources": [
+            {
+              "file": "wikifi/config.py",
+              "lines": [
+                38,
+                56
+              ],
+              "fingerprint": "8cd2ca53c957"
+            }
+          ]
+        },
+        {
+          "section_id": "cross_cutting",
+          "finding": "A minimum content threshold (default 64 bytes) prevents the system from invoking the language model on essentially empty stub files, guarding against runaway reasoning on trivial inputs.",
+          "sources": [
+            {
+              "file": "wikifi/config.py",
+              "lines": [
+                56,
+                59
+              ],
+              "fingerprint": "8cd2ca53c957"
+            }
+          ]
+        },
+        {
+          "section_id": "cross_cutting",
+          "finding": "All language model calls share a single per-request timeout (default 900 seconds), providing a uniform backstop against hung inference requests across all providers.",
+          "sources": [
+            {
+              "file": "wikifi/config.py",
+              "lines": [
+                33,
+                34
+              ],
+              "fingerprint": "8cd2ca53c957"
+            }
+          ]
+        },
+        {
+          "section_id": "hard_specifications",
+          "finding": "Files exceeding 2,000,000 bytes are unconditionally dropped and never read; this threshold is explicitly documented as targeting vendored or generated noise rather than real source files.",
+          "sources": [
+            {
+              "file": "wikifi/config.py",
+              "lines": [
+                36,
+                42
+              ],
+              "fingerprint": "8cd2ca53c957"
+            }
+          ]
+        },
+        {
+          "section_id": "hard_specifications",
+          "finding": "Each language model call is limited to a 150,000-byte content window, sized to fit within a 32K-context model after prompt overhead; larger files must be split into overlapping chunks rather than truncated.",
+          "sources": [
+            {
+              "file": "wikifi/config.py",
+              "lines": [
+                43,
+                50
+              ],
+              "fingerprint": "8cd2ca53c957"
+            }
+          ]
+        },
+        {
+          "section_id": "hard_specifications",
+          "finding": "Adjacent file chunks share an 8,000-byte overlap region to preserve cross-boundary context; this overlap guarantee must be maintained when the chunking logic is modified.",
+          "sources": [
+            {
+              "file": "wikifi/config.py",
+              "lines": [
+                51,
+                54
+              ],
+              "fingerprint": "8cd2ca53c957"
+            }
+          ]
+        }
+      ]
+    },
+    "wikifi/critic.py": {
+      "fingerprint": "502af9aee392",
+      "summary": "Quality-assurance component that scores synthesized wiki sections against a rubric, identifies unsupported claims and gaps, and optionally revises bodies that fall below a minimum quality threshold.",
+      "chunks_processed": 1,
+      "findings": [
+        {
+          "section_id": "intent",
+          "finding": "The critic exists specifically to catch hallucination and missing-coverage failures that are most likely to occur in single-shot synthesis of derivative sections. It enforces that all wiki content remains tech-agnostic and grounded in upstream evidence, so that a migration team can trust the output without manually verifying every claim.",
+          "sources": [
+            {
+              "file": "wikifi/critic.py",
+              "lines": [
+                1,
+                15
+              ],
+              "fingerprint": "502af9aee392"
+            }
+          ]
+        },
+        {
+          "section_id": "capabilities",
+          "finding": "The system can evaluate any synthesized wiki section body against its brief and upstream evidence, producing a structured score (0–10) with itemised unsupported claims, gaps, and suggested edits. When the initial score falls below a configurable threshold, it automatically invokes a revision pass and only accepts the revision if it improves or matches the prior score, preventing regressions.",
+          "sources": [
+            {
+              "file": "wikifi/critic.py",
+              "lines": [
+                100,
+                153
+              ],
+              "fingerprint": "502af9aee392"
+            }
+          ]
+        },
+        {
+          "section_id": "capabilities",
+          "finding": "A separate audit path walks every section in the finished wiki and produces a rubric-style quality report, including per-section coverage statistics such as total files analysed, files that produced findings, and finding counts per section. This report is surfaced via the `wikifi report` command.",
+          "sources": [
+            {
+              "file": "wikifi/critic.py",
+              "lines": [
+                155,
+                180
+              ],
+              "fingerprint": "502af9aee392"
+            }
+          ]
+        },
+        {
+          "section_id": "entities",
+          "finding": "A `Critique` entity captures the quality assessment of a single section: an integer score (0–10), a short overall judgment, a list of unsupported claims, a list of gaps relative to the section brief, and a list of concrete revision suggestions.",
+          "sources": [
+            {
+              "file": "wikifi/critic.py",
+              "lines": [
+                67,
+                84
+              ],
+              "fingerprint": "502af9aee392"
+            }
+          ]
+        },
+        {
+          "section_id": "entities",
+          "finding": "A `ReviewOutcome` entity tracks the lifecycle of a section review: the section identifier, the initial critique, the current body text, a flag indicating whether a revision was applied, and the optional follow-up critique produced after revision.",
+          "sources": [
+            {
+              "file": "wikifi/critic.py",
+              "lines": [
+                91,
+                96
+              ],
+              "fingerprint": "502af9aee392"
+            }
+          ]
+        },
+        {
+          "section_id": "entities",
+          "finding": "A `WikiQualityReport` entity aggregates the full-wiki audit results: an overall numeric score, a mapping from section identifiers to their individual critiques, and optional coverage statistics. `CoverageStats` records total files, files with findings, and per-section finding and file counts.",
+          "sources": [
+            {
+              "file": "wikifi/critic.py",
+              "lines": [
+                99,
+                114
+              ],
+              "fingerprint": "502af9aee392"
+            }
+          ]
+        },
+        {
+          "section_id": "hard_specifications",
+          "finding": "The scoring rubric is fixed: 9–10 indicates fully grounded, tech-agnostic, narratively coherent content with no unsupported claims; 6–8 allows minor issues; 3–5 signals substantial gaps or partial coverage; 0–2 marks incoherent or off-brief content. The default minimum acceptable score for shipping a section without revision is 7.",
+          "sources": [
+            {
+              "file": "wikifi/critic.py",
+              "lines": [
+                31,
+                48
+              ],
+              "fingerprint": "502af9aee392"
+            }
+          ]
+        },
+        {
+          "section_id": "hard_specifications",
+          "finding": "A revised body is only accepted if its follow-up critique score is greater than or equal to the initial score; any revision that causes a score regression is discarded and the original body is retained. This invariant must be preserved in any reimplementation.",
+          "sources": [
+            {
+              "file": "wikifi/critic.py",
+              "lines": [
+                137,
+                147
+              ],
+              "fingerprint": "502af9aee392"
+            }
+          ]
+        },
+        {
+          "section_id": "hard_specifications",
+          "finding": "All section bodies must be tech-agnostic: the reviser is explicitly instructed not to invent claims unsupported by upstream evidence and to declare gaps explicitly when evidence is missing rather than speculating.",
+          "sources": [
+            {
+              "file": "wikifi/critic.py",
+              "lines": [
+                53,
+                61
+              ],
+              "fingerprint": "502af9aee392"
+            }
+          ]
+        },
+        {
+          "section_id": "cross_cutting",
+          "finding": "Failures in either the critic or reviser calls are caught and logged as warnings; the system degrades gracefully by returning the original body rather than propagating errors. A score of 0 with a diagnostic message is returned when the critic is unavailable.",
+          "sources": [
+            {
+              "file": "wikifi/critic.py",
+              "lines": [
+                158,
+                165
+              ],
+              "fingerprint": "502af9aee392"
+            }
+          ]
+        },
+        {
+          "section_id": "integrations",
+          "finding": "This module calls into the shared LLM provider (from the providers layer) for both structured critique completions and structured revision completions, passing domain-specific system prompts and Pydantic schemas for type-safe JSON responses. It consumes Section metadata from the sections catalogue and its outputs are consumed by the report module.",
+          "sources": [
+            {
+              "file": "wikifi/critic.py",
+              "lines": [
+                30,
+                32
+              ],
+              "fingerprint": "502af9aee392"
+            }
+          ]
+        }
+      ]
+    },
+    "wikifi/deriver.py": {
+      "fingerprint": "0b7f4f5abb09",
+      "summary": "Stage 4 of the wiki generation pipeline: synthesizes derivative sections (personas, user stories, diagrams) by feeding aggregated upstream section content into the language model, then optionally running a critic/reviser quality loop.",
+      "chunks_processed": 1,
+      "findings": [
+        {
+          "section_id": "intent",
+          "finding": "Some wiki sections — personas, user stories, and diagrams — cannot be extracted from individual source files because they only emerge from the aggregate of capabilities, entities, and integrations. This module exists specifically to synthesize those derivative sections after all primary sections have been written, grounding each output exclusively in already-aggregated upstream evidence.",
+          "sources": [
+            {
+              "file": "wikifi/deriver.py",
+              "lines": [
+                1,
+                18
+              ],
+              "fingerprint": "0b7f4f5abb09"
+            }
+          ]
+        },
+        {
+          "section_id": "capabilities",
+          "finding": "The system synthesizes derivative wiki sections (personas, Gherkin-style user stories, and Mermaid architectural diagrams) by collecting the final markdown bodies of all upstream primary sections and passing them to the language model with a targeted brief. If upstream sections are empty or missing, the system writes a placeholder that declares the gap rather than fabricating content.",
+          "sources": [
+            {
+              "file": "wikifi/deriver.py",
+              "lines": [
+                73,
+                107
+              ],
+              "fingerprint": "0b7f4f5abb09"
+            }
+          ]
+        },
+        {
+          "section_id": "capabilities",
+          "finding": "Each synthesized derivative section can optionally be run through a critic-and-reviser quality loop. The system explicitly notes this loop is the highest-leverage quality control point for derivative sections, because personas and Gherkin stories are where single-shot synthesis most often hallucinates.",
+          "sources": [
+            {
+              "file": "wikifi/deriver.py",
+              "lines": [
+                90,
+                103
+              ],
+              "fingerprint": "0b7f4f5abb09"
+            }
+          ]
+        },
+        {
+          "section_id": "cross_cutting",
+          "finding": "Hallucination prevention is enforced at two levels: (1) a heuristic filters placeholder bodies so no derivative section treats an unpopulated upstream as real evidence, and (2) an optional critic review loop scores and revises each derivative before it is written. Revision events are counted in the run's stats for observability.",
+          "sources": [
+            {
+              "file": "wikifi/deriver.py",
+              "lines": [
+                110,
+                135
+              ],
+              "fingerprint": "0b7f4f5abb09"
+            }
+          ]
+        },
+        {
+          "section_id": "cross_cutting",
+          "finding": "The empty-content heuristic must match all known placeholder shapes ('not yet populated', 'no findings were extracted', 'upstream sections required to derive') to prevent fabricated findings cascading into downstream derivative sections.",
+          "sources": [
+            {
+              "file": "wikifi/deriver.py",
+              "lines": [
+                118,
+                135
+              ],
+              "fingerprint": "0b7f4f5abb09"
+            }
+          ]
+        },
+        {
+          "section_id": "cross_cutting",
+          "finding": "All derivation failures are caught and logged; a fallback body is written that preserves the upstream evidence verbatim rather than leaving the section blank, ensuring the wiki remains inspectable even after partial failures.",
+          "sources": [
+            {
+              "file": "wikifi/deriver.py",
+              "lines": [
+                96,
+                107
+              ],
+              "fingerprint": "0b7f4f5abb09"
+            }
+          ]
+        },
+        {
+          "section_id": "entities",
+          "finding": "A `DerivationStats` record accumulates pipeline metrics for a single run: count of sections derived, skipped, and revised, plus the full list of critic review outcomes. This acts as an audit trail for the synthesis stage.",
+          "sources": [
+            {
+              "file": "wikifi/deriver.py",
+              "lines": [
+                57,
+                62
+              ],
+              "fingerprint": "0b7f4f5abb09"
+            }
+          ]
+        },
+        {
+          "section_id": "entities",
+          "finding": "A `Section` entity has a `derived_from` list declaring which upstream section IDs it depends on, establishing an explicit dependency graph between primary and derivative sections.",
+          "sources": [
+            {
+              "file": "wikifi/deriver.py",
+              "lines": [
+                112,
+                116
+              ],
+              "fingerprint": "0b7f4f5abb09"
+            }
+          ]
+        },
+        {
+          "section_id": "hard_specifications",
+          "finding": "Derivative sections must be grounded solely in upstream section content. The model is instructed to declare gaps explicitly rather than filling them with invented facts — this is a hard constraint on output integrity.",
+          "sources": [
+            {
+              "file": "wikifi/deriver.py",
+              "lines": [
+                34,
+                50
+              ],
+              "fingerprint": "0b7f4f5abb09"
+            }
+          ]
+        },
+        {
+          "section_id": "hard_specifications",
+          "finding": "All wiki content, including derivative sections, must remain technology-agnostic: language names, framework names, and library names are forbidden and must be translated into domain terms.",
+          "sources": [
+            {
+              "file": "wikifi/deriver.py",
+              "lines": [
+                37,
+                39
+              ],
+              "fingerprint": "0b7f4f5abb09"
+            }
+          ]
+        },
+        {
+          "section_id": "hard_specifications",
+          "finding": "Gherkin-style outputs must use proper Given/When/Then syntax inside fenced ```gherkin code blocks. Mermaid diagrams must be valid and inside fenced ```mermaid code blocks, preferring graph, classDiagram, erDiagram, and sequenceDiagram diagram types.",
+          "sources": [
+            {
+              "file": "wikifi/deriver.py",
+              "lines": [
+                40,
+                45
+              ],
+              "fingerprint": "0b7f4f5abb09"
+            }
+          ]
+        },
+        {
+          "section_id": "integrations",
+          "finding": "The deriver reads upstream section bodies from the filesystem layout written by the aggregator stage, and writes its output back through the same layout abstraction. It also calls into the critic module to obtain scored review outcomes for each derivative section.",
+          "sources": [
+            {
+              "file": "wikifi/deriver.py",
+              "lines": [
+                73,
+                107
+              ],
+              "fingerprint": "0b7f4f5abb09"
+            }
+          ]
+        }
+      ]
+    },
+    "wikifi/evidence.py": {
+      "fingerprint": "dddfe1a01c85",
+      "summary": "Defines the core evidence model — source references, claims, contradictions, and rendering helpers — that gives every wiki assertion a traceable pointer back to the original codebase.",
+      "chunks_processed": 1,
+      "findings": [
+        {
+          "section_id": "intent",
+          "finding": "The system exists so that any architect reading the migration wiki can ask 'where in the source did this come from?' and receive a precise, verifiable answer. Every assertion in the generated wiki is backed by file paths and optional line ranges captured at extraction time.",
+          "sources": [
+            {
+              "file": "wikifi/evidence.py",
+              "lines": [
+                1,
+                18
+              ],
+              "fingerprint": "dddfe1a01c85"
+            }
+          ]
+        },
+        {
+          "section_id": "capabilities",
+          "finding": "The system surfaces conflicting information found across source files as explicit 'Contradiction' entries rather than silently merging them, treating disagreements as high-priority migration signals that encode tribal knowledge.",
+          "sources": [
+            {
+              "file": "wikifi/evidence.py",
+              "lines": [
+                13,
+                17
+              ],
+              "fingerprint": "dddfe1a01c85"
+            }
+          ]
+        },
+        {
+          "section_id": "capabilities",
+          "finding": "The system renders each wiki section with a 'Sources' footer enumerating every distinct source reference that backs claims in that section, and an additional 'Conflicts in source' sub-section when contradictions exist.",
+          "sources": [
+            {
+              "file": "wikifi/evidence.py",
+              "lines": [
+                88,
+                121
+              ],
+              "fingerprint": "dddfe1a01c85"
+            }
+          ]
+        },
+        {
+          "section_id": "entities",
+          "finding": "A SourceRef represents a single span of source code: a repo-relative file path, an optional inclusive line range, and a short content fingerprint captured at extraction time for change detection.",
+          "sources": [
+            {
+              "file": "wikifi/evidence.py",
+              "lines": [
+                37,
+                52
+              ],
+              "fingerprint": "dddfe1a01c85"
+            }
+          ]
+        },
+        {
+          "section_id": "entities",
+          "finding": "A Claim represents one assertion placed in a wiki section, carrying the markdown text and a list of SourceRefs that justify it; a claim with no sources is explicitly marked as unsupported.",
+          "sources": [
+            {
+              "file": "wikifi/evidence.py",
+              "lines": [
+                55,
+                67
+              ],
+              "fingerprint": "dddfe1a01c85"
+            }
+          ]
+        },
+        {
+          "section_id": "entities",
+          "finding": "A Contradiction groups two or more conflicting Claims about the same topic under a single summary sentence; each disagreeing position retains its own source references.",
+          "sources": [
+            {
+              "file": "wikifi/evidence.py",
+              "lines": [
+                70,
+                77
+              ],
+              "fingerprint": "dddfe1a01c85"
+            }
+          ]
+        },
+        {
+          "section_id": "entities",
+          "finding": "An EvidenceBundle is the aggregator's structured output for a single wiki section, combining the narrative body text, a list of Claims, and a list of Contradictions.",
+          "sources": [
+            {
+              "file": "wikifi/evidence.py",
+              "lines": [
+                80,
+                85
+              ],
+              "fingerprint": "dddfe1a01c85"
+            }
+          ]
+        },
+        {
+          "section_id": "cross_cutting",
+          "finding": "Full source traceability is a non-negotiable invariant: every sentence in every wiki section must be linkable back to the originating file and, when available, the precise line range. This is enforced structurally through the Claim and SourceRef types rather than by convention.",
+          "sources": [
+            {
+              "file": "wikifi/evidence.py",
+              "lines": [
+                1,
+                18
+              ],
+              "fingerprint": "dddfe1a01c85"
+            }
+          ]
+        },
+        {
+          "section_id": "hard_specifications",
+          "finding": "Source references must be rendered in the format 'path/to/file:start-end' (or 'path/to/file:line' for a single line, or just 'path/to/file' when lines are unknown). The 'Sources' footer uses 1-based sequential numeric indices in the form '1. `path`'.",
+          "sources": [
+            {
+              "file": "wikifi/evidence.py",
+              "lines": [
+                45,
+                52
+              ],
+              "fingerprint": "dddfe1a01c85"
+            }
+          ]
+        },
+        {
+          "section_id": "hard_specifications",
+          "finding": "Contradictions must never be silently merged into a unified narrative; they must be explicitly surfaced in a dedicated 'Conflicts in source' sub-section, with a warning that migration teams must resolve them before re-implementation.",
+          "sources": [
+            {
+              "file": "wikifi/evidence.py",
+              "lines": [
+                96,
+                102
+              ],
+              "fingerprint": "dddfe1a01c85"
+            }
+          ]
+        }
+      ]
+    },
+    "wikifi/extractor.py": {
+      "fingerprint": "b0e939259557",
+      "summary": "Orchestrates per-file extraction of intent-bearing findings from repository source files, routing each file through caching, specialized deterministic parsing, or LLM-based chunked extraction, then appending structured findings to per-section note stores for downstream aggregation.",
+      "chunks_processed": 1,
+      "findings": [
+        {
+          "section_id": "intent",
+          "finding": "The extractor exists to make large codebases understandable by walking every included source file and asking what intent-bearing content it contributes to each section of a technology-agnostic wiki. It is designed to handle repositories of arbitrary size — including 50,000-file legacy monorepos — by making repeated walks cheap through content-addressed caching and by keeping per-chunk LLM failures isolated so partial results are never discarded.",
+          "sources": [
+            {
+              "file": "wikifi/extractor.py",
+              "lines": [
+                1,
+                37
+              ],
+              "fingerprint": "b0e939259557"
+            }
+          ]
+        },
+        {
+          "section_id": "capabilities",
+          "finding": "The system can extract structured, section-tagged findings from every file in a repository, supporting three extraction paths: replaying previously cached findings for unchanged files, running deterministic structure-reading for files classified as SQL, OpenAPI, Protobuf, GraphQL, or migrations, and invoking an LLM for all other files. Large files are recursively split into overlapping chunks so no content is missed regardless of file size.",
+          "sources": [
+            {
+              "file": "wikifi/extractor.py",
+              "lines": [
+                140,
+                200
+              ],
+              "fingerprint": "b0e939259557"
+            }
+          ]
+        },
+        {
+          "section_id": "capabilities",
+          "finding": "Every emitted finding carries a source citation — the originating file path, an optional inclusive line range within that file, and a content fingerprint — enabling the aggregator to stitch citations back into the rendered wiki. Line ranges reported per-chunk are translated to absolute file line numbers before storage.",
+          "sources": [
+            {
+              "file": "wikifi/extractor.py",
+              "lines": [
+                251,
+                270
+              ],
+              "fingerprint": "b0e939259557"
+            }
+          ]
+        },
+        {
+          "section_id": "capabilities",
+          "finding": "Cross-file context is surfaced to the LLM by supplying each file's import neighborhood (up to eight neighbor paths) in the extraction prompt, enabling findings to describe inter-file flows rather than treating each file in isolation.",
+          "sources": [
+            {
+              "file": "wikifi/extractor.py",
+              "lines": [
+                241,
+                246
+              ],
+              "fingerprint": "b0e939259557"
+            }
+          ]
+        },
+        {
+          "section_id": "entities",
+          "finding": "A `SectionFinding` represents one contribution from a single file to one wiki section, carrying the target section identifier, a technology-agnostic prose description of the contribution, and an optional inclusive line range within the source chunk. A `FileFindings` groups a one-sentence file summary with all findings produced for that file.",
+          "sources": [
+            {
+              "file": "wikifi/extractor.py",
+              "lines": [
+                106,
+                123
+              ],
+              "fingerprint": "b0e939259557"
+            }
+          ]
+        },
+        {
+          "section_id": "entities",
+          "finding": "An `ExtractionStats` record accumulates walk-level counters: total files seen, files yielding at least one finding, total findings, skipped files, chunks processed, cache hits, specialized-extractor invocations, and a per-kind file breakdown. It is returned by the walk so callers can report or act on extraction quality.",
+          "sources": [
+            {
+              "file": "wikifi/extractor.py",
+              "lines": [
+                126,
+                135
+              ],
+              "fingerprint": "b0e939259557"
+            }
+          ]
+        },
+        {
+          "section_id": "cross_cutting",
+          "finding": "Crash-resumability is a first-class property: after each file completes, the cache is optionally persisted via a caller-supplied callback, so a mid-walk failure loses at most one file's worth of work. Combined with content-addressed cache lookup, this makes re-walking an interrupted run nearly instantaneous for already-processed files.",
+          "sources": [
+            {
+              "file": "wikifi/extractor.py",
+              "lines": [
+                155,
+                175
+              ],
+              "fingerprint": "b0e939259557"
+            }
+          ]
+        },
+        {
+          "section_id": "cross_cutting",
+          "finding": "Findings that emerge from the overlap region shared between adjacent chunks are deduplicated by (section_id, normalized finding text) within each file's processing pass, preventing the same declaration from being double-counted in the aggregated wiki.",
+          "sources": [
+            {
+              "file": "wikifi/extractor.py",
+              "lines": [
+                253,
+                262
+              ],
+              "fingerprint": "b0e939259557"
+            }
+          ]
+        },
+        {
+          "section_id": "cross_cutting",
+          "finding": "Extraction failures — whether from the LLM provider or a specialized parser — are logged and counted but never propagate to abort the walk. A file whose only chunk fails with no salvageable findings is counted as skipped; partially-chunked files retain whatever findings were recovered.",
+          "sources": [
+            {
+              "file": "wikifi/extractor.py",
+              "lines": [
+                228,
+                242
+              ],
+              "fingerprint": "b0e939259557"
+            }
+          ]
+        },
+        {
+          "section_id": "integrations",
+          "finding": "The extractor delegates LLM calls to a provider abstraction sourced from the providers layer, passes file fingerprints to a cache layer for lookup and recording, reads import-graph neighborhoods from a repo-graph component, appends findings to a wiki layout via a note-store helper, and hands off recognized structured file types to a specialized extractor registry.",
+          "sources": [
+            {
+              "file": "wikifi/extractor.py",
+              "lines": [
+                32,
+                42
+              ],
+              "fingerprint": "b0e939259557"
+            }
+          ]
+        },
+        {
+          "section_id": "external_dependencies",
+          "finding": "An LLM service is the primary external dependency for the general extraction path: structured prompts are sent per chunk and the responses are parsed as typed finding objects. The system is designed so the LLM call is the sole expensive operation, with all other mechanisms (caching, specialization, chunking) oriented toward minimizing how often it must be invoked.",
+          "sources": [
+            {
+              "file": "wikifi/extractor.py",
+              "lines": [
+                224,
+                236
+              ],
+              "fingerprint": "b0e939259557"
+            }
+          ]
+        },
+        {
+          "section_id": "hard_specifications",
+          "finding": "Per-file extraction is restricted to primary wiki sections only. Derivative sections (personas, user stories, diagrams) are explicitly excluded from per-file extraction and are instead produced in a later aggregation stage; requesting them at the per-file level is documented as producing sparse, speculative findings.",
+          "sources": [
+            {
+              "file": "wikifi/extractor.py",
+              "lines": [
+                46,
+                51
+              ],
+              "fingerprint": "b0e939259557"
+            }
+          ]
+        },
+        {
+          "section_id": "hard_specifications",
+          "finding": "The recursive text splitter must guarantee termination on any input, including minified single-line files with no whitespace, by falling back through separator priority (blank lines → single newlines → spaces → character boundaries). The character-boundary split is the terminal step that ensures every byte is eventually consumed.",
+          "sources": [
+            {
+              "file": "wikifi/extractor.py",
+              "lines": [
+                91,
+                103
+              ],
+              "fingerprint": "b0e939259557"
+            }
+          ]
+        },
+        {
+          "section_id": "hard_specifications",
+          "finding": "Chunk overlap must satisfy `0 <= overlap < chunk_size`; violating this constraint raises an error. The effective base chunk size is `chunk_size - overlap` so that prepending an overlap tail never causes a chunk to exceed `chunk_size` bytes.",
+          "sources": [
+            {
+              "file": "wikifi/extractor.py",
+              "lines": [
+                328,
+                336
+              ],
+              "fingerprint": "b0e939259557"
+            }
+          ]
+        }
+      ]
+    },
+    "wikifi/fingerprint.py": {
+      "fingerprint": "853400108135",
+      "summary": "Utility that produces stable short content fingerprints (12-character SHA-256 hex prefixes) used for cache keying, source-evidence citations, and dependency-graph invalidation.",
+      "chunks_processed": 1,
+      "findings": [
+        {
+          "section_id": "cross_cutting",
+          "finding": "Content fingerprints serve three cross-cutting roles: keying extraction and aggregation caches so stale results are never served, anchoring source-evidence citations so wiki claims can be verified against a re-walk of the repository, and tracking file identity inside the dependency graph so cross-file context is invalidated when any source changes.",
+          "sources": [
+            {
+              "file": "wikifi/fingerprint.py",
+              "lines": [
+                1,
+                18
+              ],
+              "fingerprint": "853400108135"
+            }
+          ]
+        },
+        {
+          "section_id": "hard_specifications",
+          "finding": "Fingerprints are defined as the first 12 hexadecimal characters of a SHA-256 digest (48 bits of entropy). This length is explicitly chosen to be sufficient to distinguish every file in any realistic repository (estimated 50% collision threshold at ~10 trillion files) while remaining short enough to embed inline in human-readable citations. This format must be preserved across any migration because it is recorded in cached artefacts and emitted into wiki evidence references.",
+          "sources": [
+            {
+              "file": "wikifi/fingerprint.py",
+              "lines": [
+                23,
+                27
+              ],
+              "fingerprint": "853400108135"
+            }
+          ]
+        },
+        {
+          "section_id": "cross_cutting",
+          "finding": "Files are always hashed as raw bytes rather than decoded text, ensuring that the cache layer and the extractor produce the same fingerprint for the same file regardless of encoding assumptions.",
+          "sources": [
+            {
+              "file": "wikifi/fingerprint.py",
+              "lines": [
+                44,
+                50
+              ],
+              "fingerprint": "853400108135"
+            }
+          ]
+        }
+      ]
+    },
+    "wikifi/introspection.py": {
+      "fingerprint": "59cd5940f72e",
+      "summary": "Implements Stage 1 of the wiki-generation pipeline: a single LLM call that examines a compressed repository structure and decides which paths contain production source worth deeper analysis.",
+      "chunks_processed": 1,
+      "findings": [
+        {
+          "section_id": "intent",
+          "finding": "The system exists to produce a technology-agnostic wiki from an unknown codebase. Stage 1 solves the problem of not knowing which parts of a repository contain intent-bearing production code versus scaffolding, tests, or build artifacts — without reading any source files up front.",
+          "sources": [
+            {
+              "file": "wikifi/introspection.py",
+              "lines": [
+                1,
+                9
+              ],
+              "fingerprint": "59cd5940f72e"
+            }
+          ]
+        },
+        {
+          "section_id": "capabilities",
+          "finding": "The system can analyze a repository's directory layout and manifest files to classify paths as worth walking (production source, business logic, integrations, domain models) or worth skipping (vendored dependencies, build output, test code, CI/CD, documentation). The classification is returned as a structured, diffable result.",
+          "sources": [
+            {
+              "file": "wikifi/introspection.py",
+              "lines": [
+                28,
+                44
+              ],
+              "fingerprint": "59cd5940f72e"
+            }
+          ]
+        },
+        {
+          "section_id": "capabilities",
+          "finding": "The system compresses the entire repository tree into a compact directory-summary representation and reads selected manifest files, then submits this compressed view to an LLM to infer the repository's likely purpose, primary languages, and path patterns to include or exclude.",
+          "sources": [
+            {
+              "file": "wikifi/introspection.py",
+              "lines": [
+                61,
+                70
+              ],
+              "fingerprint": "59cd5940f72e"
+            }
+          ]
+        },
+        {
+          "section_id": "domains",
+          "finding": "The core domain is automated repository understanding: deciding which parts of an arbitrary codebase encode business intent versus infrastructure or tooling. A key subdomain constraint is tech-agnosticism — the analysis must not depend on recognizing any specific language or framework.",
+          "sources": [
+            {
+              "file": "wikifi/introspection.py",
+              "lines": [
+                19,
+                44
+              ],
+              "fingerprint": "59cd5940f72e"
+            }
+          ]
+        },
+        {
+          "section_id": "entities",
+          "finding": "The `IntrospectionResult` entity captures the Stage 1 decision: a list of gitignore-style include patterns, a list of exclude patterns, a list of primary languages (informational), a one-paragraph guess at the system's purpose, and a rationale for the include/exclude choices.",
+          "sources": [
+            {
+              "file": "wikifi/introspection.py",
+              "lines": [
+                47,
+                64
+              ],
+              "fingerprint": "59cd5940f72e"
+            }
+          ]
+        },
+        {
+          "section_id": "cross_cutting",
+          "finding": "LLM output is constrained to a strict Pydantic schema to ensure deterministic parsing and easy diffing between runs. At Stage 1, the agent deliberately has no access to source file contents — only compressed directory metadata and manifest files — enforcing a clean separation of concerns between introspection and per-file analysis.",
+          "sources": [
+            {
+              "file": "wikifi/introspection.py",
+              "lines": [
+                5,
+                9
+              ],
+              "fingerprint": "59cd5940f72e"
+            }
+          ]
+        },
+        {
+          "section_id": "hard_specifications",
+          "finding": "Stage 1 must operate without reading any source files; it sees only directory-level summaries and manifest contents. This constraint is architectural and must be preserved: source reading is exclusively Stage 2's responsibility.",
+          "sources": [
+            {
+              "file": "wikifi/introspection.py",
+              "lines": [
+                5,
+                9
+              ],
+              "fingerprint": "59cd5940f72e"
+            }
+          ]
+        },
+        {
+          "section_id": "hard_specifications",
+          "finding": "Include and exclude patterns produced by Stage 1 must be in gitignore-style format relative to the repository root.",
+          "sources": [
+            {
+              "file": "wikifi/introspection.py",
+              "lines": [
+                50,
+                58
+              ],
+              "fingerprint": "59cd5940f72e"
+            }
+          ]
+        },
+        {
+          "section_id": "integrations",
+          "finding": "Stage 1 calls into an LLM provider (via the shared LLMProvider interface) requesting structured JSON output conforming to the IntrospectionResult schema. It also depends on the walker component to produce directory summaries and read manifest file contents. The orchestrator calls this stage as the first step of the pipeline.",
+          "sources": [
+            {
+              "file": "wikifi/introspection.py",
+              "lines": [
+                61,
+                70
+              ],
+              "fingerprint": "59cd5940f72e"
+            }
+          ]
+        }
+      ]
+    },
+    "wikifi/orchestrator.py": {
+      "fingerprint": "6ed682a87356",
+      "summary": "Central orchestrator that wires the full four-stage documentation-generation pipeline (repository introspection → per-file extraction → section aggregation → derivative content derivation) and constructs the appropriate LLM provider based on configuration.",
+      "chunks_processed": 1,
+      "findings": [
+        {
+          "section_id": "intent",
+          "finding": "The system automates the creation of a structured wiki from a source repository. It analyses the repository's files using a language model and produces aggregated documentation sections along with derived artefacts such as personas, user stories, and diagrams — removing the burden of manual documentation from developers.",
+          "sources": [
+            {
+              "file": "wikifi/orchestrator.py",
+              "lines": [
+                1,
+                16
+              ],
+              "fingerprint": "6ed682a87356"
+            }
+          ]
+        },
+        {
+          "section_id": "capabilities",
+          "finding": "The pipeline initialises a wiki skeleton in the target repository, introspects its structure to determine which files are in scope, performs per-file content extraction into structured notes with optional caching and import-graph context, aggregates those notes into primary wiki sections, and then derives higher-level artefacts (personas, user stories, diagrams) from the aggregated sections. An optional critic loop can review and rescore the derived content.",
+          "sources": [
+            {
+              "file": "wikifi/orchestrator.py",
+              "lines": [
+                62,
+                155
+              ],
+              "fingerprint": "6ed682a87356"
+            }
+          ]
+        },
+        {
+          "section_id": "capabilities",
+          "finding": "The system can be initialised idempotently against any repository root, automatically bootstrapping the required directory skeleton if it does not yet exist before executing the walk pipeline.",
+          "sources": [
+            {
+              "file": "wikifi/orchestrator.py",
+              "lines": [
+                62,
+                76
+              ],
+              "fingerprint": "6ed682a87356"
+            }
+          ]
+        },
+        {
+          "section_id": "external_dependencies",
+          "finding": "Three external language-model backends are supported: a locally hosted inference server (Ollama, the default), the Anthropic hosted API (requiring an API key), and the OpenAI hosted API (requiring an API key and an optional custom base URL). Each backend is configured with a model name, timeout, and token limits drawn from application settings.",
+          "sources": [
+            {
+              "file": "wikifi/orchestrator.py",
+              "lines": [
+                163,
+                210
+              ],
+              "fingerprint": "6ed682a87356"
+            }
+          ]
+        },
+        {
+          "section_id": "integrations",
+          "finding": "The orchestrator is the primary entry point called by the CLI layer (`init_wiki`, `run_walk`). It delegates outward to the introspection, extraction, aggregation, and derivation modules, and further to the chosen LLM provider. The cache and file-walker modules are also called as part of the pipeline.",
+          "sources": [
+            {
+              "file": "wikifi/orchestrator.py",
+              "lines": [
+                40,
+                60
+              ],
+              "fingerprint": "6ed682a87356"
+            }
+          ]
+        },
+        {
+          "section_id": "cross_cutting",
+          "finding": "A persistent extraction cache is maintained across runs: on each walk the cache is loaded, entries for files that are no longer in scope are pruned, and the cache is saved after extraction and again after all stages complete. Caching can be disabled, in which case the cache is fully reset before the walk begins.",
+          "sources": [
+            {
+              "file": "wikifi/orchestrator.py",
+              "lines": [
+                95,
+                110
+              ],
+              "fingerprint": "6ed682a87356"
+            }
+          ]
+        },
+        {
+          "section_id": "cross_cutting",
+          "finding": "Structured logging is used at each major stage boundary (introspection, graph build, extraction, aggregation, derivation) to provide observability into pipeline progress.",
+          "sources": [
+            {
+              "file": "wikifi/orchestrator.py",
+              "lines": [
+                84,
+                148
+              ],
+              "fingerprint": "6ed682a87356"
+            }
+          ]
+        },
+        {
+          "section_id": "entities",
+          "finding": "A `WalkReport` aggregates the outputs of all four pipeline stages: the repository introspection result, per-file extraction statistics, section aggregation statistics, derivation statistics, the live cache state, and the repository import graph. It is the single return value representing a completed wiki-generation run.",
+          "sources": [
+            {
+              "file": "wikifi/orchestrator.py",
+              "lines": [
+                54,
+                61
+              ],
+              "fingerprint": "6ed682a87356"
+            }
+          ]
+        },
+        {
+          "section_id": "hard_specifications",
+          "finding": "When a user selects the Anthropic provider but the configured model name does not begin with 'claude-', the system silently substitutes the model identifier 'claude-opus-4-7' rather than forwarding an invalid name. Similarly, for OpenAI, non-OpenAI-pattern model names are replaced with 'gpt-4o'. This model-name substitution logic must be preserved so that users migrating from the default local provider do not receive opaque remote API errors.",
+          "sources": [
+            {
+              "file": "wikifi/orchestrator.py",
+              "lines": [
+                178,
+                207
+              ],
+              "fingerprint": "6ed682a87356"
+            }
+          ]
+        },
+        {
+          "section_id": "hard_specifications",
+          "finding": "The only accepted provider identifiers are 'ollama', 'anthropic', and 'openai'; any other value raises an error. This contract is enforced at provider construction time and must be maintained by any future provider registration mechanism.",
+          "sources": [
+            {
+              "file": "wikifi/orchestrator.py",
+              "lines": [
+                208,
+                210
+              ],
+              "fingerprint": "6ed682a87356"
+            }
+          ]
+        }
+      ]
+    },
+    "wikifi/repograph.py": {
+      "fingerprint": "3d8bbdb10112",
+      "summary": "Provides lightweight, language-agnostic static analysis of a repository: classifies each in-scope file by kind and constructs an import/reference graph so that per-file wiki extraction can reference cross-file flows rather than treating each file in isolation.",
+      "chunks_processed": 1,
+      "findings": [
+        {
+          "section_id": "intent",
+          "finding": "This module exists to enrich wiki extraction with two signals: what kind of structured artifact each file represents (schema, API contract, migration, general code) and which other files it depends on or is depended upon by. The goal is to let per-file analysis describe cross-file flows (e.g. 'this handler delegates to the billing service') rather than producing island findings.",
+          "sources": [
+            {
+              "file": "wikifi/repograph.py",
+              "lines": [
+                1,
+                30
+              ],
+              "fingerprint": "3d8bbdb10112"
+            }
+          ]
+        },
+        {
+          "section_id": "capabilities",
+          "finding": "The system classifies every in-scope file into one of seven categories — general application code, SQL DDL, OpenAPI/Swagger spec, Protobuf definition, GraphQL schema, database migration, or unclassified — allowing downstream stages to route structured files to specialised extractors that skip the language model entirely.",
+          "sources": [
+            {
+              "file": "wikifi/repograph.py",
+              "lines": [
+                41,
+                52
+              ],
+              "fingerprint": "3d8bbdb10112"
+            }
+          ]
+        },
+        {
+          "section_id": "capabilities",
+          "finding": "A regex-driven import graph is built across the entire in-scope file set for multiple language families, producing for each file the list of files it imports and the list of files that import it. This neighbor map is injected into per-file extraction prompts to surface cross-file relationships.",
+          "sources": [
+            {
+              "file": "wikifi/repograph.py",
+              "lines": [
+                155,
+                210
+              ],
+              "fingerprint": "3d8bbdb10112"
+            }
+          ]
+        },
+        {
+          "section_id": "capabilities",
+          "finding": "Migration files are distinguished from generic DDL by detecting well-known migration directory conventions (Alembic, Django, Rails, Prisma, Flyway, Liquibase), ensuring the wiki can separate the current schema state from historical forward-only change scripts.",
+          "sources": [
+            {
+              "file": "wikifi/repograph.py",
+              "lines": [
+                84,
+                99
+              ],
+              "fingerprint": "3d8bbdb10112"
+            }
+          ]
+        },
+        {
+          "section_id": "capabilities",
+          "finding": "OpenAPI/Swagger specifications are detected inside YAML and JSON files by scanning the first 4 KB for characteristic header patterns, since extension alone is insufficient to distinguish them from other structured data files.",
+          "sources": [
+            {
+              "file": "wikifi/repograph.py",
+              "lines": [
+                102,
+                109
+              ],
+              "fingerprint": "3d8bbdb10112"
+            }
+          ]
+        },
+        {
+          "section_id": "entities",
+          "finding": "A `FileKind` enumeration captures seven mutually exclusive file roles: application code, SQL, OpenAPI, Protobuf, GraphQL, migration, and other. This classification drives routing to specialised or general-purpose extraction paths.",
+          "sources": [
+            {
+              "file": "wikifi/repograph.py",
+              "lines": [
+                41,
+                52
+              ],
+              "fingerprint": "3d8bbdb10112"
+            }
+          ]
+        },
+        {
+          "section_id": "entities",
+          "finding": "A `GraphNode` entity represents a single file's position in the import graph, carrying its repo-relative path, the ordered set of files it imports, and the ordered set of files that import it. It exposes a capped combined-neighbor list for use in prompts.",
+          "sources": [
+            {
+              "file": "wikifi/repograph.py",
+              "lines": [
+                148,
+                167
+              ],
+              "fingerprint": "3d8bbdb10112"
+            }
+          ]
+        },
+        {
+          "section_id": "entities",
+          "finding": "A `RepoGraph` entity holds the complete per-file import-edge map for a repository scan, supporting lookup of a node by path and retrieval of a capped neighbor list for any given file.",
+          "sources": [
+            {
+              "file": "wikifi/repograph.py",
+              "lines": [
+                170,
+                181
+              ],
+              "fingerprint": "3d8bbdb10112"
+            }
+          ]
+        },
+        {
+          "section_id": "cross_cutting",
+          "finding": "The import graph caps neighbor lists at eight entries by default when constructing prompt context, providing a bounded, deterministic input size regardless of how highly connected a file is in the repository.",
+          "sources": [
+            {
+              "file": "wikifi/repograph.py",
+              "lines": [
+                156,
+                165
+              ],
+              "fingerprint": "3d8bbdb10112"
+            }
+          ]
+        },
+        {
+          "section_id": "hard_specifications",
+          "finding": "The implementation must remain dependency-free beyond regex and path resolution — tree-sitter or similar binary dependencies are explicitly prohibited so that the tool can be installed without native compilation.",
+          "sources": [
+            {
+              "file": "wikifi/repograph.py",
+              "lines": [
+                24,
+                29
+              ],
+              "fingerprint": "3d8bbdb10112"
+            }
+          ]
+        },
+        {
+          "section_id": "integrations",
+          "finding": "This module is consumed by the extractor and orchestrator components: the file classification result determines which specialised extractor is invoked, and the neighbor list from the graph is injected into the Stage 2 extraction prompt for each file.",
+          "sources": [
+            {
+              "file": "wikifi/repograph.py",
+              "lines": [
+                1,
+                15
+              ],
+              "fingerprint": "3d8bbdb10112"
+            }
+          ]
+        }
+      ]
+    },
+    "wikifi/report.py": {
+      "fingerprint": "2b94c0a5e62e",
+      "summary": "Produces a read-only coverage-and-quality report over a completed wiki walk, answering whether the codebase was fully covered and whether the resulting wiki is good enough to act on.",
+      "chunks_processed": 1,
+      "findings": [
+        {
+          "section_id": "intent",
+          "finding": "The report module addresses the questions that migration leads ask before committing to a re-implementation effort: (1) did the automated walk cover the entire system, and (2) is the generated wiki accurate and complete enough to guide action? It runs purely from existing on-disk artifacts and never mutates the wiki, making it safe to run in CI without side-effects.",
+          "sources": [
+            {
+              "file": "wikifi/report.py",
+              "lines": [
+                1,
+                14
+              ],
+              "fingerprint": "2b94c0a5e62e"
+            }
+          ]
+        },
+        {
+          "section_id": "capabilities",
+          "finding": "The system can produce a structured coverage report showing, per wiki section, how many files contributed findings and how many findings were extracted. It also offers an optional quality-scoring mode where each populated section is evaluated by the critic and assigned a numeric score out of 10, surfacing unsupported claims and gaps. A human-readable markdown table is rendered from these results.",
+          "sources": [
+            {
+              "file": "wikifi/report.py",
+              "lines": [
+                44,
+                77
+              ],
+              "fingerprint": "2b94c0a5e62e"
+            }
+          ]
+        },
+        {
+          "section_id": "capabilities",
+          "finding": "Coverage statistics are derived from the persisted walk cache, comparing total files seen against files that produced at least one finding, and computing a coverage percentage. This allows teams to identify dead zones — files the extraction pass processed but from which no signal was extracted.",
+          "sources": [
+            {
+              "file": "wikifi/report.py",
+              "lines": [
+                103,
+                107
+              ],
+              "fingerprint": "2b94c0a5e62e"
+            }
+          ]
+        },
+        {
+          "section_id": "entities",
+          "finding": "A `SectionReport` captures the per-section view: the section descriptor, count of contributing files, total findings count, body size in characters, an emptiness flag, and an optional quality critique. A `WikiReport` aggregates all section reports alongside overall coverage statistics and an optional mean quality score across populated sections.",
+          "sources": [
+            {
+              "file": "wikifi/report.py",
+              "lines": [
+                28,
+                42
+              ],
+              "fingerprint": "2b94c0a5e62e"
+            }
+          ]
+        },
+        {
+          "section_id": "entities",
+          "finding": "A `CoverageStats` entity (defined in the critic module) holds the total files seen, files with findings, and per-section breakdowns of findings and contributing files, and exposes a coverage percentage computation.",
+          "sources": [
+            {
+              "file": "wikifi/report.py",
+              "lines": [
+                85,
+                94
+              ],
+              "fingerprint": "2b94c0a5e62e"
+            }
+          ]
+        },
+        {
+          "section_id": "cross_cutting",
+          "finding": "The report is explicitly read-only: it inspects on-disk artifacts (notes JSONL, section markdown files, and the walk cache) without modifying the wiki. This invariant is stated in the module docstring and upheld throughout the implementation.",
+          "sources": [
+            {
+              "file": "wikifi/report.py",
+              "lines": [
+                9,
+                12
+              ],
+              "fingerprint": "2b94c0a5e62e"
+            }
+          ]
+        },
+        {
+          "section_id": "cross_cutting",
+          "finding": "Emptiness detection for a section applies three textual sentinel checks — 'Not yet populated', 'No findings were extracted', and 'upstream sections required to derive' — to decide whether a section should be skipped for scoring. These sentinels act as a lightweight data-integrity signal distinguishing meaningfully populated sections from placeholder content.",
+          "sources": [
+            {
+              "file": "wikifi/report.py",
+              "lines": [
+                118,
+                123
+              ],
+              "fingerprint": "2b94c0a5e62e"
+            }
+          ]
+        },
+        {
+          "section_id": "cross_cutting",
+          "finding": "Structured logging is initialised under the `wikifi.report` namespace for observability into report generation steps.",
+          "sources": [
+            {
+              "file": "wikifi/report.py",
+              "lines": [
+                22,
+                22
+              ],
+              "fingerprint": "2b94c0a5e62e"
+            }
+          ]
+        },
+        {
+          "section_id": "integrations",
+          "finding": "The report integrates with the walk cache to retrieve the full extraction manifest (file → findings mapping) for computing coverage statistics, and with the notes store to count per-section findings and contributing files.",
+          "sources": [
+            {
+              "file": "wikifi/report.py",
+              "lines": [
+                103,
+                107
+              ],
+              "fingerprint": "2b94c0a5e62e"
+            }
+          ]
+        },
+        {
+          "section_id": "integrations",
+          "finding": "When quality scoring is requested and a language-model provider is available, the report delegates to the critic subsystem, optionally supplying upstream section bodies for derivative sections that depend on earlier wiki content.",
+          "sources": [
+            {
+              "file": "wikifi/report.py",
+              "lines": [
+                124,
+                131
+              ],
+              "fingerprint": "2b94c0a5e62e"
+            }
+          ]
+        },
+        {
+          "section_id": "hard_specifications",
+          "finding": "Quality scoring is only performed when explicitly requested (`score=True`) and a provider is supplied; without both conditions the report remains purely structural. This ensures the tool can run in provider-free environments such as CI pipelines without failure.",
+          "sources": [
+            {
+              "file": "wikifi/report.py",
+              "lines": [
+                80,
+                84
+              ],
+              "fingerprint": "2b94c0a5e62e"
+            }
+          ]
+        }
+      ]
+    },
+    "wikifi/sections.py": {
+      "fingerprint": "f743972a8fce",
+      "summary": "Defines the complete taxonomy of wiki sections that the system generates, distinguishing between primary sections (extracted from per-file evidence) and derivative sections (synthesized from aggregates of primary sections).",
+      "chunks_processed": 1,
+      "findings": [
+        {
+          "section_id": "intent",
+          "finding": "The system exists to generate structured, technology-agnostic wiki documentation from a codebase. Its design explicitly separates extraction of direct per-file evidence (primary sections) from higher-order synthesis across the whole codebase (derivative sections), because single files rarely contain enough signal to infer personas, user stories, or diagrams.",
+          "sources": [
+            {
+              "file": "wikifi/sections.py",
+              "lines": [
+                1,
+                19
+              ],
+              "fingerprint": "f743972a8fce"
+            }
+          ]
+        },
+        {
+          "section_id": "capabilities",
+          "finding": "The system produces wiki documentation organized into eight primary sections — business domains, system intent, capabilities, external dependencies, integrations, cross-cutting concerns, core entities, and hard specifications — plus three derivative sections: user personas, Gherkin-style user stories, and Mermaid diagrams. Each derivative section declares which primary sections it depends on and is only generated after those primaries are finalized.",
+          "sources": [
+            {
+              "file": "wikifi/sections.py",
+              "lines": [
+                44,
+                142
+              ],
+              "fingerprint": "f743972a8fce"
+            }
+          ]
+        },
+        {
+          "section_id": "entities",
+          "finding": "A Section entity captures: a unique identifier, a human-readable title, a prose description of what belongs in that section, a tier (primary or derivative), and an ordered tuple of upstream section identifiers it is derived from. Sections form a dependency graph that must be topologically ordered — each derivative's upstreams must appear earlier in the canonical section list, enforced at startup.",
+          "sources": [
+            {
+              "file": "wikifi/sections.py",
+              "lines": [
+                30,
+                40
+              ],
+              "fingerprint": "f743972a8fce"
+            }
+          ]
+        },
+        {
+          "section_id": "domains",
+          "finding": "The wiki-generation process is split into two subdomains: per-file evidence extraction (primary sections, Stages 2–3) and aggregate synthesis (derivative sections, Stage 4). The dependency ordering between these two subdomains is a first-class design constraint enforced structurally.",
+          "sources": [
+            {
+              "file": "wikifi/sections.py",
+              "lines": [
+                1,
+                19
+              ],
+              "fingerprint": "f743972a8fce"
+            }
+          ]
+        },
+        {
+          "section_id": "hard_specifications",
+          "finding": "Derivative sections must always reference only known section IDs, and every upstream a derivative depends on must appear earlier in the canonical SECTIONS ordering. This ordering invariant is validated at module load time and any violation raises an error, making it a hard structural requirement for the section taxonomy.",
+          "sources": [
+            {
+              "file": "wikifi/sections.py",
+              "lines": [
+                148,
+                158
+              ],
+              "fingerprint": "f743972a8fce"
+            }
+          ]
+        }
+      ]
+    },
+    "wikifi/walker.py": {
+      "fingerprint": "a29bd1ad8bdb",
+      "summary": "Filesystem walker that enumerates and filters source files in a repository, building directory summaries and reading manifest content for downstream analysis passes.",
+      "chunks_processed": 1,
+      "findings": [
+        {
+          "section_id": "intent",
+          "finding": "The walker exists to give higher-level analysis passes a clean, noise-free view of a repository's source files. It deliberately excludes VCS metadata, dependency caches, build artifacts, and the tool's own working directory so that only meaningful source content reaches the analysis layer. It is described as intentionally provider-free — it knows nothing about analysis models or output sections.",
+          "sources": [
+            {
+              "file": "wikifi/walker.py",
+              "lines": [
+                1,
+                12
+              ],
+              "fingerprint": "a29bd1ad8bdb"
+            }
+          ]
+        },
+        {
+          "section_id": "capabilities",
+          "finding": "The system can enumerate all analyzable files in a repository tree while respecting gitignore rules and a configurable set of additional exclusion patterns. It produces a depth-limited, pre-order directory summary (file counts, byte totals, extension histograms, notable filenames) used as a compressed structural view for the Stage 1 introspection pass. It can also read a targeted set of manifest and readme files up to a configurable byte limit for inclusion in introspection prompts.",
+          "sources": [
+            {
+              "file": "wikifi/walker.py",
+              "lines": [
+                92,
+                186
+              ],
+              "fingerprint": "a29bd1ad8bdb"
+            }
+          ]
+        },
+        {
+          "section_id": "capabilities",
+          "finding": "File selection applies layered filtering: pattern-based exclusion, size upper-bound to discard generated or vendored assets, and a minimum content threshold to skip stubs and near-empty files before they reach any analysis model.",
+          "sources": [
+            {
+              "file": "wikifi/walker.py",
+              "lines": [
+                100,
+                130
+              ],
+              "fingerprint": "a29bd1ad8bdb"
+            }
+          ]
+        },
+        {
+          "section_id": "entities",
+          "finding": "WalkConfig is a configuration entity capturing: the repository root path, extra exclusion patterns beyond the defaults, whether to honour gitignore rules, a maximum file size in bytes, and a minimum stripped-content size in bytes. It is immutable once constructed.",
+          "sources": [
+            {
+              "file": "wikifi/walker.py",
+              "lines": [
+                61,
+                79
+              ],
+              "fingerprint": "a29bd1ad8bdb"
+            }
+          ]
+        },
+        {
+          "section_id": "entities",
+          "finding": "DirSummary is a value object representing aggregate statistics for a single (non-recursive) directory: its repo-relative path, file count, total byte size, a frequency map of file extensions (top 10), and a tuple of notable filenames (manifests, readmes) present in that directory.",
+          "sources": [
+            {
+              "file": "wikifi/walker.py",
+              "lines": [
+                144,
+                153
+              ],
+              "fingerprint": "a29bd1ad8bdb"
+            }
+          ]
+        },
+        {
+          "section_id": "cross_cutting",
+          "finding": "Files exceeding 2 MB are silently dropped on the assumption they are vendored, generated, or binary assets; real source files are expected to fit within this bound. Files whose stripped text content is shorter than 64 bytes are also dropped to prevent analysis models from producing speculative or hallucinated findings on effectively empty inputs.",
+          "sources": [
+            {
+              "file": "wikifi/walker.py",
+              "lines": [
+                61,
+                79
+              ],
+              "fingerprint": "a29bd1ad8bdb"
+            }
+          ]
+        },
+        {
+          "section_id": "cross_cutting",
+          "finding": "Manifest files read for introspection context are hard-truncated at 20,000 bytes with a visible truncation marker to keep prompt payloads bounded.",
+          "sources": [
+            {
+              "file": "wikifi/walker.py",
+              "lines": [
+                220,
+                231
+              ],
+              "fingerprint": "a29bd1ad8bdb"
+            }
+          ]
+        },
+        {
+          "section_id": "cross_cutting",
+          "finding": "Directory traversal prunes ignored directories before descending into them, meaning exclusion patterns apply to entire subtrees efficiently rather than file-by-file.",
+          "sources": [
+            {
+              "file": "wikifi/walker.py",
+              "lines": [
+                133,
+                143
+              ],
+              "fingerprint": "a29bd1ad8bdb"
+            }
+          ]
+        },
+        {
+          "section_id": "hard_specifications",
+          "finding": "The maximum file size threshold is 2,000,000 bytes (2 MB); files at or above this limit are unconditionally skipped and never sent for analysis. The minimum content threshold is 64 bytes of stripped text. Manifest files are truncated to 20,000 bytes maximum before being included in any prompt.",
+          "sources": [
+            {
+              "file": "wikifi/walker.py",
+              "lines": [
+                61,
+                79
+              ],
+              "fingerprint": "a29bd1ad8bdb"
+            }
+          ]
+        },
+        {
+          "section_id": "integrations",
+          "finding": "The walker is called into by the introspection layer (Stage 1) and the extractor layer: introspection uses `summarize_tree` and `read_manifest_files` to build its compressed repo view, while the extractor uses `iter_files` to obtain the filtered file list for per-file analysis. The walker itself calls into no external services.",
+          "sources": [
+            {
+              "file": "wikifi/walker.py",
+              "lines": [
+                1,
+                12
+              ],
+              "fingerprint": "a29bd1ad8bdb"
+            }
+          ]
+        }
+      ]
+    },
+    "wikifi/wiki.py": {
+      "fingerprint": "9230b7444e0d",
+      "summary": "Manages the on-disk wiki directory layout, scaffolding lifecycle, and persistence of per-file extraction notes and rendered section documents.",
+      "chunks_processed": 1,
+      "findings": [
+        {
+          "section_id": "hard_specifications",
+          "finding": "The directory layout is explicitly declared as a stable contract between the tool and any target project: upgrading the tool must not break existing wikis. This constraint is called out in the module docstring and governs all future changes to path conventions.",
+          "sources": [
+            {
+              "file": "wikifi/wiki.py",
+              "lines": [
+                1,
+                13
+              ],
+              "fingerprint": "9230b7444e0d"
+            }
+          ]
+        },
+        {
+          "section_id": "entities",
+          "finding": "WikiLayout is a value object (immutable dataclass) that encapsulates the root path of a target project and derives all canonical sub-paths from it: the wiki directory, configuration file, gitignore file, notes directory, per-section markdown files, and per-section JSONL note files.",
+          "sources": [
+            {
+              "file": "wikifi/wiki.py",
+              "lines": [
+                34,
+                61
+              ],
+              "fingerprint": "9230b7444e0d"
+            }
+          ]
+        },
+        {
+          "section_id": "capabilities",
+          "finding": "The system can initialize a wiki skeleton inside a target project directory in an idempotent manner: it creates the directory structure, a provider/model configuration file, a gitignore, and one placeholder markdown file per defined section — skipping anything that already exists.",
+          "sources": [
+            {
+              "file": "wikifi/wiki.py",
+              "lines": [
+                64,
+                86
+              ],
+              "fingerprint": "9230b7444e0d"
+            }
+          ]
+        },
+        {
+          "section_id": "capabilities",
+          "finding": "The system can write a fully rendered markdown document for any individual section, replacing its previous content, and can append timestamped per-file extraction notes to a section's scratch log, read those notes back in insertion order, and wipe all notes at the start of a fresh analysis run.",
+          "sources": [
+            {
+              "file": "wikifi/wiki.py",
+              "lines": [
+                89,
+                121
+              ],
+              "fingerprint": "9230b7444e0d"
+            }
+          ]
+        },
+        {
+          "section_id": "cross_cutting",
+          "finding": "Per-file extraction state is stored as newline-delimited JSON (JSONL), with each record automatically stamped with a UTC timestamp. Notes are excluded from version control via a generated gitignore entry, while rendered section markdown is intended to be committed.",
+          "sources": [
+            {
+              "file": "wikifi/wiki.py",
+              "lines": [
+                96,
+                121
+              ],
+              "fingerprint": "9230b7444e0d"
+            }
+          ]
+        },
+        {
+          "section_id": "hard_specifications",
+          "finding": "The `.wikifi/` directory layout follows a fixed, documented schema: `config.toml` for provider/model overrides, `.gitignore` for excluding notes, one `<section>.md` per defined section, and a `.notes/<section>.jsonl` per section for extraction state. This schema must remain stable across upgrades.",
+          "sources": [
+            {
+              "file": "wikifi/wiki.py",
+              "lines": [
+                1,
+                13
+              ],
+              "fingerprint": "9230b7444e0d"
+            }
+          ]
+        },
+        {
+          "section_id": "integrations",
+          "finding": "This module is the authoritative persistence layer consumed by the orchestrator, extractor, aggregator, deriver, and CLI — all path resolution for reading and writing wiki artifacts flows through WikiLayout rather than being scattered across those callers.",
+          "sources": [
+            {
+              "file": "wikifi/wiki.py",
+              "lines": [
+                34,
+                61
+              ],
+              "fingerprint": "9230b7444e0d"
+            }
+          ]
+        }
+      ]
+    },
+    "wikifi/specialized/__init__.py": {
+      "fingerprint": "84d6c382c745",
+      "summary": "Dispatcher that routes high-signal source artifacts (schemas, IDLs, API specs, migrations) to purpose-built parsers instead of the general LLM extraction path, while preserving a uniform output contract downstream.",
+      "chunks_processed": 1,
+      "findings": [
+        {
+          "section_id": "intent",
+          "finding": "Schema files, interface definition languages, API specifications, and database migrations encode a system's contracts in structured, machine-readable form. Passing them through a general-purpose prose extractor is both inefficient and lossy; dedicated parsers can read the structure directly. This package implements that optimised path as a drop-in replacement for the LLM call whenever a file's kind is recognised.",
+          "sources": [
+            {
+              "file": "wikifi/specialized/__init__.py",
+              "lines": [
+                1,
+                13
+              ],
+              "fingerprint": "84d6c382c745"
+            }
+          ]
+        },
+        {
+          "section_id": "capabilities",
+          "finding": "The system selects a specialised extractor based on the detected kind of a source file — covering SQL queries, database migrations, OpenAPI specifications, Protocol Buffer definitions, and GraphQL schemas — and routes each file to the parser best suited to its structure rather than treating all files identically.",
+          "sources": [
+            {
+              "file": "wikifi/specialized/__init__.py",
+              "lines": [
+                46,
+                57
+              ],
+              "fingerprint": "84d6c382c745"
+            }
+          ]
+        },
+        {
+          "section_id": "entities",
+          "finding": "A `SpecializedFinding` represents a single structured insight extracted from a file, carrying a section identifier, a human-readable description, and a list of source references. A `SpecializedResult` groups zero or more such findings together with an optional summary string, and is the standard output contract for every specialised extractor.",
+          "sources": [
+            {
+              "file": "wikifi/specialized/__init__.py",
+              "lines": [
+                29,
+                38
+              ],
+              "fingerprint": "84d6c382c745"
+            }
+          ]
+        },
+        {
+          "section_id": "cross_cutting",
+          "finding": "All specialised extractors are required to return results in the same `{section_id, finding, sources}` shape that the LLM extractor produces, ensuring the downstream aggregation layer needs no knowledge of which extraction path was taken. This interface contract is an invariant that must be preserved.",
+          "sources": [
+            {
+              "file": "wikifi/specialized/__init__.py",
+              "lines": [
+                9,
+                13
+              ],
+              "fingerprint": "84d6c382c745"
+            }
+          ]
+        },
+        {
+          "section_id": "integrations",
+          "finding": "The dispatcher integrates internally with the file-kind classification system (sourced from the repository graph module) and delegates to four sibling extractor modules — SQL, OpenAPI, Protobuf, and GraphQL — each responsible for a distinct artifact type.",
+          "sources": [
+            {
+              "file": "wikifi/specialized/__init__.py",
+              "lines": [
+                46,
+                57
+              ],
+              "fingerprint": "84d6c382c745"
+            }
+          ]
+        }
+      ]
+    },
+    "wikifi/specialized/graphql.py": {
+      "fingerprint": "bbb305e0d47f",
+      "summary": "Specialized extractor that parses GraphQL Schema Definition Language files and maps their constructs to structured wiki findings about domain entities and API capabilities.",
+      "chunks_processed": 1,
+      "findings": [
+        {
+          "section_id": "capabilities",
+          "finding": "The system can analyze GraphQL schema files to identify and catalog all operation roots. Query and Mutation roots are recognized as first-class capability surfaces, with each declared field surfaced as an individually named operation the API exposes.",
+          "sources": [
+            {
+              "file": "wikifi/specialized/graphql.py",
+              "lines": [
+                85,
+                101
+              ],
+              "fingerprint": "bbb305e0d47f"
+            }
+          ]
+        },
+        {
+          "section_id": "integrations",
+          "finding": "Subscription roots in a GraphQL schema are treated as integration touchpoints rather than capabilities, reflecting their role as real-time or event-driven channels that external consumers attach to.",
+          "sources": [
+            {
+              "file": "wikifi/specialized/graphql.py",
+              "lines": [
+                88,
+                91
+              ],
+              "fingerprint": "bbb305e0d47f"
+            }
+          ]
+        },
+        {
+          "section_id": "entities",
+          "finding": "Domain-level GraphQL object types (excluding operation roots) are extracted and recorded as named entities. Interfaces, input types, and enums are each treated as distinct entity-level constructs: interfaces represent shared shape contracts, inputs represent request payload shapes, and enums represent closed value sets.",
+          "sources": [
+            {
+              "file": "wikifi/specialized/graphql.py",
+              "lines": [
+                32,
+                81
+              ],
+              "fingerprint": "bbb305e0d47f"
+            }
+          ]
+        },
+        {
+          "section_id": "intent",
+          "finding": "The extractor exists to make GraphQL schemas first-class source material for wiki generation, automatically translating schema structure into domain-meaningful findings about entities and API surface rather than requiring manual documentation of those schemas.",
+          "sources": [
+            {
+              "file": "wikifi/specialized/graphql.py",
+              "lines": [
+                1,
+                7
+              ],
+              "fingerprint": "bbb305e0d47f"
+            }
+          ]
+        }
+      ]
+    },
+    "wikifi/specialized/openapi.py": {
+      "fingerprint": "ae97781309c4",
+      "summary": "Parses OpenAPI/Swagger contract files and extracts structured findings about public endpoints, data schemas, and authentication schemes to support migration analysis.",
+      "chunks_processed": 1,
+      "findings": [
+        {
+          "section_id": "intent",
+          "finding": "OpenAPI specification files are treated as authoritative 'migration gold' because they enumerate every public endpoint, request/response body, and authentication method in one structured document. This extractor surfaces that information so migration teams have a complete picture of the API contract without manually reading raw spec files.",
+          "sources": [
+            {
+              "file": "wikifi/specialized/openapi.py",
+              "lines": [
+                1,
+                11
+              ],
+              "fingerprint": "ae97781309c4"
+            }
+          ]
+        },
+        {
+          "section_id": "capabilities",
+          "finding": "The system can parse an API contract file (JSON or YAML format) and produce an inventory of all public HTTP endpoints — including the verb, path, and human-readable description — capping display at 20 with a count of omitted entries. When a spec cannot be parsed, it emits a graceful advisory finding rather than failing, directing reviewers to inspect the file manually.",
+          "sources": [
+            {
+              "file": "wikifi/specialized/openapi.py",
+              "lines": [
+                23,
+                50
+              ],
+              "fingerprint": "ae97781309c4"
+            }
+          ]
+        },
+        {
+          "section_id": "capabilities",
+          "finding": "The extractor also surfaces the API title, version, and description from the contract's info block, providing high-level identity context for the API being migrated.",
+          "sources": [
+            {
+              "file": "wikifi/specialized/openapi.py",
+              "lines": [
+                53,
+                66
+              ],
+              "fingerprint": "ae97781309c4"
+            }
+          ]
+        },
+        {
+          "section_id": "entities",
+          "finding": "API request/response schemas are extracted from the contract's component definitions and listed by name (up to 25, with overflow count). These represent the canonical data models the API exposes or consumes, and are surfaced as entity-level findings for migration awareness.",
+          "sources": [
+            {
+              "file": "wikifi/specialized/openapi.py",
+              "lines": [
+                94,
+                108
+              ],
+              "fingerprint": "ae97781309c4"
+            }
+          ]
+        },
+        {
+          "section_id": "cross_cutting",
+          "finding": "Authentication schemes declared in the API contract are extracted and categorized by type. This ensures that security contracts (e.g., API key, OAuth, HTTP bearer) are recorded as cross-cutting concerns that must be preserved through migration.",
+          "sources": [
+            {
+              "file": "wikifi/specialized/openapi.py",
+              "lines": [
+                110,
+                121
+              ],
+              "fingerprint": "ae97781309c4"
+            }
+          ]
+        },
+        {
+          "section_id": "integrations",
+          "finding": "Each parsed API contract contributes an inbound-integration finding recording the count of HTTP endpoints exposed to external consumers, establishing the external-facing API surface as a documented integration point.",
+          "sources": [
+            {
+              "file": "wikifi/specialized/openapi.py",
+              "lines": [
+                83,
+                92
+              ],
+              "fingerprint": "ae97781309c4"
+            }
+          ]
+        },
+        {
+          "section_id": "external_dependencies",
+          "finding": "The system optionally relies on an external YAML parsing library for reading YAML-formatted API specifications. When the library is unavailable, a built-in minimal parser handles the subset of YAML structures present in standard OpenAPI documents, ensuring no hard runtime dependency is introduced.",
+          "sources": [
+            {
+              "file": "wikifi/specialized/openapi.py",
+              "lines": [
+                143,
+                157
+              ],
+              "fingerprint": "ae97781309c4"
+            }
+          ]
+        }
+      ]
+    },
+    "wikifi/specialized/protobuf.py": {
+      "fingerprint": "e20d5913745a",
+      "summary": "Specialized extractor that parses interface definition (proto) files to surface message types as domain entities and service/RPC blocks as integration touchpoints for migration-ready contract analysis.",
+      "chunks_processed": 1,
+      "findings": [
+        {
+          "section_id": "intent",
+          "finding": "This extractor exists to treat interface definition files as pure contracts: its findings are intended to be read directly into interface design when re-implementing in a new stack. It bridges the gap between existing wire-protocol definitions and a migration team's understanding of what must be preserved.",
+          "sources": [
+            {
+              "file": "wikifi/specialized/protobuf.py",
+              "lines": [
+                1,
+                8
+              ],
+              "fingerprint": "e20d5913745a"
+            }
+          ]
+        },
+        {
+          "section_id": "capabilities",
+          "finding": "Parses protocol definition files to extract: named data types (messages) grouped by package, closed value sets (enums), service definitions, and individual remote procedure signatures including streaming variants on both input and output. Produces structured findings categorised by entity type and integration surface.",
+          "sources": [
+            {
+              "file": "wikifi/specialized/protobuf.py",
+              "lines": [
+                27,
+                95
+              ],
+              "fingerprint": "e20d5913745a"
+            }
+          ]
+        },
+        {
+          "section_id": "entities",
+          "finding": "Extracts protocol message types and enum types from interface definition files, recording each by name and source line. Messages are grouped under their package namespace; enums are surfaced separately as closed value sets. Up to 25 of each are reported verbatim; larger sets are truncated with a count.",
+          "sources": [
+            {
+              "file": "wikifi/specialized/protobuf.py",
+              "lines": [
+                44,
+                68
+              ],
+              "fingerprint": "e20d5913745a"
+            }
+          ]
+        },
+        {
+          "section_id": "integrations",
+          "finding": "Identifies every declared service and maps each of its remote procedures, capturing the procedure name, request message type, response message type, and whether either side is a streaming channel. Each service is emitted as a distinct integration touchpoint.",
+          "sources": [
+            {
+              "file": "wikifi/specialized/protobuf.py",
+              "lines": [
+                70,
+                87
+              ],
+              "fingerprint": "e20d5913745a"
+            }
+          ]
+        },
+        {
+          "section_id": "hard_specifications",
+          "finding": "The module explicitly designates proto file findings as direct inputs to interface design during migration, implying that message names, enum value sets, service names, RPC signatures, and streaming contracts must be preserved verbatim when porting to a new stack.",
+          "sources": [
+            {
+              "file": "wikifi/specialized/protobuf.py",
+              "lines": [
+                1,
+                8
+              ],
+              "fingerprint": "e20d5913745a"
+            }
+          ]
+        }
+      ]
+    },
+    "wikifi/specialized/sql.py": {
+      "fingerprint": "1ef5e77c4038",
+      "summary": "SQL DDL and migration extractor that converts CREATE TABLE, ALTER TABLE, and CREATE INDEX statements into structured findings about domain entities, relational links, and storage invariants.",
+      "chunks_processed": 1,
+      "findings": [
+        {
+          "section_id": "capabilities",
+          "finding": "The system can parse SQL schema files and migration scripts to automatically discover domain entities, their fields, foreign-key relationships, uniqueness and nullability constraints, and index definitions — producing structured wiki findings without requiring a live database connection.",
+          "sources": [
+            {
+              "file": "wikifi/specialized/sql.py",
+              "lines": [
+                56,
+                62
+              ],
+              "fingerprint": "1ef5e77c4038"
+            }
+          ]
+        },
+        {
+          "section_id": "capabilities",
+          "finding": "Migration files are parsed with the same logic as baseline DDL but are distinguished in output summaries, allowing the migration team to differentiate additive schema changes from the original baseline structure.",
+          "sources": [
+            {
+              "file": "wikifi/specialized/sql.py",
+              "lines": [
+                56,
+                62
+              ],
+              "fingerprint": "1ef5e77c4038"
+            }
+          ]
+        },
+        {
+          "section_id": "entities",
+          "finding": "Each CREATE TABLE statement is treated as a domain entity: the extractor captures the table name, all column names, foreign key edges, and storage constraints as structured entity findings.",
+          "sources": [
+            {
+              "file": "wikifi/specialized/sql.py",
+              "lines": [
+                64,
+                84
+              ],
+              "fingerprint": "1ef5e77c4038"
+            }
+          ]
+        },
+        {
+          "section_id": "entities",
+          "finding": "ALTER TABLE statements are also tracked as entity-level findings, recording what schema evolution has been applied to a given entity over time (e.g., added columns, dropped constraints).",
+          "sources": [
+            {
+              "file": "wikifi/specialized/sql.py",
+              "lines": [
+                99,
+                111
+              ],
+              "fingerprint": "1ef5e77c4038"
+            }
+          ]
+        },
+        {
+          "section_id": "integrations",
+          "finding": "Foreign key declarations — both explicit FOREIGN KEY clauses and inline REFERENCES annotations on column definitions — are surfaced as hard relational links between entities, capturing which field on one entity points into another.",
+          "sources": [
+            {
+              "file": "wikifi/specialized/sql.py",
+              "lines": [
+                86,
+                96
+              ],
+              "fingerprint": "1ef5e77c4038"
+            }
+          ]
+        },
+        {
+          "section_id": "cross_cutting",
+          "finding": "UNIQUE and NOT NULL constraints found within a table definition are extracted as storage invariants that the system flags must be preserved across any migration or re-implementation.",
+          "sources": [
+            {
+              "file": "wikifi/specialized/sql.py",
+              "lines": [
+                97,
+                98
+              ],
+              "fingerprint": "1ef5e77c4038"
+            }
+          ]
+        },
+        {
+          "section_id": "cross_cutting",
+          "finding": "Index definitions (CREATE INDEX) are recorded as query-time performance invariants, with an explicit note that the new system must preserve them.",
+          "sources": [
+            {
+              "file": "wikifi/specialized/sql.py",
+              "lines": [
+                113,
+                125
+              ],
+              "fingerprint": "1ef5e77c4038"
+            }
+          ]
+        },
+        {
+          "section_id": "hard_specifications",
+          "finding": "Indexes are explicitly annotated as performance invariants that 'the new system must preserve,' establishing a carry-forward requirement for any target platform.",
+          "sources": [
+            {
+              "file": "wikifi/specialized/sql.py",
+              "lines": [
+                117,
+                122
+              ],
+              "fingerprint": "1ef5e77c4038"
+            }
+          ]
+        },
+        {
+          "section_id": "hard_specifications",
+          "finding": "UNIQUE and NOT NULL constraints are treated as storage-level invariants that must survive migration, not merely advisory metadata.",
+          "sources": [
+            {
+              "file": "wikifi/specialized/sql.py",
+              "lines": [
+                97,
+                98
+              ],
+              "fingerprint": "1ef5e77c4038"
+            }
+          ]
+        }
+      ]
+    },
+    "wikifi/providers/anthropic_provider.py": {
+      "fingerprint": "872020d40ac3",
+      "summary": "Implements the hosted-AI provider by calling an external large-language-model service, with a prompt-caching strategy that makes large-scale codebase walks economically viable.",
+      "chunks_processed": 1,
+      "findings": [
+        {
+          "section_id": "external_dependencies",
+          "finding": "The system depends on a hosted large-language-model service (Anthropic Claude) for structured extraction and free-text generation. The API key is resolved from an environment variable (`ANTHROPIC_API_KEY`) or injected at construction time, and a configurable HTTP timeout guards against long-running inference calls.",
+          "sources": [
+            {
+              "file": "wikifi/providers/anthropic_provider.py",
+              "lines": [
+                100,
+                108
+              ],
+              "fingerprint": "872020d40ac3"
+            }
+          ]
+        },
+        {
+          "section_id": "integrations",
+          "finding": "This module is the outbound integration point to the hosted LLM service. It is consumed by the orchestrator (`wikifi/orchestrator.py`) to drive all per-file extraction, aggregation, and derivation calls. Three interaction shapes are exposed: schema-validated structured output, free-text completion, and multi-turn chat.",
+          "sources": [
+            {
+              "file": "wikifi/providers/anthropic_provider.py",
+              "lines": [
+                115,
+                175
+              ],
+              "fingerprint": "872020d40ac3"
+            }
+          ]
+        },
+        {
+          "section_id": "cross_cutting",
+          "finding": "A prompt-caching mechanism marks the large, repeated system prompt with an ephemeral cache breakpoint so that only the first call in a pipeline walk pays full input-token cost; subsequent calls pay roughly 10% of that cost as a cache read. The module's own documentation states this is the critical cost control that makes hosted inference economical on codebases of tens of thousands of files.",
+          "sources": [
+            {
+              "file": "wikifi/providers/anthropic_provider.py",
+              "lines": [
+                193,
+                210
+              ],
+              "fingerprint": "872020d40ac3"
+            }
+          ]
+        },
+        {
+          "section_id": "cross_cutting",
+          "finding": "All errors from the external LLM service are caught and re-raised as a normalized internal error type, carrying the provider's request identifier when available. This preserves the pipeline's existing per-call fallback behaviour without leaking provider-specific error types into the broader system.",
+          "sources": [
+            {
+              "file": "wikifi/providers/anthropic_provider.py",
+              "lines": [
+                238,
+                244
+              ],
+              "fingerprint": "872020d40ac3"
+            }
+          ]
+        },
+        {
+          "section_id": "cross_cutting",
+          "finding": "A configurable reasoning-depth control (`think`) is translated into the external API's adaptive-thinking feature, allowing callers to trade inference latency and cost against extraction quality without branching on provider type elsewhere in the codebase.",
+          "sources": [
+            {
+              "file": "wikifi/providers/anthropic_provider.py",
+              "lines": [
+                212,
+                232
+              ],
+              "fingerprint": "872020d40ac3"
+            }
+          ]
+        },
+        {
+          "section_id": "hard_specifications",
+          "finding": "Sampling parameters (temperature, top_p, top_k) must not be sent to the claude-opus-4-7 model variant — doing so causes a 400 error. The provider explicitly omits these parameters for this model generation, making their absence a hard constraint carried forward with the provider implementation.",
+          "sources": [
+            {
+              "file": "wikifi/providers/anthropic_provider.py",
+              "lines": [
+                17,
+                21
+              ],
+              "fingerprint": "872020d40ac3"
+            }
+          ]
+        },
+        {
+          "section_id": "hard_specifications",
+          "finding": "The maximum output token budget per call is set at 16,000 tokens. This is documented as comfortable headroom for any section schema response while staying within the SDK's non-streaming HTTP timeout guard, making it an operationally important default that should not be reduced without re-validating pipeline completions.",
+          "sources": [
+            {
+              "file": "wikifi/providers/anthropic_provider.py",
+              "lines": [
+                72,
+                76
+              ],
+              "fingerprint": "872020d40ac3"
+            }
+          ]
+        }
+      ]
+    },
+    "wikifi/providers/base.py": {
+      "fingerprint": "2750f0f56327",
+      "summary": "Defines the minimal provider abstraction that all language-model backends must satisfy, enabling the rest of the system to swap underlying AI services without changing call sites.",
+      "chunks_processed": 1,
+      "findings": [
+        {
+          "section_id": "intent",
+          "finding": "The provider protocol is explicitly designed to be minimal so that switching between different AI backends (local, hosted, or mock) requires changing only a single class, keeping the rest of the system decoupled from any particular AI service.",
+          "sources": [
+            {
+              "file": "wikifi/providers/base.py",
+              "lines": [
+                1,
+                16
+              ],
+              "fingerprint": "2750f0f56327"
+            }
+          ]
+        },
+        {
+          "section_id": "capabilities",
+          "finding": "The system interacts with language models in three distinct modes: structured JSON generation (used for repository introspection, per-file extraction, and section aggregation), free-form markdown generation (used for diagram passes), and stateful multi-turn conversation (used for the interactive chat REPL).",
+          "sources": [
+            {
+              "file": "wikifi/providers/base.py",
+              "lines": [
+                1,
+                16
+              ],
+              "fingerprint": "2750f0f56327"
+            }
+          ]
+        },
+        {
+          "section_id": "integrations",
+          "finding": "The provider abstraction is the outbound integration boundary between wikifi's pipeline stages and any AI model backend; all pipeline components (introspection, extractor, aggregator, deriver, critic, chat, orchestrator) call through this interface rather than directly to a specific service.",
+          "sources": [
+            {
+              "file": "wikifi/providers/base.py",
+              "lines": [
+                30,
+                48
+              ],
+              "fingerprint": "2750f0f56327"
+            }
+          ]
+        },
+        {
+          "section_id": "entities",
+          "finding": "A `ChatMessage` entity carries a `role` and `content` field and represents a single turn in a multi-turn conversation; lists of these are passed to the chat mode to maintain conversation history across turns.",
+          "sources": [
+            {
+              "file": "wikifi/providers/base.py",
+              "lines": [
+                28,
+                30
+              ],
+              "fingerprint": "2750f0f56327"
+            }
+          ]
+        },
+        {
+          "section_id": "cross_cutting",
+          "finding": "Structured output validation is a cross-cutting concern: the `complete_json` mode requires the model response to be validated against a declared schema before being returned, ensuring type-safe data flows through every pipeline stage that uses it.",
+          "sources": [
+            {
+              "file": "wikifi/providers/base.py",
+              "lines": [
+                36,
+                38
+              ],
+              "fingerprint": "2750f0f56327"
+            }
+          ]
+        }
+      ]
+    },
+    "wikifi/providers/ollama_provider.py": {
+      "fingerprint": "0a21916665a5",
+      "summary": "Ollama-backed LLM provider that handles schema-enforced structured output, free-text generation, and multi-turn chat by connecting to a locally-hosted inference runtime.",
+      "chunks_processed": 1,
+      "findings": [
+        {
+          "section_id": "external_dependencies",
+          "finding": "The system depends on a locally-hosted Ollama inference runtime reachable at a configurable host address. Ollama serves as the sole LLM backend, handling structured JSON output (via schema enforcement), free-text completion, and multi-turn chat. A per-connection timeout (defaulting to 900 seconds) gates all calls to this service.",
+          "sources": [
+            {
+              "file": "wikifi/providers/ollama_provider.py",
+              "lines": [
+                50,
+                56
+              ],
+              "fingerprint": "0a21916665a5"
+            }
+          ]
+        },
+        {
+          "section_id": "integrations",
+          "finding": "The orchestrator calls this provider for all LLM inference work. The provider, in turn, calls the Ollama service for three interaction modes: schema-constrained structured extraction, unconstrained text generation, and stateful multi-turn conversation. This provider is the exclusive outbound integration boundary between the system and any language model.",
+          "sources": [
+            {
+              "file": "wikifi/providers/ollama_provider.py",
+              "lines": [
+                58,
+                95
+              ],
+              "fingerprint": "0a21916665a5"
+            }
+          ]
+        },
+        {
+          "section_id": "cross_cutting",
+          "finding": "Temperature is hard-pinned to 0 on every structured-output call, enforcing determinism so that identical inputs reliably produce identical structured results across repeated runs. The text and chat paths leave temperature at the model default, accepting variability in exchange for naturalness.",
+          "sources": [
+            {
+              "file": "wikifi/providers/ollama_provider.py",
+              "lines": [
+                58,
+                68
+              ],
+              "fingerprint": "0a21916665a5"
+            }
+          ]
+        },
+        {
+          "section_id": "hard_specifications",
+          "finding": "Qwen3-family models must not be invoked with think=False on the structured-output path: doing so causes the model to bypass the schema constraint and emit free text, which fails downstream validation. The thinking level must be 'low' or higher to preserve schema compliance. For the derivative-section synthesis pass, 'high' thinking is the preferred setting for output quality, but callers must budget 1–3 minutes per file and configure the timeout to at least 900 seconds to absorb that latency.",
+          "sources": [
+            {
+              "file": "wikifi/providers/ollama_provider.py",
+              "lines": [
+                14,
+                32
+              ],
+              "fingerprint": "0a21916665a5"
+            }
+          ]
+        },
+        {
+          "section_id": "capabilities",
+          "finding": "The provider exposes three distinct LLM interaction modes: structured extraction (response validated against a caller-supplied schema), open-ended text generation, and multi-turn conversational exchange. This separation allows the orchestrator to select the right interaction pattern for each processing stage (per-file extraction vs. derivative synthesis vs. interactive refinement).",
+          "sources": [
+            {
+              "file": "wikifi/providers/ollama_provider.py",
+              "lines": [
+                58,
+                95
+              ],
+              "fingerprint": "0a21916665a5"
+            }
+          ]
+        }
+      ]
+    },
+    "wikifi/providers/openai_provider.py": {
+      "fingerprint": "428df9ba13f1",
+      "summary": "Implements the OpenAI-hosted LLM backend for wikifi, providing structured-output, free-text, and multi-turn chat completions with automatic prompt-caching and reasoning-effort control.",
+      "chunks_processed": 1,
+      "findings": [
+        {
+          "section_id": "external_dependencies",
+          "finding": "The system depends on OpenAI's hosted language model API for all inference when this provider is selected. It is activated via an environment variable (`WIKIFI_PROVIDER=openai`) and an API key, and supports an optional custom base URL to point at compatible third-party endpoints.",
+          "sources": [
+            {
+              "file": "wikifi/providers/openai_provider.py",
+              "lines": [
+                1,
+                10
+              ],
+              "fingerprint": "428df9ba13f1"
+            }
+          ]
+        },
+        {
+          "section_id": "integrations",
+          "finding": "This provider is one of three selectable backends (alongside local and Anthropic-hosted options) consumed by the orchestrator. It implements the shared provider protocol defined in `wikifi/providers/base.py`, exposing structured-JSON, free-text, and multi-turn chat completion methods that the orchestrator calls during per-file extraction and synthesis passes.",
+          "sources": [
+            {
+              "file": "wikifi/providers/openai_provider.py",
+              "lines": [
+                1,
+                8
+              ],
+              "fingerprint": "428df9ba13f1"
+            }
+          ]
+        },
+        {
+          "section_id": "capabilities",
+          "finding": "The provider supports three interaction modes: schema-constrained structured output (returning a validated domain object), free-text generation, and stateful multi-turn conversation. This covers the full range of interactions wikifi needs — per-file structured extraction, narrative synthesis, and interactive Q&A.",
+          "sources": [
+            {
+              "file": "wikifi/providers/openai_provider.py",
+              "lines": [
+                120,
+                185
+              ],
+              "fingerprint": "428df9ba13f1"
+            }
+          ]
+        },
+        {
+          "section_id": "cross_cutting",
+          "finding": "API errors are caught and re-raised with a normalised diagnostic message that includes the upstream request identifier when available, preserving traceability across the provider boundary without leaking raw SDK exceptions to callers.",
+          "sources": [
+            {
+              "file": "wikifi/providers/openai_provider.py",
+              "lines": [
+                248,
+                255
+              ],
+              "fingerprint": "428df9ba13f1"
+            }
+          ]
+        },
+        {
+          "section_id": "cross_cutting",
+          "finding": "Prompt caching is exploited automatically by placing the system prompt at message position 0 in every call; the hosted service caches identical long prefixes, reducing latency and cost for the repeated multi-kilobyte extraction prompt that is sent once per source file.",
+          "sources": [
+            {
+              "file": "wikifi/providers/openai_provider.py",
+              "lines": [
+                13,
+                17
+              ],
+              "fingerprint": "428df9ba13f1"
+            }
+          ]
+        },
+        {
+          "section_id": "hard_specifications",
+          "finding": "Reasoning-capable model families (identified by name prefix) must receive output-token limits via a distinct parameter name from standard chat models; sending the wrong parameter to either family causes a request failure. The provider routes the correct parameter unconditionally based on model identity.",
+          "sources": [
+            {
+              "file": "wikifi/providers/openai_provider.py",
+              "lines": [
+                215,
+                226
+              ],
+              "fingerprint": "428df9ba13f1"
+            }
+          ]
+        },
+        {
+          "section_id": "hard_specifications",
+          "finding": "The `think` (reasoning-effort) knob must only be forwarded to reasoning-capable models; forwarding it to a plain chat model risks a validation error from the hosted service. The mapping from wikifi's internal knob values (`low`, `medium`, `high`) to the API's accepted values is fixed and must be preserved.",
+          "sources": [
+            {
+              "file": "wikifi/providers/openai_provider.py",
+              "lines": [
+                200,
+                214
+              ],
+              "fingerprint": "428df9ba13f1"
+            }
+          ]
+        },
+        {
+          "section_id": "hard_specifications",
+          "finding": "When the hosted service returns a response that cannot be parsed into the expected structured schema (e.g. due to refusal or truncation), the system falls back to direct JSON validation of the raw text rather than returning a null result, preserving the protocol contract that callers always receive a validated object or an explicit error.",
+          "sources": [
+            {
+              "file": "wikifi/providers/openai_provider.py",
+              "lines": [
+                150,
+                163
+              ],
+              "fingerprint": "428df9ba13f1"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

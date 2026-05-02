@@ -1,29 +1,27 @@
 # External-System Dependencies
 
-The system relies on a set of external services and infrastructure components that enable source code ingestion, semantic analysis, and structured documentation generation. These dependencies are abstracted to support interchangeable implementations while maintaining consistent operational roles.
+The system draws on several categories of external service: language-model inference backends, development-time tooling integrations, and a continuous-integration platform.
 
-### AI Inference Engine
-The primary external dependency is an AI inference service, which may be provisioned as a third-party API or a locally hosted instance. This engine provides the cognitive layer required for:
-- Semantic analysis and intent extraction from raw source code
-- Interpretation of code structure and abstraction of business domains
-- Transformation of technical evidence into formal specifications, structured narratives, and architectural artifacts
-- Generation of both structured data and unstructured explanatory text based on system prompts
+## Language-Model Inference
 
-The system abstracts the deployment model of this layer, allowing it to operate against either cloud-hosted endpoints or local inference servers without altering core workflows.
+All substantive text generation and structured extraction is delegated to an external (or locally hosted) language-model service. Three backends are supported through a common provider abstraction:
 
-### Supporting Infrastructure & Standards
-Beyond the inference engine, the system depends on several foundational services and standards to ensure reliable operation and output consistency:
+| Backend | Hosting | Authentication | Role |
+|---|---|---|---|
+| Local inference server (default) | Self-hosted, no network egress | None required | Default backend for all extraction and synthesis calls; configurable host address and 15-minute per-call timeout |
+| Hosted AI service A (Anthropic) | Cloud API | API key (`ANTHROPIC_API_KEY`) | Opt-in backend; uses an ephemeral prompt-cache marker on the system prompt so that large extraction prompts are billed at roughly 10 % of normal input-token cost across repeated per-file calls |
+| Hosted AI service B (OpenAI-compatible) | Cloud API (or compatible proxy/Azure endpoint) | API key + optional custom base URL | Opt-in backend; relies on automatic prefix caching (prefixes ≥ 1 024 tokens cached for ~5–10 minutes); exposes a reasoning-intensity knob mapped to the backend's reasoning-effort parameter on capable model variants |
 
-- **Host File System:** Direct read access is required to ingest source files and gather the raw technical evidence processed by the extraction engine.
-- **Data Validation Framework:** A structured validation layer verifies output integrity, ensuring that generated artifacts conform to expected schemas before delivery.
-- **Documentation & Diagramming Standards:** The system relies on standardized markup and diagram syntaxes to guarantee consistent rendering and interoperability across downstream consumption platforms.
-- **Repository Filtering Logic:** Pattern-matching utilities aligned with standard version control ignore semantics are used to safely exclude irrelevant directories, build artifacts, and configuration files during traversal.
+The local inference server is the default and requires no credentials or external network access. The two hosted backends are opt-in and each require a provisioned API key. All three backends are configured with a model name, timeout, and per-call output-token cap drawn from the application's runtime settings.
 
-### Dependency Summary
-| Dependency | Role in System |
-|---|---|
-| AI Inference Service | Semantic analysis, intent extraction, content generation, and domain abstraction |
-| Host File System | Source code ingestion and raw evidence collection |
-| Data Validation Framework | Output integrity verification and schema enforcement |
-| Standardized Markup/Diagram Syntaxes | Cross-platform rendering consistency and interoperability |
-| VCS Ignore Pattern Logic | Safe repository traversal and artifact filtering |
+### Caching Strategy
+Because the extraction prompt is large and is reused across every file in a repository, minimising repeated billing for identical prompt prefixes is a first-class concern. The hosted-AI-service-A integration achieves this by tagging the system-prompt block with an ephemeral cache-control marker. The hosted-AI-service-B integration relies on the provider's automatic prefix-caching mechanism without requiring explicit markers.
+
+## Development-Time Tool Integrations
+
+The MCP server configuration reveals several additional integrations that appear to be used during development or agent-assisted workflows rather than in the core production pipeline:
+
+- **Google AI generative API** — consumed by at least two registered tool integrations; authenticated via a shared API key.
+- **Self-hosted web-crawling service** — running locally on a fixed port with no API key, providing crawling capability on demand.
+- **External documentation/context lookup service** — called over HTTP with a dedicated API key; likely used to retrieve up-to-date reference documentation for prompt enrichment.
+- **Google-hosted orchestration service (

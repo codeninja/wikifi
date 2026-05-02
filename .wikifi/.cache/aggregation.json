@@ -1,0 +1,2656 @@
+{
+  "version": 1,
+  "saved_at": "2026-05-02T02:17:19.876759+00:00",
+  "entries": {
+    "domains": {
+      "notes_hash": "4040897a09cc",
+      "body": "## Core Domain\n\nThe system's core domain is **codebase knowledge extraction**: ingesting an existing source base, classifying its contents, deriving domain findings from individual files, and synthesising those findings into a structured, technology-agnostic wiki. The primary consumers are migration teams who need to understand business intent, domain structure, and operational behaviour before re-implementing or replacing a legacy system.\n\n## Subdomains\n\n### Repository Introspection\nThis subdomain concerns discovering and classifying the files that make up a target codebase. Its central responsibility is distinguishing production source that encodes business intent from infrastructure, tooling, and other artefacts that do not. Tech-agnosticism is a first-class constraint here: the classification logic must not rely on recognising any specific language, framework, or runtime.\n\n### Per-File Knowledge Extraction\nOnce relevant files are identified, each is analysed independently to surface domain findings. This subdomain covers the full extraction loop — examining file content, applying domain heuristics, and producing structured evidence — and forms the first phase of wiki generation (primary sections).\n\n### Section Synthesis and Aggregation\nThe second phase of wiki generation operates over the evidence produced by per-file extraction. It aggregates findings across files into coherent wiki sections, derives higher-level content that cannot be inferred from any single file, and enforces the dependency ordering between primary (evidence-driven) and derivative (aggregated) sections. This ordering is a structural design constraint, not merely a runtime convention.\n\n### Wiki Authoring and Organisation\nA secondary domain governs how extracted knowledge is structured and stored. It defines the taxonomy of sections, distinguishes primary from derivative content, and produces output that a migration team can navigate and consume independently of the source codebase.\n\n### Interactive Knowledge Retrieval\nA supporting subdomain exposes the generated wiki to conversational or query-driven access, allowing stakeholders to interrogate extracted knowledge without directly inspecting raw wiki files.\n\n## Cross-Cutting Constraint: Tech-Agnosticism\nTech-agnosticism spans every subdomain. All analysis, extraction, and synthesis must produce domain-level descriptions that are free of references to specific languages, frameworks, or libraries. This constraint is enforced at both the classification stage (repository introspection) and the output stage (section content).\n\n## Subdomain Relationships\n\n| Subdomain | Role | Depends On |\n|---|---|---|\n| Repository Introspection | Identifies source worth analysing | — |\n| Per-File Knowledge Extraction | Produces primary section evidence | Introspection |\n| Section Synthesis & Aggregation | Produces derivative sections | Per-File Extraction |\n| Wiki Authoring & Organisation | Structures and stores the wiki | Synthesis |\n| Interactive Knowledge Retrieval | Queries the completed wiki | Authoring |\n",
+      "claims": [
+        {
+          "text": "The core domain is codebase knowledge extraction: ingesting source files, classifying them, deriving domain findings, and synthesising those findings into a structured wiki.",
+          "sources": [
+            {
+              "file": "README.md",
+              "lines": [
+                28,
+                52
+              ],
+              "fingerprint": "996c401d036d"
+            },
+            {
+              "file": "VISION.md",
+              "lines": [
+                3,
+                20
+              ],
+              "fingerprint": "10651b456a64"
+            },
+            {
+              "file": "wikifi/cli.py",
+              "lines": [
+                1,
+                8
+              ],
+              "fingerprint": "f326383c7da1"
+            }
+          ]
+        },
+        {
+          "text": "The primary consumers are migration teams who need to understand business intent, domain structure, and operational behaviour of a legacy system.",
+          "sources": [
+            {
+              "file": "VISION.md",
+              "lines": [
+                3,
+                20
+              ],
+              "fingerprint": "10651b456a64"
+            }
+          ]
+        },
+        {
+          "text": "Repository introspection is responsible for distinguishing production source that encodes business intent from infrastructure, tooling, and other artefacts.",
+          "sources": [
+            {
+              "file": "wikifi/cli.py",
+              "lines": [
+                1,
+                8
+              ],
+              "fingerprint": "f326383c7da1"
+            },
+            {
+              "file": "wikifi/introspection.py",
+              "lines": [
+                19,
+                44
+              ],
+              "fingerprint": "59cd5940f72e"
+            }
+          ]
+        },
+        {
+          "text": "Tech-agnosticism is a first-class constraint on the introspection subdomain: classification must not rely on recognising any specific language or framework.",
+          "sources": [
+            {
+              "file": "wikifi/introspection.py",
+              "lines": [
+                19,
+                44
+              ],
+              "fingerprint": "59cd5940f72e"
+            }
+          ]
+        },
+        {
+          "text": "Wiki generation is split into two subdomains: per-file evidence extraction (primary sections) and aggregate synthesis (derivative sections), with a structurally enforced dependency ordering between them.",
+          "sources": [
+            {
+              "file": "README.md",
+              "lines": [
+                28,
+                52
+              ],
+              "fingerprint": "996c401d036d"
+            },
+            {
+              "file": "wikifi/sections.py",
+              "lines": [
+                1,
+                19
+              ],
+              "fingerprint": "f743972a8fce"
+            }
+          ]
+        },
+        {
+          "text": "Wiki authoring and organisation is a secondary domain governing how extracted knowledge is structured and stored for consumption.",
+          "sources": [
+            {
+              "file": "VISION.md",
+              "lines": [
+                3,
+                20
+              ],
+              "fingerprint": "10651b456a64"
+            },
+            {
+              "file": "wikifi/sections.py",
+              "lines": [
+                1,
+                19
+              ],
+              "fingerprint": "f743972a8fce"
+            }
+          ]
+        },
+        {
+          "text": "Interactive knowledge retrieval is a supporting subdomain that exposes the generated wiki to query-driven access.",
+          "sources": [
+            {
+              "file": "wikifi/cli.py",
+              "lines": [
+                1,
+                8
+              ],
+              "fingerprint": "f326383c7da1"
+            }
+          ]
+        }
+      ],
+      "contradictions": []
+    },
+    "intent": {
+      "notes_hash": "5f1844b4a404",
+      "body": "wikifi exists because the intent embedded in a legacy system is typically invisible — locked inside years of implementation choices, technology-specific conventions, and accumulated structure that makes it difficult to separate *what the system does and why* from *how it currently does it*. Migration teams tasked with replacing or re-implementing such a system need the former without the latter.\n\n### The Core Problem\n\nWhen a team inherits a large legacy codebase and must produce a new implementation, they face a knowledge-extraction problem. The source describes a particular way of solving a set of problems, but rarely describes the problems themselves at a level that is portable to a new context. Reading the source directly tends to reproduce the same structure and constraints in the new system — recreating legacy decisions rather than the underlying intent.\n\nwikifi addresses this by walking a repository and producing a structured, technology-agnostic wiki that surfaces:\n\n- **Domain entities and capabilities** — what the system models and what it can do\n- **API contracts and integration touchpoints** — what it exposes and to whom\n- **Cross-cutting concerns** — considerations that span the system as a whole\n- **Personas, user stories, and diagrams** — who uses the system, what they need, and how flows connect\n\nThe goal is to make legacy intent explicit, complete, and portable so a fresh implementation can retain full functional value without inheriting structural decisions.\n\n### Primary Audience\n\nThe immediate audience is migration teams — architects and developers who need to understand a system's domain well enough to re-implement it rather than maintain it. A secondary audience includes anyone who must understand what a system does without reading its source directly, including those who need to interrogate the resulting wiki conversationally.\n\n### What the System Is Not\n\nwikifi is explicitly a feature-extraction tool, not a transposition tool. It surfaces what a legacy system does and leaves all decisions about target architecture, structure, and approach entirely to the migration team. The output prescribes nothing about how the new system should be built.\n\n### Shaping Constraints\n\nSeveral constraints are built into the design from the outset:\n\n| Constraint | Rationale |\n|---|---|\n| **Technology agnosticism** | Output must be expressed in domain terms, never in terms of the implementation technology found in the source, so the wiki does not embed the very assumptions it is meant to dissolve. |\n| **Quality over speed** | Accuracy and completeness of the generated wiki are prioritised over processing throughput. |\n| **Arbitrary scale** | The system must handle repositories of any size — including legacy monorepos with tens of thousands of files — through caching and chunking strategies that make repeated and interrupted runs cheap. |\n| **Full traceability** | Every assertion in the generated wiki must trace back to specific source files and locations so architects can verify any claim against the original codebase. |\n| **Honest disagreement** | Where source files contain conflicting signals, the system surfaces those contradictions explicitly rather than silently resolving them, preserving the full picture for the migration team. |",
+      "claims": [
+        {
+          "text": "wikifi exists because the intent of legacy systems is locked inside their implementation choices, making it difficult to separate what the system does from how it does it.",
+          "sources": [
+            {
+              "file": "VISION.md",
+              "lines": [
+                3,
+                9
+              ],
+              "fingerprint": "10651b456a64"
+            }
+          ]
+        },
+        {
+          "text": "Migration teams need a description of what a system does and why, decoupled from how it currently does it, so they can re-implement on a fresh stack without recreating legacy structure.",
+          "sources": [
+            {
+              "file": "CLAUDE.md",
+              "lines": [
+                73,
+                75
+              ],
+              "fingerprint": "ac9698d91de6"
+            },
+            {
+              "file": "README.md",
+              "lines": [
+                3,
+                3
+              ],
+              "fingerprint": "996c401d036d"
+            },
+            {
+              "file": "VISION.md",
+              "lines": [
+                3,
+                9
+              ],
+              "fingerprint": "10651b456a64"
+            },
+            {
+              "file": "wikifi/cli.py",
+              "lines": [
+                1,
+                8
+              ],
+              "fingerprint": "f326383c7da1"
+            }
+          ]
+        },
+        {
+          "text": "wikifi walks a repository and produces a structured, technology-agnostic wiki surfacing features, domains, entities, capabilities, and delivered value.",
+          "sources": [
+            {
+              "file": ".env.example",
+              "lines": [
+                1,
+                2
+              ],
+              "fingerprint": "2e493dbd2d87"
+            },
+            {
+              "file": "README.md",
+              "lines": [
+                3,
+                3
+              ],
+              "fingerprint": "996c401d036d"
+            },
+            {
+              "file": "TESTING-AND-DEMO.md",
+              "lines": [
+                1,
+                6
+              ],
+              "fingerprint": "3b93f710ebca"
+            },
+            {
+              "file": "wikifi/cli.py",
+              "lines": [
+                1,
+                8
+              ],
+              "fingerprint": "f326383c7da1"
+            },
+            {
+              "file": "wikifi/config.py",
+              "lines": [
+                1,
+                8
+              ],
+              "fingerprint": "8cd2ca53c957"
+            }
+          ]
+        },
+        {
+          "text": "The wiki includes domain entities and capabilities, API contracts and integration touchpoints, and cross-cutting concerns extracted from source files.",
+          "sources": [
+            {
+              "file": "README.md",
+              "lines": [
+                3,
+                3
+              ],
+              "fingerprint": "996c401d036d"
+            },
+            {
+              "file": "TESTING-AND-DEMO.md",
+              "lines": [
+                1,
+                6
+              ],
+              "fingerprint": "3b93f710ebca"
+            },
+            {
+              "file": "wikifi/specialized/__init__.py",
+              "lines": [
+                1,
+                13
+              ],
+              "fingerprint": "84d6c382c745"
+            },
+            {
+              "file": "wikifi/specialized/openapi.py",
+              "lines": [
+                1,
+                11
+              ],
+              "fingerprint": "ae97781309c4"
+            },
+            {
+              "file": "wikifi/specialized/protobuf.py",
+              "lines": [
+                1,
+                8
+              ],
+              "fingerprint": "e20d5913745a"
+            }
+          ]
+        },
+        {
+          "text": "Certain wiki sections — personas, user stories, and diagrams — are synthesized from aggregated primary evidence because they cannot be inferred from individual files.",
+          "sources": [
+            {
+              "file": "wikifi/deriver.py",
+              "lines": [
+                1,
+                18
+              ],
+              "fingerprint": "0b7f4f5abb09"
+            },
+            {
+              "file": "wikifi/sections.py",
+              "lines": [
+                1,
+                19
+              ],
+              "fingerprint": "f743972a8fce"
+            }
+          ]
+        },
+        {
+          "text": "The goal is to make legacy intent explicit, complete, and portable so a fresh implementation retains full functional value without inheriting structural decisions.",
+          "sources": [
+            {
+              "file": "README.md",
+              "lines": [
+                3,
+                3
+              ],
+              "fingerprint": "996c401d036d"
+            },
+            {
+              "file": "VISION.md",
+              "lines": [
+                3,
+                9
+              ],
+              "fingerprint": "10651b456a64"
+            }
+          ]
+        },
+        {
+          "text": "The primary audience is migration teams who need to understand a system's domain well enough to re-implement it.",
+          "sources": [
+            {
+              "file": "CLAUDE.md",
+              "lines": [
+                73,
+                75
+              ],
+              "fingerprint": "ac9698d91de6"
+            },
+            {
+              "file": "VISION.md",
+              "lines": [
+                3,
+                9
+              ],
+              "fingerprint": "10651b456a64"
+            },
+            {
+              "file": "VISION.md",
+              "lines": [
+                86,
+                89
+              ],
+              "fingerprint": "10651b456a64"
+            },
+            {
+              "file": "wikifi/critic.py",
+              "lines": [
+                1,
+                15
+              ],
+              "fingerprint": "502af9aee392"
+            }
+          ]
+        },
+        {
+          "text": "Users can also interrogate the generated wiki conversationally, with every answer grounded in the extracted sections rather than invented detail.",
+          "sources": [
+            {
+              "file": "wikifi/chat.py",
+              "lines": [
+                1,
+                32
+              ],
+              "fingerprint": "0333e700a046"
+            }
+          ]
+        },
+        {
+          "text": "wikifi is explicitly a feature-extraction tool, not a transposition tool — it surfaces what the legacy system does and leaves all target architecture decisions to the migration team.",
+          "sources": [
+            {
+              "file": "CLAUDE.md",
+              "lines": [
+                73,
+                75
+              ],
+              "fingerprint": "ac9698d91de6"
+            },
+            {
+              "file": "VISION.md",
+              "lines": [
+                86,
+                89
+              ],
+              "fingerprint": "10651b456a64"
+            }
+          ]
+        },
+        {
+          "text": "All output is expressed in domain terms, never in terms of the implementation technology found in the source.",
+          "sources": [
+            {
+              "file": "CLAUDE.md",
+              "lines": [
+                73,
+                75
+              ],
+              "fingerprint": "ac9698d91de6"
+            },
+            {
+              "file": "README.md",
+              "lines": [
+                3,
+                3
+              ],
+              "fingerprint": "996c401d036d"
+            },
+            {
+              "file": "VISION.md",
+              "lines": [
+                86,
+                89
+              ],
+              "fingerprint": "10651b456a64"
+            },
+            {
+              "file": "wikifi/cli.py",
+              "lines": [
+                1,
+                8
+              ],
+              "fingerprint": "f326383c7da1"
+            }
+          ]
+        },
+        {
+          "text": "The system prioritises documentation quality over processing speed.",
+          "sources": [
+            {
+              "file": ".env.example",
+              "lines": [
+                1,
+                2
+              ],
+              "fingerprint": "2e493dbd2d87"
+            },
+            {
+              "file": "wikifi/config.py",
+              "lines": [
+                1,
+                8
+              ],
+              "fingerprint": "8cd2ca53c957"
+            }
+          ]
+        },
+        {
+          "text": "The system is designed to handle repositories of arbitrary size, including legacy monorepos with tens of thousands of files, through caching and chunking.",
+          "sources": [
+            {
+              "file": "wikifi/cache.py",
+              "lines": [
+                1,
+                21
+              ],
+              "fingerprint": "1ba541fe863d"
+            },
+            {
+              "file": "wikifi/config.py",
+              "lines": [
+                1,
+                8
+              ],
+              "fingerprint": "8cd2ca53c957"
+            },
+            {
+              "file": "wikifi/extractor.py",
+              "lines": [
+                1,
+                37
+              ],
+              "fingerprint": "b0e939259557"
+            }
+          ]
+        },
+        {
+          "text": "Every assertion in the generated wiki must trace back to specific source files and locations so architects can verify any claim against the original codebase.",
+          "sources": [
+            {
+              "file": "wikifi/aggregator.py",
+              "lines": [
+                1,
+                15
+              ],
+              "fingerprint": "c5f76cb7c4a3"
+            },
+            {
+              "file": "wikifi/evidence.py",
+              "lines": [
+                1,
+                18
+              ],
+              "fingerprint": "dddfe1a01c85"
+            }
+          ]
+        },
+        {
+          "text": "Where source files contain conflicting signals, the system surfaces those contradictions explicitly rather than silently resolving them.",
+          "sources": [
+            {
+              "file": "wikifi/aggregator.py",
+              "lines": [
+                1,
+                15
+              ],
+              "fingerprint": "c5f76cb7c4a3"
+            }
+          ]
+        }
+      ],
+      "contradictions": []
+    },
+    "capabilities": {
+      "notes_hash": "4a4c91043bca",
+      "body": "wikifi analyzes any target codebase and produces a structured, technology-agnostic wiki that captures domain knowledge, system intent, capabilities, external dependencies, integrations, cross-cutting concerns, core entities, and hard specifications — expressed entirely in domain terms rather than in the language of a specific technology stack.\n\n## Workspace Initialization\n\nBefore analysis begins, the system bootstraps a wiki workspace inside the target project in an idempotent manner, creating the required directory structure, a configuration file, version-control ignore rules, and one placeholder document per defined section. Repeat invocations leave already-existing artifacts untouched.\n\n## Codebase Analysis Pipeline\n\nThe core pipeline runs in four ordered stages:\n\n1. **Repository introspection** — The system compresses the repository's directory layout and reads key manifest files, then uses this compact view to classify every path as either worth walking (production source, business logic, integrations, domain models) or worth skipping (vendored dependencies, build output, tests, CI/CD). The classification is returned as a structured, diffable result.\n\n2. **Per-file extraction** — Every in-scope file is routed through one of three extraction paths:\n   - *Cache replay* — if a file's content is unchanged since the last run, previously stored findings are reused without any further processing.\n   - *Deterministic schema parsing* — files recognised as structured schema artifacts (SQL DDL, database migrations, API contract specs, interface definition files, and graph schema files) are processed by purpose-built parsers that produce findings about entities, relationships, operations, and constraints without invoking an AI model.\n   - *AI-assisted extraction* — all remaining files pass through an AI extraction pass; large files are recursively split into overlapping chunks so no content is missed regardless of size.\n\n   Every finding carries a source citation — the originating file path, an inclusive line range, and a content fingerprint — enabling full traceability back to the codebase.\n\n3. **Cross-file context enrichment** — In parallel with extraction, the system builds an import and reference graph across the entire in-scope file set. Each file's neighborhood (the files it depends on and the files that depend on it) is injected into its extraction prompt, enabling findings to describe inter-file flows rather than treating each file in isolation.\n\n4. **Section aggregation** — Per-file findings are grouped by their target wiki section and synthesised into readable markdown bodies. Every asserted claim is backed by numbered citations pointing to the originating files and line ranges. Where two or more files make incompatible assertions about the same topic, the system surfaces the conflict explicitly in a dedicated *Conflicts in source* block rather than silently resolving it — a deliberate feature for legacy codebases where disagreements encode high-priority migration signals.\n\n## Wiki Structure\n\nThe generated wiki is organised into **eleven sections**: eight primary sections populated directly from per-file evidence, and three derivative sections synthesised from the completed primaries:\n\n| Section type | Sections |\n|---|---|\n| Primary (8) | Business domains, system intent, capabilities, external dependencies, integrations, cross-cutting concerns, core entities, hard specifications |\n| Derivative (3) | User personas, Gherkin-style user stories, Mermaid architectural diagrams |\n\nDerivative sections are only generated after the primaries they depend on are finalised. If upstream primary sections are empty or missing, the system writes a placeholder that declares the gap rather than fabricating content.\n\n## Quality Assurance\n\nAn optional critic-and-reviser pass evaluates any synthesised section against its brief and the upstream evidence it drew from, producing a structured quality score (0–10) with itemised unsupported claims, gaps, and suggested edits. When a section scores below a configurable threshold, a revision is automatically invoked; the revision is accepted only if it matches or improves the original score, preventing regressions. This loop is particularly valuable for derivative sections — personas and user stories — where single-shot synthesis is most prone to introducing unsupported assertions.\n\n## Incremental and Resumable Walks\n\nThe pipeline uses a two-scope content-addressed cache: per-file extraction results are keyed to a combination of file path and content fingerprint, and per-section aggregation results are keyed to a digest of the contributing notes payload. Only changed files and affected sections are reprocessed on incremental runs. Because results are persisted after every completed file, an interrupted walk resumes from the last unprocessed file rather than restarting from scratch. The cache can also be fully invalidated to force a clean re-walk.\n\n## Coverage and Quality Reporting\n\nA report command produces a human-readable markdown table summarising every wiki section by contributing file count, finding count, body size, optional critic-derived quality score, and the highest-priority content gap identified by the critic. Coverage statistics also surface *dead zones* — files that were processed but produced no findings — so teams can identify blind spots in the analysis.\n\n## Interactive Knowledge Querying\n\nOnce a wiki has been generated, users can open an interactive conversational session grounded in all populated sections. The session supports multi-turn exchanges, conversation history reset, and introspection of which sections are currently loaded as context. Only meaningfully populated sections are included, ensuring the assistant is not grounded in placeholder content.\n\n## Graceful Degradation\n\nWhen AI synthesis fails for a section, the system falls back to emitting the raw collected notes directly in the section body, preserving information at the cost of polish and surfacing the error inline. Similarly, unparseable schema files produce an advisory finding directing reviewers to inspect the file manually rather than silently failing.",
+      "claims": [
+        {
+          "text": "wikifi analyzes a target codebase and produces a technology-agnostic wiki covering DDD domains, intent, capabilities, external dependencies, integrations, cross-cutting concerns, core entities, and hard specifications.",
+          "sources": [
+            {
+              "file": "VISION.md",
+              "lines": [
+                6,
+                8
+              ],
+              "fingerprint": "10651b456a64"
+            },
+            {
+              "file": "wikifi/sections.py",
+              "lines": [
+                44,
+                142
+              ],
+              "fingerprint": "f743972a8fce"
+            }
+          ]
+        },
+        {
+          "text": "The system bootstraps a wiki workspace inside the target project in an idempotent manner, creating directory structure, configuration, version-control ignore rules, and one placeholder document per section.",
+          "sources": [
+            {
+              "file": "README.md",
+              "lines": [
+                14,
+                24
+              ],
+              "fingerprint": "996c401d036d"
+            },
+            {
+              "file": "wikifi/orchestrator.py",
+              "lines": [
+                62,
+                76
+              ],
+              "fingerprint": "6ed682a87356"
+            },
+            {
+              "file": "wikifi/wiki.py",
+              "lines": [
+                64,
+                86
+              ],
+              "fingerprint": "9230b7444e0d"
+            }
+          ]
+        },
+        {
+          "text": "Stage 1 introspects the repository by compressing its directory layout and reading manifest files, then classifies paths as worth walking or worth skipping.",
+          "sources": [
+            {
+              "file": "wikifi/introspection.py",
+              "lines": [
+                28,
+                44
+              ],
+              "fingerprint": "59cd5940f72e"
+            },
+            {
+              "file": "wikifi/introspection.py",
+              "lines": [
+                61,
+                70
+              ],
+              "fingerprint": "59cd5940f72e"
+            },
+            {
+              "file": "wikifi/walker.py",
+              "lines": [
+                92,
+                186
+              ],
+              "fingerprint": "a29bd1ad8bdb"
+            }
+          ]
+        },
+        {
+          "text": "Per-file extraction routes each file through one of three paths: cache replay, deterministic schema parsing, or AI-assisted extraction with chunking for large files.",
+          "sources": [
+            {
+              "file": "wikifi/extractor.py",
+              "lines": [
+                140,
+                200
+              ],
+              "fingerprint": "b0e939259557"
+            },
+            {
+              "file": "wikifi/cache.py",
+              "lines": [
+                5,
+                8
+              ],
+              "fingerprint": "1ba541fe863d"
+            }
+          ]
+        },
+        {
+          "text": "Structured schema artifacts — SQL DDL, migrations, API contract specs, interface definition files, and graph schema files — are processed by purpose-built deterministic parsers without invoking an AI model.",
+          "sources": [
+            {
+              "file": "README.md",
+              "lines": [
+                34,
+                36
+              ],
+              "fingerprint": "996c401d036d"
+            },
+            {
+              "file": "TESTING-AND-DEMO.md",
+              "lines": [
+                116,
+                149
+              ],
+              "fingerprint": "3b93f710ebca"
+            },
+            {
+              "file": "wikifi/config.py",
+              "lines": [
+                75,
+                81
+              ],
+              "fingerprint": "8cd2ca53c957"
+            },
+            {
+              "file": "wikifi/extractor.py",
+              "lines": [
+                140,
+                200
+              ],
+              "fingerprint": "b0e939259557"
+            },
+            {
+              "file": "wikifi/repograph.py",
+              "lines": [
+                41,
+                52
+              ],
+              "fingerprint": "3d8bbdb10112"
+            },
+            {
+              "file": "wikifi/specialized/__init__.py",
+              "lines": [
+                46,
+                57
+              ],
+              "fingerprint": "84d6c382c745"
+            },
+            {
+              "file": "wikifi/specialized/sql.py",
+              "lines": [
+                56,
+                62
+              ],
+              "fingerprint": "1ef5e77c4038"
+            }
+          ]
+        },
+        {
+          "text": "Every finding carries a source citation including file path, line range, and content fingerprint.",
+          "sources": [
+            {
+              "file": "wikifi/extractor.py",
+              "lines": [
+                251,
+                270
+              ],
+              "fingerprint": "b0e939259557"
+            },
+            {
+              "file": "TESTING-AND-DEMO.md",
+              "lines": [
+                40,
+                66
+              ],
+              "fingerprint": "3b93f710ebca"
+            },
+            {
+              "file": "wikifi/aggregator.py",
+              "lines": [
+                1,
+                15
+              ],
+              "fingerprint": "c5f76cb7c4a3"
+            }
+          ]
+        },
+        {
+          "text": "The system builds an import and reference graph across the in-scope file set and injects each file's neighborhood into its extraction prompt.",
+          "sources": [
+            {
+              "file": "TESTING-AND-DEMO.md",
+              "lines": [
+                90,
+                114
+              ],
+              "fingerprint": "3b93f710ebca"
+            },
+            {
+              "file": "wikifi/config.py",
+              "lines": [
+                69,
+                74
+              ],
+              "fingerprint": "8cd2ca53c957"
+            },
+            {
+              "file": "wikifi/extractor.py",
+              "lines": [
+                241,
+                246
+              ],
+              "fingerprint": "b0e939259557"
+            },
+            {
+              "file": "wikifi/repograph.py",
+              "lines": [
+                155,
+                210
+              ],
+              "fingerprint": "3d8bbdb10112"
+            }
+          ]
+        },
+        {
+          "text": "Per-file findings are synthesised into readable markdown section bodies with every claim backed by numbered citations.",
+          "sources": [
+            {
+              "file": "wikifi/aggregator.py",
+              "lines": [
+                1,
+                15
+              ],
+              "fingerprint": "c5f76cb7c4a3"
+            },
+            {
+              "file": "wikifi/evidence.py",
+              "lines": [
+                88,
+                121
+              ],
+              "fingerprint": "dddfe1a01c85"
+            }
+          ]
+        },
+        {
+          "text": "Where two or more files make incompatible assertions about the same topic, the system surfaces the conflict explicitly in a 'Conflicts in source' block rather than silently resolving it.",
+          "sources": [
+            {
+              "file": "wikifi/aggregator.py",
+              "lines": [
+                9,
+                14
+              ],
+              "fingerprint": "c5f76cb7c4a3"
+            },
+            {
+              "file": "wikifi/evidence.py",
+              "lines": [
+                13,
+                17
+              ],
+              "fingerprint": "dddfe1a01c85"
+            },
+            {
+              "file": "TESTING-AND-DEMO.md",
+              "lines": [
+                40,
+                66
+              ],
+              "fingerprint": "3b93f710ebca"
+            }
+          ]
+        },
+        {
+          "text": "The wiki is organised into eight primary sections and three derivative sections (user personas, Gherkin-style user stories, and Mermaid diagrams).",
+          "sources": [
+            {
+              "file": "wikifi/sections.py",
+              "lines": [
+                44,
+                142
+              ],
+              "fingerprint": "f743972a8fce"
+            },
+            {
+              "file": "VISION.md",
+              "lines": [
+                53,
+                63
+              ],
+              "fingerprint": "10651b456a64"
+            },
+            {
+              "file": "wikifi/deriver.py",
+              "lines": [
+                73,
+                107
+              ],
+              "fingerprint": "0b7f4f5abb09"
+            }
+          ]
+        },
+        {
+          "text": "Derivative sections are only generated after the primaries they depend on are finalised; if upstream sections are empty, a placeholder is written rather than fabricating content.",
+          "sources": [
+            {
+              "file": "wikifi/deriver.py",
+              "lines": [
+                73,
+                107
+              ],
+              "fingerprint": "0b7f4f5abb09"
+            },
+            {
+              "file": "wikifi/sections.py",
+              "lines": [
+                44,
+                142
+              ],
+              "fingerprint": "f743972a8fce"
+            }
+          ]
+        },
+        {
+          "text": "An optional critic-and-reviser pass evaluates sections against a quality rubric, scoring them 0–10, and invokes a revision only when the score is below a configurable threshold, accepting the revision only if it matches or improves the original score.",
+          "sources": [
+            {
+              "file": "TESTING-AND-DEMO.md",
+              "lines": [
+                151,
+                164
+              ],
+              "fingerprint": "3b93f710ebca"
+            },
+            {
+              "file": "wikifi/config.py",
+              "lines": [
+                83,
+                94
+              ],
+              "fingerprint": "8cd2ca53c957"
+            },
+            {
+              "file": "wikifi/critic.py",
+              "lines": [
+                100,
+                153
+              ],
+              "fingerprint": "502af9aee392"
+            },
+            {
+              "file": "wikifi/deriver.py",
+              "lines": [
+                90,
+                103
+              ],
+              "fingerprint": "0b7f4f5abb09"
+            }
+          ]
+        },
+        {
+          "text": "The pipeline uses a two-scope content-addressed cache — per-file and per-section — so only changed files and affected sections are reprocessed on incremental runs.",
+          "sources": [
+            {
+              "file": "TESTING-AND-DEMO.md",
+              "lines": [
+                67,
+                88
+              ],
+              "fingerprint": "3b93f710ebca"
+            },
+            {
+              "file": "wikifi/cache.py",
+              "lines": [
+                5,
+                8
+              ],
+              "fingerprint": "1ba541fe863d"
+            },
+            {
+              "file": "wikifi/cache.py",
+              "lines": [
+                9,
+                12
+              ],
+              "fingerprint": "1ba541fe863d"
+            },
+            {
+              "file": "wikifi/config.py",
+              "lines": [
+                63,
+                68
+              ],
+              "fingerprint": "8cd2ca53c957"
+            }
+          ]
+        },
+        {
+          "text": "Interrupted walks are resumable because per-file results are persisted incrementally; the cache can also be fully invalidated to force a clean re-walk.",
+          "sources": [
+            {
+              "file": "wikifi/cache.py",
+              "lines": [
+                14,
+                18
+              ],
+              "fingerprint": "1ba541fe863d"
+            },
+            {
+              "file": "wikifi/cache.py",
+              "lines": [
+                105,
+                113
+              ],
+              "fingerprint": "1ba541fe863d"
+            },
+            {
+              "file": "README.md",
+              "lines": [
+                16,
+                20
+              ],
+              "fingerprint": "996c401d036d"
+            },
+            {
+              "file": "wikifi/cli.py",
+              "lines": [
+                88,
+                112
+              ],
+              "fingerprint": "f326383c7da1"
+            }
+          ]
+        },
+        {
+          "text": "A report command produces a markdown table summarising every wiki section by file count, finding count, body size, quality score, and highest-priority content gap.",
+          "sources": [
+            {
+              "file": "README.md",
+              "lines": [
+                21,
+                23
+              ],
+              "fingerprint": "996c401d036d"
+            },
+            {
+              "file": "TESTING-AND-DEMO.md",
+              "lines": [
+                166,
+                186
+              ],
+              "fingerprint": "3b93f710ebca"
+            },
+            {
+              "file": "wikifi/critic.py",
+              "lines": [
+                155,
+                180
+              ],
+              "fingerprint": "502af9aee392"
+            },
+            {
+              "file": "wikifi/report.py",
+              "lines": [
+                44,
+                77
+              ],
+              "fingerprint": "2b94c0a5e62e"
+            }
+          ]
+        },
+        {
+          "text": "Coverage statistics surface dead zones — files processed but producing no findings.",
+          "sources": [
+            {
+              "file": "wikifi/report.py",
+              "lines": [
+                103,
+                107
+              ],
+              "fingerprint": "2b94c0a5e62e"
+            }
+          ]
+        },
+        {
+          "text": "An interactive conversational session grounded in all populated wiki sections supports multi-turn exchanges and various session management commands.",
+          "sources": [
+            {
+              "file": "README.md",
+              "lines": [
+                24,
+                25
+              ],
+              "fingerprint": "996c401d036d"
+            },
+            {
+              "file": "wikifi/chat.py",
+              "lines": [
+                88,
+                130
+              ],
+              "fingerprint": "0333e700a046"
+            },
+            {
+              "file": "wikifi/chat.py",
+              "lines": [
+                63,
+                82
+              ],
+              "fingerprint": "0333e700a046"
+            },
+            {
+              "file": "wikifi/cli.py",
+              "lines": [
+                60,
+                220
+              ],
+              "fingerprint": "f326383c7da1"
+            }
+          ]
+        },
+        {
+          "text": "When AI synthesis fails for a section, the system falls back to emitting raw collected notes with the error message inline.",
+          "sources": [
+            {
+              "file": "wikifi/aggregator.py",
+              "lines": [
+                272,
+                285
+              ],
+              "fingerprint": "c5f76cb7c4a3"
+            }
+          ]
+        },
+        {
+          "text": "Unparseable schema files produce an advisory finding rather than failing silently.",
+          "sources": [
+            {
+              "file": "wikifi/specialized/openapi.py",
+              "lines": [
+                23,
+                50
+              ],
+              "fingerprint": "ae97781309c4"
+            }
+          ]
+        }
+      ],
+      "contradictions": []
+    },
+    "external_dependencies": {
+      "notes_hash": "ba55342df61c",
+      "body": "The system draws on several categories of external service: language-model inference backends, development-time tooling integrations, and a continuous-integration platform.\n\n## Language-Model Inference\n\nAll substantive text generation and structured extraction is delegated to an external (or locally hosted) language-model service. Three backends are supported through a common provider abstraction:\n\n| Backend | Hosting | Authentication | Role |\n|---|---|---|---|\n| Local inference server (default) | Self-hosted, no network egress | None required | Default backend for all extraction and synthesis calls; configurable host address and 15-minute per-call timeout |\n| Hosted AI service A (Anthropic) | Cloud API | API key (`ANTHROPIC_API_KEY`) | Opt-in backend; uses an ephemeral prompt-cache marker on the system prompt so that large extraction prompts are billed at roughly 10 % of normal input-token cost across repeated per-file calls |\n| Hosted AI service B (OpenAI-compatible) | Cloud API (or compatible proxy/Azure endpoint) | API key + optional custom base URL | Opt-in backend; relies on automatic prefix caching (prefixes ≥ 1 024 tokens cached for ~5–10 minutes); exposes a reasoning-intensity knob mapped to the backend's reasoning-effort parameter on capable model variants |\n\nThe local inference server is the default and requires no credentials or external network access. The two hosted backends are opt-in and each require a provisioned API key. All three backends are configured with a model name, timeout, and per-call output-token cap drawn from the application's runtime settings.\n\n### Caching Strategy\nBecause the extraction prompt is large and is reused across every file in a repository, minimising repeated billing for identical prompt prefixes is a first-class concern. The hosted-AI-service-A integration achieves this by tagging the system-prompt block with an ephemeral cache-control marker. The hosted-AI-service-B integration relies on the provider's automatic prefix-caching mechanism without requiring explicit markers.\n\n## Development-Time Tool Integrations\n\nThe MCP server configuration reveals several additional integrations that appear to be used during development or agent-assisted workflows rather than in the core production pipeline:\n\n- **Google AI generative API** — consumed by at least two registered tool integrations; authenticated via a shared API key.\n- **Self-hosted web-crawling service** — running locally on a fixed port with no API key, providing crawling capability on demand.\n- **External documentation/context lookup service** — called over HTTP with a dedicated API key; likely used to retrieve up-to-date reference documentation for prompt enrichment.\n- **Google-hosted orchestration service (",
+      "claims": [],
+      "contradictions": []
+    },
+    "integrations": {
+      "notes_hash": "dc7982e6a028",
+      "body": "### Inbound: Entry Points into the System\n\nThe system is distributed as a library installed directly into a target project. The command-line interface (CLI) is the primary inbound entry point, exposing subcommands that drive the full pipeline from repository introspection through wiki generation, interactive querying, and quality reporting. The CLI delegates all pipeline coordination to the orchestrator, which is also the central hub wiring together every downstream stage.\n\n---\n\n### Outbound: AI Model Backends\n\nAll pipeline stages — introspection, per-file extraction, section aggregation, derivative content derivation, quality critique, and interactive chat — communicate with an AI model backend exclusively through a shared provider abstraction. No stage calls a specific backend directly. Three interaction shapes are exposed through this abstraction: schema-validated structured output, free-text completion, and multi-turn stateful conversation.\n\nThree backends are available and are interchangeable without altering any pipeline code:\n\n| Backend type | Hosting model |\n|---|---|\n| Local self-hosted inference runtime | On-premise / developer machine |\n| Hosted AI service (Anthropic-compatible) | Remote cloud |\n| Hosted AI service (OpenAI-compatible) | Remote cloud or self-managed endpoint |\n\nThe active backend is selected via an environment variable or a per-invocation flag at the CLI level. OpenAI-compatible endpoints — including corporate reverse proxies and managed cloud deployments — are supported by overriding the base URL alone, with no other changes to the calling code.\n\n---\n\n### Outbound: Development-Time Tool Servers (MCP)\n\nA separate set of external capability providers is declared through an MCP client configuration used during development or runtime. Four tool servers are wired up: a local AI utility, a local web crawler, a remote documentation-context service, and a remote search-and-stitching service. The system acts as an MCP client that fans requests out to these providers as needed.\n\n---\n\n### Outbound: Filesystem and Persistence Layer\n\nAll reading and writing of wiki artifacts — extraction notes, finished section bodies, and cache entries — flows through a centralized layout abstraction that manages the `.wikifi/` output directory inside the target project. The extractor, aggregator, deriver, CLI, and orchestrator all resolve paths through this abstraction rather than independently.\n\nA content-addressed cache layer sits between the orchestrator and the AI backend, consulting a fingerprinting service to derive content hashes as cache keys. The extractor, aggregator, and orchestrator each consult the cache before issuing AI calls, enabling both incremental re-runs and resumability for large codebases.\n\n---\n\n### Integration Touchpoints Discovered in Target Codebases\n\nWhen analyzing a target codebase, the system identifies and surfaces integration touchpoints from high-signal artifact files through specialized parsers:\n\n- **HTTP API surfaces** — Parsed from API contract files; each contract contributes a finding recording the count of externally exposed endpoints, establishing the public-facing API surface as a documented integration point.\n- **RPC service definitions** — Each declared service and its remote procedures are mapped, capturing procedure names, request and response message types, and whether either channel is streaming.\n- **Event-driven channels** — Subscription roots found in schema definition files are classified as real-time integration touchpoints rather than ordinary capabilities, reflecting their role as channels that external consumers attach to.\n- **Relational links** — Foreign key declarations (both explicit and inline) are surfaced as hard relational links between domain entities, identifying cross-entity data dependencies.\n\nThe dispatcher that routes files to these specialized parsers uses the file-kind classification produced by the repository graph module, ensuring each artifact type reaches the appropriate parser while preserving a uniform output contract for downstream aggregation.",
+      "claims": [
+        {
+          "text": "The system is distributed as a library installed into a target project and invoked via a CLI from that project's root.",
+          "sources": [
+            {
+              "file": "README.md",
+              "lines": [
+                8,
+                12
+              ],
+              "fingerprint": "996c401d036d"
+            }
+          ]
+        },
+        {
+          "text": "The CLI is the primary inbound entry point, exposing subcommands that drive the full pipeline from introspection through wiki generation, chat, and reporting.",
+          "sources": [
+            {
+              "file": "wikifi/cli.py",
+              "lines": [
+                98,
+                101
+              ],
+              "fingerprint": "f326383c7da1"
+            }
+          ]
+        },
+        {
+          "text": "The orchestrator is the central hub called by the CLI that wires together all pipeline stages.",
+          "sources": [
+            {
+              "file": "wikifi/orchestrator.py",
+              "lines": [
+                40,
+                60
+              ],
+              "fingerprint": "6ed682a87356"
+            }
+          ]
+        },
+        {
+          "text": "All pipeline stages communicate with an AI model backend exclusively through a shared provider abstraction; no stage calls a specific backend directly.",
+          "sources": [
+            {
+              "file": "wikifi/providers/base.py",
+              "lines": [
+                30,
+                48
+              ],
+              "fingerprint": "2750f0f56327"
+            }
+          ]
+        },
+        {
+          "text": "Three interaction shapes are exposed through the provider abstraction: schema-validated structured output, free-text completion, and multi-turn stateful conversation.",
+          "sources": [
+            {
+              "file": "wikifi/providers/anthropic_provider.py",
+              "lines": [
+                115,
+                175
+              ],
+              "fingerprint": "872020d40ac3"
+            },
+            {
+              "file": "wikifi/providers/base.py",
+              "lines": [
+                30,
+                48
+              ],
+              "fingerprint": "2750f0f56327"
+            },
+            {
+              "file": "wikifi/providers/ollama_provider.py",
+              "lines": [
+                58,
+                95
+              ],
+              "fingerprint": "0a21916665a5"
+            },
+            {
+              "file": "wikifi/providers/openai_provider.py",
+              "lines": [
+                1,
+                8
+              ],
+              "fingerprint": "428df9ba13f1"
+            }
+          ]
+        },
+        {
+          "text": "Three interchangeable backends are available: a local self-hosted inference runtime, an Anthropic-hosted service, and an OpenAI-compatible service.",
+          "sources": [
+            {
+              "file": "README.md",
+              "lines": [
+                46,
+                51
+              ],
+              "fingerprint": "996c401d036d"
+            },
+            {
+              "file": "wikifi/cli.py",
+              "lines": [
+                98,
+                101
+              ],
+              "fingerprint": "f326383c7da1"
+            },
+            {
+              "file": "wikifi/providers/anthropic_provider.py",
+              "lines": [
+                115,
+                175
+              ],
+              "fingerprint": "872020d40ac3"
+            },
+            {
+              "file": "wikifi/providers/ollama_provider.py",
+              "lines": [
+                58,
+                95
+              ],
+              "fingerprint": "0a21916665a5"
+            },
+            {
+              "file": "wikifi/providers/openai_provider.py",
+              "lines": [
+                1,
+                8
+              ],
+              "fingerprint": "428df9ba13f1"
+            }
+          ]
+        },
+        {
+          "text": "The active backend is selected via an environment variable or a per-invocation flag.",
+          "sources": [
+            {
+              "file": "README.md",
+              "lines": [
+                46,
+                51
+              ],
+              "fingerprint": "996c401d036d"
+            },
+            {
+              "file": "wikifi/cli.py",
+              "lines": [
+                98,
+                101
+              ],
+              "fingerprint": "f326383c7da1"
+            }
+          ]
+        },
+        {
+          "text": "OpenAI-compatible endpoints including corporate reverse proxies and managed cloud deployments are supported by overriding the base URL only, with no other code changes.",
+          "sources": [
+            {
+              "file": "TESTING-AND-DEMO.md",
+              "lines": [
+                232,
+                235
+              ],
+              "fingerprint": "3b93f710ebca"
+            }
+          ]
+        },
+        {
+          "text": "An MCP client configuration wires up four external tool servers: a local AI utility, a local web crawler, a remote documentation-context service, and a remote search-and-stitching service.",
+          "sources": [
+            {
+              "file": ".mcp.json",
+              "lines": [
+                2,
+                36
+              ],
+              "fingerprint": "b6b856cb3fe2"
+            }
+          ]
+        },
+        {
+          "text": "All wiki artifact persistence flows through a centralized layout abstraction managing the .wikifi/ directory, consumed by the orchestrator, extractor, aggregator, deriver, and CLI.",
+          "sources": [
+            {
+              "file": "wikifi/wiki.py",
+              "lines": [
+                34,
+                61
+              ],
+              "fingerprint": "9230b7444e0d"
+            }
+          ]
+        },
+        {
+          "text": "A content-addressed cache layer uses a fingerprinting service to compute content hashes as cache keys, and is consulted by the extractor, aggregator, and orchestrator before issuing AI calls.",
+          "sources": [
+            {
+              "file": "wikifi/cache.py",
+              "lines": [
+                244,
+                246
+              ],
+              "fingerprint": "1ba541fe863d"
+            },
+            {
+              "file": "wikifi/cache.py",
+              "lines": [
+                30,
+                30
+              ],
+              "fingerprint": "1ba541fe863d"
+            }
+          ]
+        },
+        {
+          "text": "API contract files are parsed to produce inbound-integration findings recording the count of HTTP endpoints exposed to external consumers.",
+          "sources": [
+            {
+              "file": "wikifi/specialized/openapi.py",
+              "lines": [
+                83,
+                92
+              ],
+              "fingerprint": "ae97781309c4"
+            }
+          ]
+        },
+        {
+          "text": "Service and RPC definition files are parsed to map each procedure, capturing name, request and response types, and streaming flags, with each service emitted as a distinct integration touchpoint.",
+          "sources": [
+            {
+              "file": "wikifi/specialized/protobuf.py",
+              "lines": [
+                70,
+                87
+              ],
+              "fingerprint": "e20d5913745a"
+            }
+          ]
+        },
+        {
+          "text": "Subscription roots in schema definition files are classified as real-time integration touchpoints rather than ordinary capabilities.",
+          "sources": [
+            {
+              "file": "wikifi/specialized/graphql.py",
+              "lines": [
+                88,
+                91
+              ],
+              "fingerprint": "bbb305e0d47f"
+            }
+          ]
+        },
+        {
+          "text": "Foreign key declarations are surfaced as hard relational links between domain entities.",
+          "sources": [
+            {
+              "file": "wikifi/specialized/sql.py",
+              "lines": [
+                86,
+                96
+              ],
+              "fingerprint": "1ef5e77c4038"
+            }
+          ]
+        },
+        {
+          "text": "The specialized-parser dispatcher uses the file-kind classification from the repository graph module and routes to four sibling parsers while preserving a uniform output contract.",
+          "sources": [
+            {
+              "file": "wikifi/specialized/__init__.py",
+              "lines": [
+                46,
+                57
+              ],
+              "fingerprint": "84d6c382c745"
+            }
+          ]
+        }
+      ],
+      "contradictions": []
+    },
+    "cross_cutting": {
+      "notes_hash": "9142920419c0",
+      "body": "## Observability\n\nA consistent, pipeline-wide observability model spans every stage of the system. Structured logging is initialised once and reused across all subcommands; a single verbose flag activates debug-level output globally without each subsystem needing its own toggle. Stage-boundary log events are emitted at each major transition — repository introspection, dependency-graph construction, file extraction, section aggregation, and derivative synthesis — so operators can pinpoint where a long walk is spending time. Revision and quality-scoring events are counted in the run's statistics, and cache hit counts are surfaced in the post-walk report, giving a quantitative picture of incremental efficiency.\n\n## Resilience and Error Handling\n\nThe system is designed so that no single failure can abort an entire pipeline run. Extraction failures — whether caused by an inference provider or a specialised deterministic parser — are logged and tallied but never propagated upward; a file whose processing fails entirely is recorded as skipped, and partially-recovered files retain whatever findings were salvaged. Aggregation and derivation failures follow the same pattern: errors are caught and logged at warning level, and a fallback body that preserves the raw upstream evidence is written so the wiki remains inspectable. Quality-assurance (critic and reviser) failures degrade gracefully to returning the original body with a diagnostic score of zero rather than halting. Provider failures during interactive query sessions are surfaced inline without terminating the session. Across all provider backends, raw infrastructure errors are caught at the provider boundary and re-raised as a normalised internal error type carrying the upstream request identifier when available, so the rest of the pipeline does not branch on provider-specific exception shapes.\n\n## Content-Addressed Caching and Crash Resumability\n\nAll expensive inference work is protected by a two-scope content-addressed cache stored under a dedicated hidden subdirectory within the wiki output directory, inheriting the same version-control ignore rules as other working-state artifacts.\n\n- **Extraction scope:** each file's results are keyed by the combination of its relative path and a stable hash of its raw bytes. Any unchanged file is skipped on re-walk with no inference call.\n- **Aggregation scope:** each section's synthesised body is keyed by a deterministic digest of its note payload. Unchanged inputs reuse the stored body and evidence bundle.\n\nCache entries are written after every individual file completes, so a mid-walk crash loses at most one file's work. Writes are performed atomically — content is first written to a temporary location and then renamed into place — preventing corrupt partial writes. Malformed entries are silently dropped and logged rather than causing a hard failure, so a partially corrupt cache degrades gracefully to a fresh extraction for only the affected entries. A monotonically increasing version tag is embedded in every persisted cache file; a version mismatch on load causes the entire cache to be discarded and rebuilt, providing a controlled invalidation path across software upgrades. Between runs, entries for files no longer in scope are pruned automatically.\n\n## Input Integrity Guards\n\nA layered set of guards prevents low-signal or pathological inputs from ever reaching the inference layer.\n\n| Guard | Threshold | Effect |\n|---|---|---|\n| Minimum content size | 64 bytes (stripped) | File silently skipped |\n| Maximum file size | 2 MB | File silently skipped |\n| Large-file windowing | 150 KB – 2 MB | File split into overlapping chunks with 8 KB overlap |\n| Manifest truncation | 20 000 bytes | Hard-truncated with visible marker |\n| Per-request timeout | 900 seconds | Uniform backstop across all providers |\n\nDirectory traversal prunes excluded subtrees before descending into them, so ignore patterns are applied efficiently at the directory level rather than file-by-file. Files carrying no extractable intent — stub initialisers, empty fixtures, generated lockfiles — are identified and dropped before reaching the inference layer; the invariant that a single empty or unstructured file must never stall the walk is explicitly upheld. Findings produced from the overlap region between adjacent large-file chunks are deduplicated by section and normalised text within each file's pass, preventing double-counting in downstream aggregation.\n\n## Provider Abstraction\n\nAll inference calls — structured extraction, free-text generation, and multi-turn chat — are routed through a single provider abstraction layer. This boundary is where observability hooks, retry logic, error normalisation, and backend-switching concerns live; no extraction or aggregation logic needs knowledge of which backend is active. Supported backend shapes include local inference runtimes and hosted services; the local-inference path is the default, with hosted options as addenda, and swapping between them requires no changes outside the provider boundary.\n\nStructured-output calls enforce a schema-validation contract: the model response must be validated against a declared schema before being returned to the caller, ensuring type-safe data flows through every pipeline stage. To maximise determinism, temperature is hard-pinned to zero on all structured-output calls; free-text and conversational paths accept model-default variability in exchange for naturalness.\n\nWhen a backend exposes a reasoning-depth control, the system runs at the highest available setting, prioritising output quality over walk speed. A configurable depth parameter is translated into the provider's native adaptive-thinking feature, allowing callers to trade latency and cost against quality without branching on provider type in shared pipeline code.\n\nHosted backends employ prompt-caching strategies — placing the large, repeated system prompt at a fixed position in every request so the service can serve subsequent calls from a cached prefix — making large-scale walks economically viable by paying full input cost only on the first call and a fraction of that cost on subsequent ones.\n\n## Source Traceability and Hallucination Prevention\n\nFull source traceability is a non-negotiable structural invariant: every assertion in every wiki section must be linkable back to the originating file and, where available, the precise line range within it. This is enforced through typed evidence structures (claims and source references) rather than by convention, so the constraint cannot be silently bypassed.\n\nHallucination prevention operates at two additional levels. First, the inference prompt explicitly instructs the model never to name specific technologies, translating all observations into domain terms — this is a mandatory invariant enforced at the prompt layer. Second, upstream section content that matches known placeholder shapes is filtered out before derivative synthesis, preventing empty or stub sections from being treated as real evidence; these same sentinel strings are used by the quality-report layer to exclude placeholder sections from scoring. Interactive query sessions are similarly grounded: the assistant is instructed to explicitly acknowledge when the wiki does not cover a topic rather than generating unsupported answers.\n\nContent fingerprints serve a triple cross-cutting role: keying both extraction and aggregation caches so stale results are never served, anchoring source-evidence citations so claims can be re-verified against a fresh repository walk, and tracking file identity inside the dependency graph so cross-file context is invalidated when any contributing source changes. Files are always fingerprinted as raw bytes rather than decoded text to ensure the cache layer and the extractor agree on identity regardless of encoding assumptions.\n\n## Authentication and Storage Invariants\n\nSpecialised deterministic parsers extract security and data-integrity contracts from high-signal artifacts and surface them as first-class cross-cutting concerns that must be preserved through any migration:\n\n- **Authentication schemes** declared in API contract files are extracted and categorised by type, flagging which security contracts (key-based, delegated authorisation, bearer-token, etc.) the new system must honour.\n- **Data integrity constraints** — uniqueness and non-nullability — found in schema definitions are extracted as storage invariants explicitly marked as migration-critical.\n- **Query-performance invariants** — index definitions — are recorded with an explicit note that the new system must preserve equivalent access patterns.\n\nAll specialised parsers return results in the same structured shape as the general inference extractor, so the aggregation layer needs no knowledge of which extraction path was taken; this uniform interface contract is itself an invariant that must be preserved.\n\n## Data Storage Layout\n\nThe pipeline's working state is isolated to a single hidden directory within the repository:\n\n- **Rendered section documents** live at the root of this directory and are intended to be committed to version control.\n- **Per-section extraction notes** (JSONL, each record UTC-timestamped) are stored in a notes subdirectory and excluded from version control via a generated ignore file.\n- **Extraction and aggregation caches** are stored in a cache subdirectory and similarly excluded.\n\nDeleting the cache subdirectory forces a full re-walk; deleting the entire working directory resets all pipeline state. This layout ensures generated documentation commits remain clean and the boundary between committed outputs and ephemeral working state is unambiguous.",
+      "claims": [
+        {
+          "text": "A single verbose flag activates debug-level structured logging globally across all subcommands.",
+          "sources": [
+            {
+              "file": "wikifi/cli.py",
+              "lines": [
+                51,
+                60
+              ],
+              "fingerprint": "f326383c7da1"
+            }
+          ]
+        },
+        {
+          "text": "Stage-boundary log events are emitted at each major pipeline transition — introspection, dependency-graph construction, extraction, aggregation, and derivation.",
+          "sources": [
+            {
+              "file": "wikifi/orchestrator.py",
+              "lines": [
+                84,
+                148
+              ],
+              "fingerprint": "6ed682a87356"
+            }
+          ]
+        },
+        {
+          "text": "Revision and quality-scoring events are counted in run statistics, and cache hit counts are surfaced in the post-walk report.",
+          "sources": [
+            {
+              "file": "wikifi/cli.py",
+              "lines": [
+                90,
+                97
+              ],
+              "fingerprint": "f326383c7da1"
+            },
+            {
+              "file": "wikifi/deriver.py",
+              "lines": [
+                110,
+                135
+              ],
+              "fingerprint": "0b7f4f5abb09"
+            }
+          ]
+        },
+        {
+          "text": "Structured logging is initialised under a dedicated namespace for the report subsystem.",
+          "sources": [
+            {
+              "file": "wikifi/report.py",
+              "lines": [
+                22,
+                22
+              ],
+              "fingerprint": "2b94c0a5e62e"
+            }
+          ]
+        },
+        {
+          "text": "Extraction failures are logged and tallied but never propagate to abort the walk; a file whose processing fails entirely is recorded as skipped.",
+          "sources": [
+            {
+              "file": "wikifi/extractor.py",
+              "lines": [
+                228,
+                242
+              ],
+              "fingerprint": "b0e939259557"
+            }
+          ]
+        },
+        {
+          "text": "Aggregation failures are caught and logged at warning level, and a fallback body preserving raw notes is written.",
+          "sources": [
+            {
+              "file": "wikifi/aggregator.py",
+              "lines": [
+                143,
+                152
+              ],
+              "fingerprint": "c5f76cb7c4a3"
+            }
+          ]
+        },
+        {
+          "text": "Derivation failures are caught and logged; a fallback body preserving upstream evidence is written rather than leaving the section blank.",
+          "sources": [
+            {
+              "file": "wikifi/deriver.py",
+              "lines": [
+                96,
+                107
+              ],
+              "fingerprint": "0b7f4f5abb09"
+            }
+          ]
+        },
+        {
+          "text": "Quality-assurance failures degrade gracefully by returning the original body with a diagnostic score of zero.",
+          "sources": [
+            {
+              "file": "wikifi/critic.py",
+              "lines": [
+                158,
+                165
+              ],
+              "fingerprint": "502af9aee392"
+            }
+          ]
+        },
+        {
+          "text": "Provider failures during interactive sessions are surfaced inline without terminating the session.",
+          "sources": [
+            {
+              "file": "wikifi/chat.py",
+              "lines": [
+                120,
+                125
+              ],
+              "fingerprint": "0333e700a046"
+            }
+          ]
+        },
+        {
+          "text": "Raw infrastructure errors are caught at the provider boundary and re-raised as a normalised internal error type carrying the upstream request identifier.",
+          "sources": [
+            {
+              "file": "wikifi/providers/anthropic_provider.py",
+              "lines": [
+                238,
+                244
+              ],
+              "fingerprint": "872020d40ac3"
+            },
+            {
+              "file": "wikifi/providers/openai_provider.py",
+              "lines": [
+                248,
+                255
+              ],
+              "fingerprint": "428df9ba13f1"
+            }
+          ]
+        },
+        {
+          "text": "Extraction results are keyed by the combination of a file's relative path and a stable hash of its raw bytes; unchanged files are skipped on re-walk.",
+          "sources": [
+            {
+              "file": "README.md",
+              "lines": [
+                40,
+                43
+              ],
+              "fingerprint": "996c401d036d"
+            },
+            {
+              "file": "wikifi/fingerprint.py",
+              "lines": [
+                1,
+                18
+              ],
+              "fingerprint": "853400108135"
+            }
+          ]
+        },
+        {
+          "text": "Aggregation results are keyed by a deterministic digest of the note payload; unchanged inputs reuse the stored body and evidence bundle.",
+          "sources": [
+            {
+              "file": "README.md",
+              "lines": [
+                40,
+                43
+              ],
+              "fingerprint": "996c401d036d"
+            },
+            {
+              "file": "wikifi/aggregator.py",
+              "lines": [
+                126,
+                155
+              ],
+              "fingerprint": "c5f76cb7c4a3"
+            }
+          ]
+        },
+        {
+          "text": "Cache entries are written after every individual file completes, so a mid-walk crash loses at most one file's work.",
+          "sources": [
+            {
+              "file": "TESTING-AND-DEMO.md",
+              "lines": [
+                67,
+                88
+              ],
+              "fingerprint": "3b93f710ebca"
+            },
+            {
+              "file": "wikifi/extractor.py",
+              "lines": [
+                155,
+                175
+              ],
+              "fingerprint": "b0e939259557"
+            }
+          ]
+        },
+        {
+          "text": "Cache writes are atomic — content is written to a temporary location and then renamed into place.",
+          "sources": [
+            {
+              "file": "wikifi/cache.py",
+              "lines": [
+                189,
+                193
+              ],
+              "fingerprint": "1ba541fe863d"
+            }
+          ]
+        },
+        {
+          "text": "Malformed cache entries are silently dropped and logged rather than causing a hard failure.",
+          "sources": [
+            {
+              "file": "wikifi/cache.py",
+              "lines": [
+                196,
+                222
+              ],
+              "fingerprint": "1ba541fe863d"
+            }
+          ]
+        },
+        {
+          "text": "A monotonically increasing version tag is embedded in every cache file; a version mismatch causes the entire cache to be discarded and rebuilt.",
+          "sources": [
+            {
+              "file": "wikifi/cache.py",
+              "lines": [
+                38,
+                38
+              ],
+              "fingerprint": "1ba541fe863d"
+            }
+          ]
+        },
+        {
+          "text": "Entries for files no longer in scope are pruned from the cache between runs.",
+          "sources": [
+            {
+              "file": "wikifi/orchestrator.py",
+              "lines": [
+                95,
+                110
+              ],
+              "fingerprint": "6ed682a87356"
+            }
+          ]
+        },
+        {
+          "text": "Cache files are stored under a dedicated hidden subdirectory within the wiki output directory, inheriting version-control ignore rules.",
+          "sources": [
+            {
+              "file": "wikifi/cache.py",
+              "lines": [
+                19,
+                21
+              ],
+              "fingerprint": "1ba541fe863d"
+            }
+          ]
+        },
+        {
+          "text": "Files below 64 bytes (stripped) are silently skipped to prevent inference on effectively empty inputs.",
+          "sources": [
+            {
+              "file": "wikifi/config.py",
+              "lines": [
+                56,
+                59
+              ],
+              "fingerprint": "8cd2ca53c957"
+            },
+            {
+              "file": "wikifi/walker.py",
+              "lines": [
+                61,
+                79
+              ],
+              "fingerprint": "a29bd1ad8bdb"
+            }
+          ]
+        },
+        {
+          "text": "Files above 2 MB are silently skipped on the assumption they are vendored, generated, or binary.",
+          "sources": [
+            {
+              "file": "wikifi/config.py",
+              "lines": [
+                38,
+                56
+              ],
+              "fingerprint": "8cd2ca53c957"
+            },
+            {
+              "file": "wikifi/walker.py",
+              "lines": [
+                61,
+                79
+              ],
+              "fingerprint": "a29bd1ad8bdb"
+            }
+          ]
+        },
+        {
+          "text": "Files between 150 KB and 2 MB are split into overlapping chunks with an 8 KB overlap.",
+          "sources": [
+            {
+              "file": "wikifi/config.py",
+              "lines": [
+                38,
+                56
+              ],
+              "fingerprint": "8cd2ca53c957"
+            }
+          ]
+        },
+        {
+          "text": "Manifest files are hard-truncated at 20,000 bytes with a visible truncation marker.",
+          "sources": [
+            {
+              "file": "wikifi/walker.py",
+              "lines": [
+                220,
+                231
+              ],
+              "fingerprint": "a29bd1ad8bdb"
+            }
+          ]
+        },
+        {
+          "text": "All inference calls share a single per-request timeout of 900 seconds as a uniform backstop.",
+          "sources": [
+            {
+              "file": ".env.example",
+              "lines": [
+                16,
+                29
+              ],
+              "fingerprint": "2e493dbd2d87"
+            },
+            {
+              "file": "wikifi/config.py",
+              "lines": [
+                33,
+                34
+              ],
+              "fingerprint": "8cd2ca53c957"
+            }
+          ]
+        },
+        {
+          "text": "Directory traversal prunes excluded subtrees before descending into them.",
+          "sources": [
+            {
+              "file": "wikifi/walker.py",
+              "lines": [
+                133,
+                143
+              ],
+              "fingerprint": "a29bd1ad8bdb"
+            }
+          ]
+        },
+        {
+          "text": "Files carrying no extractable intent are identified and dropped before reaching the inference layer; an empty file must never stall the walk.",
+          "sources": [
+            {
+              "file": "README.md",
+              "lines": [
+                44,
+                46
+              ],
+              "fingerprint": "996c401d036d"
+            },
+            {
+              "file": "VISION.md",
+              "lines": [
+                99,
+                100
+              ],
+              "fingerprint": "10651b456a64"
+            }
+          ]
+        },
+        {
+          "text": "Findings from overlap regions between adjacent chunks are deduplicated by section and normalised text within each file's pass.",
+          "sources": [
+            {
+              "file": "wikifi/extractor.py",
+              "lines": [
+                253,
+                262
+              ],
+              "fingerprint": "b0e939259557"
+            }
+          ]
+        },
+        {
+          "text": "All inference calls are routed through a provider abstraction layer where observability, retry logic, error normalisation, and backend-switching concerns are centralised.",
+          "sources": [
+            {
+              "file": "CLAUDE.md",
+              "lines": [
+                53,
+                54
+              ],
+              "fingerprint": "ac9698d91de6"
+            },
+            {
+              "file": "VISION.md",
+              "lines": [
+                92,
+                96
+              ],
+              "fingerprint": "10651b456a64"
+            }
+          ]
+        },
+        {
+          "text": "Structured-output calls require the model response to be validated against a declared schema before being returned to the caller.",
+          "sources": [
+            {
+              "file": "wikifi/providers/base.py",
+              "lines": [
+                36,
+                38
+              ],
+              "fingerprint": "2750f0f56327"
+            }
+          ]
+        },
+        {
+          "text": "Temperature is hard-pinned to zero on all structured-output calls to enforce determinism; free-text and conversational paths use model-default temperature.",
+          "sources": [
+            {
+              "file": "wikifi/providers/ollama_provider.py",
+              "lines": [
+                58,
+                68
+              ],
+              "fingerprint": "0a21916665a5"
+            }
+          ]
+        },
+        {
+          "text": "When a backend exposes a reasoning-depth control, the system runs at the highest available setting, prioritising quality over speed.",
+          "sources": [
+            {
+              "file": "VISION.md",
+              "lines": [
+                97,
+                98
+              ],
+              "fingerprint": "10651b456a64"
+            },
+            {
+              "file": "wikifi/providers/anthropic_provider.py",
+              "lines": [
+                212,
+                232
+              ],
+              "fingerprint": "872020d40ac3"
+            }
+          ]
+        },
+        {
+          "text": "Hosted backends employ prompt-caching strategies so that only the first call in a walk pays full input-token cost.",
+          "sources": [
+            {
+              "file": "wikifi/providers/anthropic_provider.py",
+              "lines": [
+                193,
+                210
+              ],
+              "fingerprint": "872020d40ac3"
+            },
+            {
+              "file": "wikifi/providers/openai_provider.py",
+              "lines": [
+                13,
+                17
+              ],
+              "fingerprint": "428df9ba13f1"
+            }
+          ]
+        },
+        {
+          "text": "Full source traceability is enforced structurally: every wiki assertion must be linkable to its originating file and line range via typed evidence structures.",
+          "sources": [
+            {
+              "file": "wikifi/evidence.py",
+              "lines": [
+                1,
+                18
+              ],
+              "fingerprint": "dddfe1a01c85"
+            }
+          ]
+        },
+        {
+          "text": "The inference prompt mandates tech-agnostic output, explicitly instructing the model to translate all observations into domain terms.",
+          "sources": [
+            {
+              "file": "wikifi/aggregator.py",
+              "lines": [
+                54,
+                67
+              ],
+              "fingerprint": "c5f76cb7c4a3"
+            }
+          ]
+        },
+        {
+          "text": "Upstream section content matching known placeholder shapes is filtered out before derivative synthesis to prevent fabrication from empty inputs.",
+          "sources": [
+            {
+              "file": "wikifi/deriver.py",
+              "lines": [
+                110,
+                135
+              ],
+              "fingerprint": "0b7f4f5abb09"
+            },
+            {
+              "file": "wikifi/deriver.py",
+              "lines": [
+                118,
+                135
+              ],
+              "fingerprint": "0b7f4f5abb09"
+            }
+          ]
+        },
+        {
+          "text": "The same sentinel strings used in derivation filtering are used by the quality-report layer to exclude placeholder sections from scoring.",
+          "sources": [
+            {
+              "file": "wikifi/report.py",
+              "lines": [
+                118,
+                123
+              ],
+              "fingerprint": "2b94c0a5e62e"
+            }
+          ]
+        },
+        {
+          "text": "Interactive query sessions instruct the assistant to acknowledge when the wiki does not cover a topic rather than generating unsupported answers.",
+          "sources": [
+            {
+              "file": "wikifi/chat.py",
+              "lines": [
+                27,
+                31
+              ],
+              "fingerprint": "0333e700a046"
+            }
+          ]
+        },
+        {
+          "text": "Content fingerprints serve three roles: cache keying, citation anchoring, and dependency-graph invalidation.",
+          "sources": [
+            {
+              "file": "wikifi/fingerprint.py",
+              "lines": [
+                1,
+                18
+              ],
+              "fingerprint": "853400108135"
+            }
+          ]
+        },
+        {
+          "text": "Files are always fingerprinted as raw bytes to ensure consistent identity regardless of encoding assumptions.",
+          "sources": [
+            {
+              "file": "wikifi/fingerprint.py",
+              "lines": [
+                44,
+                50
+              ],
+              "fingerprint": "853400108135"
+            }
+          ]
+        },
+        {
+          "text": "Authentication schemes declared in API contract files are extracted and categorised by type as migration-critical cross-cutting concerns.",
+          "sources": [
+            {
+              "file": "wikifi/specialized/openapi.py",
+              "lines": [
+                110,
+                121
+              ],
+              "fingerprint": "ae97781309c4"
+            }
+          ]
+        },
+        {
+          "text": "Uniqueness and non-nullability constraints from schema definitions are extracted as storage invariants flagged as migration-critical.",
+          "sources": [
+            {
+              "file": "wikifi/specialized/sql.py",
+              "lines": [
+                97,
+                98
+              ],
+              "fingerprint": "1ef5e77c4038"
+            }
+          ]
+        },
+        {
+          "text": "Index definitions are recorded as query-performance invariants that the target system must preserve.",
+          "sources": [
+            {
+              "file": "wikifi/specialized/sql.py",
+              "lines": [
+                113,
+                125
+              ],
+              "fingerprint": "1ef5e77c4038"
+            }
+          ]
+        },
+        {
+          "text": "All specialised parsers return results in the same structured shape as the general inference extractor, preserving a uniform interface contract downstream.",
+          "sources": [
+            {
+              "file": "wikifi/specialized/__init__.py",
+              "lines": [
+                9,
+                13
+              ],
+              "fingerprint": "84d6c382c745"
+            }
+          ]
+        },
+        {
+          "text": "Rendered section documents are committed to version control; extraction notes and caches are excluded via a generated ignore file.",
+          "sources": [
+            {
+              "file": "TESTING-AND-DEMO.md",
+              "lines": [
+                249,
+                265
+              ],
+              "fingerprint": "3b93f710ebca"
+            },
+            {
+              "file": "wikifi/wiki.py",
+              "lines": [
+                96,
+                121
+              ],
+              "fingerprint": "9230b7444e0d"
+            }
+          ]
+        },
+        {
+          "text": "Deleting the cache subdirectory forces a full re-walk; deleting the entire working directory resets all pipeline state.",
+          "sources": [
+            {
+              "file": "TESTING-AND-DEMO.md",
+              "lines": [
+                249,
+                265
+              ],
+              "fingerprint": "3b93f710ebca"
+            }
+          ]
+        }
+      ],
+      "contradictions": []
+    },
+    "entities": {
+      "notes_hash": "aff1a81afdaf",
+      "body": "The system's domain model spans five functional layers — wiki structure, file classification, extraction, evidence, and review — plus supporting entities for caching, derivation, and chat.\n\n---\n\n## Wiki Structure\n\n**Section** is the central organizing entity. Each section carries a unique identifier, a human-readable title, a prose description of what belongs in it, and a tier (primary or derivative). Derivative sections additionally declare an ordered list of upstream section identifiers they depend on, forming an explicit dependency graph. An invariant holds at startup: every upstream identifier in a derivative section's dependency list must refer to a section that appears earlier in the canonical ordering (topological sort enforced).\n\n**WikiLayout** is an immutable value object that encodes the on-disk structure of a wiki workspace. Given a project root, it derives all canonical sub-paths: the wiki directory, configuration file, gitignore file, notes directory, per-section markdown files, and per-section note files. No fields are mutable after construction.\n\n**WalkConfig** is an immutable configuration record consumed by the filesystem walker. It captures the repository root, extra exclusion patterns, a flag for honouring ignore rules, a maximum file size in bytes, and a minimum stripped-content size in bytes.\n\n---\n\n## File Classification and Graph\n\n**FileKind** is a closed enumeration of seven mutually exclusive file roles: application code, SQL, OpenAPI, Protobuf, GraphQL, migration, and other. This classification determines whether a file is routed to a specialised deterministic parser or the general-purpose extraction path.\n\n**GraphNode** represents a single file's position in the repository's import graph. It carries the file's repo-relative path, the ordered set of files it imports, and the ordered set of files that import it. It exposes a capped combined-neighbour list for inclusion in extraction prompts.\n\n**RepoGraph** holds the complete import-edge map for a repository scan. It supports node lookup by path and retrieval of a capped neighbour list for any given file, providing cross-file context during extraction.\n\n**DirSummary** is a value object holding aggregate statistics for a single (non-recursive) directory: its repo-relative path, file count, total byte size, a frequency map of the top-10 file extensions, and a tuple of notable filenames (manifests, readmes) present in that directory.\n\n---\n\n## Extraction Layer\n\n**SectionFinding** represents one file's contribution to one wiki section. It carries the target section identifier, a technology-agnostic prose description of the contribution, and an optional inclusive line range within the source chunk.\n\n**FileFindings** groups a one-sentence summary of a file with all `SectionFinding` records produced for it.\n\n**SpecializedFinding** is the output unit of the deterministic parsing paths. It carries a section identifier, a human-readable description, and a list of source references. **SpecializedResult** groups zero or more such findings with an optional summary string; this is the uniform output contract for all specialised extractors, ensuring interoperability with the general extraction path downstream.\n\n**ExtractionStats** is a walk-level counter record, accumulating: total files seen, files yielding at least one finding, total findings, skipped files, chunks processed, cache hits, specialised-extractor invocations, and a per-kind file breakdown.\n\n---\n\n## Evidence Layer\n\n**SourceRef** represents a single span of source: a repo-relative file path, an optional inclusive line range, and a short content fingerprint captured at extraction time for change detection.\n\n**Claim** represents one assertion placed in a wiki section. It carries the markdown text and a list of `SourceRef` values that justify it. A claim with no sources is explicitly marked unsupported — this is a first-class state, not an error.\n\n**Contradiction** groups two or more conflicting `Claim` objects about the same topic under a single summary sentence. Each disagreeing position retains its own source references, preserving full traceability.\n\n**EvidenceBundle** is the aggregator's structured output for a single wiki section. It combines the narrative body text, a list of `Claim` records, and a list of `Contradiction` records. The renderer uses the bundle to thread numbered citations and a conflicts block into the final markdown.\n\nDuring aggregation, the pipeline works with intermediate forms: **AggregatedClaim** pairs a single prose assertion with the 1-based indices of the input notes that support it, and **AggregatedContradiction** holds a one-sentence summary alongside multiple conflicting positional claims, each with its own note indices. These are the structured forms that the language model produces before being resolved into the full evidence model.\n\n---\n\n## Cache Entities\n\n**CachedFindings** stores the extraction result for a single file: the file's content fingerprint, the list of structured findings produced, a one-sentence summary, and a count of processed chunks. Its invariant is content-addressed — the fingerprint is the cache key.\n\n**CachedSection** stores the aggregation result for a single wiki section: the hash of the notes payload that produced it, the rendered markdown body, and lists of claims and contradictions. It too is content-addressed on the notes hash.\n\n**WalkCache** is the in-memory container for both caches. It holds extraction and aggregation entries alongside hit and miss counters, enabling observability into cache effectiveness across a run.\n\n---\n\n## Quality and Review Layer\n\n**Critique** captures the quality assessment of a single section: an integer score (0–10), a short overall judgment, a list of unsupported claims, a list of gaps relative to the section brief, and a list of concrete revision suggestions.\n\n**ReviewOutcome** tracks a section's review lifecycle: the section identifier, the initial critique, the current body text, a flag indicating whether a revision was applied, and the optional follow-up critique produced after revision.\n\n**WikiQualityReport** aggregates the full-wiki audit: an overall numeric score, a mapping from section identifiers to their individual `Critique` records, and optional coverage statistics.\n\n**CoverageStats** records total files seen, files with findings, and per-section breakdowns of finding counts and contributing file counts; it exposes a coverage-percentage computation.\n\n**SectionReport** captures the per-section view for reporting: the section descriptor, count of contributing files, total findings count, body size in characters, an emptiness flag, and an optional quality critique.\n\n**WikiReport** aggregates all `SectionReport` records alongside overall coverage statistics and an optional mean quality score across populated sections.\n\n---\n\n## Derivation and Pipeline Outputs\n\n**IntrospectionResult** captures the Stage 1 decision about which files are worth deeper analysis: a list of gitignore-style include patterns, a list of exclude patterns, a list of primary languages (informational), a one-paragraph guess at the system's purpose, and a rationale for the choices made.\n\n**AggregationStats** records, for a single aggregation run, how many sections were written fresh, skipped due to empty notes, or served from cache.\n\n**DerivationStats** accumulates pipeline metrics for the derivation stage: counts of sections derived, skipped, and revised, plus the full list of `ReviewOutcome` records. It acts as an audit trail for the synthesis stage.\n\n**WalkReport** is the single return value of a completed wiki-generation run, aggregating the introspection result, extraction statistics, aggregation statistics, derivation statistics, the live cache state, and the repository import graph.\n\n---\n\n## Chat Layer\n\n**ChatMessage** carries a role and a content field, representing a single turn in a multi-turn conversation. Lists of these are accumulated to maintain conversation history.\n\n**LoadedSection** pairs a `Section` descriptor with its rendered markdown body, representing a single populated section ready for inclusion in a chat context.\n\n**ChatSession** holds a provider reference, the frozen system prompt built from wiki sections, and the accumulated conversation history as an ordered list of `ChatMessage` records. It supports appending user and assistant turns and clearing history while retaining the wiki context.\n\n---\n\n## Relationships and Invariants Summary\n\n| Entity | Key relationships | Notable invariants |\n|---|---|---|\n| Section | depends on upstream Sections (derivative tier only) | Dependency graph must be topologically ordered |\n| WikiLayout | derived from a project root | Immutable; all paths are computed, not stored independently |\n| SourceRef | referenced by Claim, SpecializedFinding | Fingerprint enables staleness detection |\n| Claim | groups SourceRefs; composed into EvidenceBundle | Sourceless claims are explicitly flagged unsupported |\n| Contradiction | groups ≥2 conflicting Claims | Each position retains its own SourceRefs |\n| CachedFindings | keyed on file content fingerprint | Cache miss if fingerprint changes |\n| CachedSection | keyed on notes-payload hash | Cache miss if any upstream note changes |\n| ReviewOutcome | holds pre- and post-revision Critique | Revision flag distinguishes touched from untouched sections |\n| WalkReport | aggregates all four stage outputs | Single return value for a complete run |",
+      "claims": [
+        {
+          "text": "A Section entity carries a unique identifier, human-readable title, prose description, tier (primary or derivative), and an ordered list of upstream section identifiers for derivative sections, forming an explicit dependency graph.",
+          "sources": [
+            {
+              "file": "wikifi/sections.py",
+              "lines": [
+                30,
+                40
+              ],
+              "fingerprint": "f743972a8fce"
+            },
+            {
+              "file": "wikifi/deriver.py",
+              "lines": [
+                112,
+                116
+              ],
+              "fingerprint": "0b7f4f5abb09"
+            }
+          ]
+        },
+        {
+          "text": "An invariant holds at startup: every upstream identifier in a derivative section's dependency list must refer to a section that appears earlier in the canonical ordering (topological sort enforced).",
+          "sources": [
+            {
+              "file": "wikifi/sections.py",
+              "lines": [
+                30,
+                40
+              ],
+              "fingerprint": "f743972a8fce"
+            }
+          ]
+        },
+        {
+          "text": "WikiLayout is an immutable value object that encodes the on-disk wiki workspace structure and derives all canonical sub-paths from a project root.",
+          "sources": [
+            {
+              "file": "wikifi/cli.py",
+              "lines": [
+                166,
+                172
+              ],
+              "fingerprint": "f326383c7da1"
+            },
+            {
+              "file": "wikifi/wiki.py",
+              "lines": [
+                34,
+                61
+              ],
+              "fingerprint": "9230b7444e0d"
+            }
+          ]
+        },
+        {
+          "text": "WalkConfig is an immutable configuration record capturing repository root, extra exclusion patterns, gitignore-honouring flag, maximum file size in bytes, and minimum stripped-content size in bytes.",
+          "sources": [
+            {
+              "file": "wikifi/walker.py",
+              "lines": [
+                61,
+                79
+              ],
+              "fingerprint": "a29bd1ad8bdb"
+            }
+          ]
+        },
+        {
+          "text": "FileKind is a closed enumeration of seven mutually exclusive file roles (application code, SQL, OpenAPI, Protobuf, GraphQL, migration, other), driving routing to specialised or general-purpose extraction paths.",
+          "sources": [
+            {
+              "file": "README.md",
+              "lines": [
+                31,
+                33
+              ],
+              "fingerprint": "996c401d036d"
+            },
+            {
+              "file": "wikifi/repograph.py",
+              "lines": [
+                41,
+                52
+              ],
+              "fingerprint": "3d8bbdb10112"
+            }
+          ]
+        },
+        {
+          "text": "GraphNode represents a single file's position in the import graph, carrying its repo-relative path, the ordered set of files it imports, and the ordered set of files that import it, and exposes a capped combined-neighbour list.",
+          "sources": [
+            {
+              "file": "wikifi/repograph.py",
+              "lines": [
+                148,
+                167
+              ],
+              "fingerprint": "3d8bbdb10112"
+            }
+          ]
+        },
+        {
+          "text": "RepoGraph holds the complete per-file import-edge map, supporting node lookup by path and retrieval of a capped neighbour list for any file.",
+          "sources": [
+            {
+              "file": "wikifi/repograph.py",
+              "lines": [
+                170,
+                181
+              ],
+              "fingerprint": "3d8bbdb10112"
+            }
+          ]
+        },
+        {
+          "text": "DirSummary is a value object holding aggregate statistics for a single non-recursive directory: path, file count, total byte size, top-10 extension frequency map, and notable filenames.",
+          "sources": [
+            {
+              "file": "wikifi/walker.py",
+              "lines": [
+                144,
+                153
+              ],
+              "fingerprint": "a29bd1ad8bdb"
+            }
+          ]
+        },
+        {
+          "text": "SectionFinding represents one file's contribution to one wiki section, carrying the target section identifier, a technology-agnostic prose description, and an optional inclusive line range.",
+          "sources": [
+            {
+              "file": "wikifi/extractor.py",
+              "lines": [
+                106,
+                123
+              ],
+              "fingerprint": "b0e939259557"
+            }
+          ]
+        },
+        {
+          "text": "FileFindings groups a one-sentence file summary with all SectionFinding records produced for that file.",
+          "sources": [
+            {
+              "file": "wikifi/extractor.py",
+              "lines": [
+                106,
+                123
+              ],
+              "fingerprint": "b0e939259557"
+            }
+          ]
+        },
+        {
+          "text": "SpecializedFinding carries a section identifier, a human-readable description, and a list of source references. SpecializedResult groups zero or more such findings with an optional summary string and is the uniform output contract for all specialised extractors.",
+          "sources": [
+            {
+              "file": "wikifi/specialized/__init__.py",
+              "lines": [
+                29,
+                38
+              ],
+              "fingerprint": "84d6c382c745"
+            }
+          ]
+        },
+        {
+          "text": "ExtractionStats accumulates walk-level counters: total files seen, files with findings, total findings, skipped files, chunks processed, cache hits, specialised-extractor invocations, and a per-kind file breakdown.",
+          "sources": [
+            {
+              "file": "wikifi/extractor.py",
+              "lines": [
+                126,
+                135
+              ],
+              "fingerprint": "b0e939259557"
+            }
+          ]
+        },
+        {
+          "text": "SourceRef represents a single span of source: a repo-relative file path, an optional inclusive line range, and a short content fingerprint captured at extraction time.",
+          "sources": [
+            {
+              "file": "wikifi/evidence.py",
+              "lines": [
+                37,
+                52
+              ],
+              "fingerprint": "dddfe1a01c85"
+            },
+            {
+              "file": "README.md",
+              "lines": [
+                37,
+                39
+              ],
+              "fingerprint": "996c401d036d"
+            }
+          ]
+        },
+        {
+          "text": "Claim carries markdown text and a list of SourceRefs that justify it; a claim with no sources is explicitly marked unsupported.",
+          "sources": [
+            {
+              "file": "wikifi/evidence.py",
+              "lines": [
+                55,
+                67
+              ],
+              "fingerprint": "dddfe1a01c85"
+            },
+            {
+              "file": "wikifi/aggregator.py",
+              "lines": [
+                166,
+                186
+              ],
+              "fingerprint": "c5f76cb7c4a3"
+            }
+          ]
+        },
+        {
+          "text": "Contradiction groups two or more conflicting Claims about the same topic under a single summary sentence, with each disagreeing position retaining its own source references.",
+          "sources": [
+            {
+              "file": "wikifi/evidence.py",
+              "lines": [
+                70,
+                77
+              ],
+              "fingerprint": "dddfe1a01c85"
+            },
+            {
+              "file": "wikifi/aggregator.py",
+              "lines": [
+                74,
+                101
+              ],
+              "fingerprint": "c5f76cb7c4a3"
+            }
+          ]
+        },
+        {
+          "text": "EvidenceBundle combines the narrative body text, a list of Claims, and a list of Contradictions for a single wiki section; the renderer uses it to thread citations and a conflicts block into the final markdown.",
+          "sources": [
+            {
+              "file": "README.md",
+              "lines": [
+                46,
+                48
+              ],
+              "fingerprint": "996c401d036d"
+            },
+            {
+              "file": "wikifi/evidence.py",
+              "lines": [
+                80,
+                85
+              ],
+              "fingerprint": "dddfe1a01c85"
+            },
+            {
+              "file": "wikifi/aggregator.py",
+              "lines": [
+                166,
+                186
+              ],
+              "fingerprint": "c5f76cb7c4a3"
+            }
+          ]
+        },
+        {
+          "text": "AggregatedClaim pairs a single prose assertion with the 1-based indices of the input notes that support it.",
+          "sources": [
+            {
+              "file": "wikifi/aggregator.py",
+              "lines": [
+                74,
+                101
+              ],
+              "fingerprint": "c5f76cb7c4a3"
+            }
+          ]
+        },
+        {
+          "text": "AggregatedContradiction holds a one-sentence summary alongside multiple conflicting positional claims, each with its own note indices.",
+          "sources": [
+            {
+              "file": "wikifi/aggregator.py",
+              "lines": [
+                74,
+                101
+              ],
+              "fingerprint": "c5f76cb7c4a3"
+            }
+          ]
+        },
+        {
+          "text": "CachedFindings stores the extraction result for a single file: content fingerprint, list of structured findings, one-sentence summary, and chunk count; it is content-addressed on the fingerprint.",
+          "sources": [
+            {
+              "file": "wikifi/cache.py",
+              "lines": [
+                44,
+                51
+              ],
+              "fingerprint": "1ba541fe863d"
+            }
+          ]
+        },
+        {
+          "text": "CachedSection stores the aggregation result for a single wiki section: the hash of the notes payload, the rendered markdown body, and lists of claims and contradictions; it is content-addressed on the notes hash.",
+          "sources": [
+            {
+              "file": "wikifi/cache.py",
+              "lines": [
+                54,
+                60
+              ],
+              "fingerprint": "1ba541fe863d"
+            }
+          ]
+        },
+        {
+          "text": "WalkCache is the in-memory container for both caches, holding extraction and aggregation entries alongside hit and miss counters.",
+          "sources": [
+            {
+              "file": "wikifi/cache.py",
+              "lines": [
+                63,
+                70
+              ],
+              "fingerprint": "1ba541fe863d"
+            }
+          ]
+        },
+        {
+          "text": "AggregationStats records how many sections were written fresh, skipped due to empty notes, or served from cache during a single aggregation run.",
+          "sources": [
+            {
+              "file": "wikifi/aggregator.py",
+              "lines": [
+                103,
+                107
+              ],
+              "fingerprint": "c5f76cb7c4a3"
+            }
+          ]
+        },
+        {
+          "text": "Critique captures the quality assessment of a single section: an integer score (0–10), a short overall judgment, a list of unsupported claims, a list of gaps relative to the section brief, and a list of revision suggestions.",
+          "sources": [
+            {
+              "file": "wikifi/critic.py",
+              "lines": [
+                67,
+                84
+              ],
+              "fingerprint": "502af9aee392"
+            }
+          ]
+        },
+        {
+          "text": "ReviewOutcome tracks a section's review lifecycle: the section identifier, initial critique, current body text, a revision-applied flag, and an optional follow-up critique.",
+          "sources": [
+            {
+              "file": "wikifi/critic.py",
+              "lines": [
+                91,
+                96
+              ],
+              "fingerprint": "502af9aee392"
+            }
+          ]
+        },
+        {
+          "text": "WikiQualityReport aggregates an overall numeric score, a mapping from section identifiers to individual Critique records, and optional coverage statistics.",
+          "sources": [
+            {
+              "file": "wikifi/critic.py",
+              "lines": [
+                99,
+                114
+              ],
+              "fingerprint": "502af9aee392"
+            }
+          ]
+        },
+        {
+          "text": "CoverageStats records total files seen, files with findings, and per-section breakdowns of finding counts and contributing file counts, and exposes a coverage-percentage computation.",
+          "sources": [
+            {
+              "file": "wikifi/critic.py",
+              "lines": [
+                99,
+                114
+              ],
+              "fingerprint": "502af9aee392"
+            },
+            {
+              "file": "wikifi/report.py",
+              "lines": [
+                85,
+                94
+              ],
+              "fingerprint": "2b94c0a5e62e"
+            }
+          ]
+        },
+        {
+          "text": "SectionReport captures the per-section view: section descriptor, contributing file count, total findings count, body size in characters, an emptiness flag, and an optional quality critique.",
+          "sources": [
+            {
+              "file": "wikifi/report.py",
+              "lines": [
+                28,
+                42
+              ],
+              "fingerprint": "2b94c0a5e62e"
+            }
+          ]
+        },
+        {
+          "text": "WikiReport aggregates all SectionReport records alongside overall coverage statistics and an optional mean quality score.",
+          "sources": [
+            {
+              "file": "wikifi/report.py",
+              "lines": [
+                28,
+                42
+              ],
+              "fingerprint": "2b94c0a5e62e"
+            }
+          ]
+        },
+        {
+          "text": "IntrospectionResult captures the Stage 1 decision: include/exclude gitignore-style patterns, primary languages (informational), a one-paragraph purpose guess, and a rationale.",
+          "sources": [
+            {
+              "file": "wikifi/introspection.py",
+              "lines": [
+                47,
+                64
+              ],
+              "fingerprint": "59cd5940f72e"
+            }
+          ]
+        },
+        {
+          "text": "DerivationStats accumulates pipeline metrics for the derivation stage: derived, skipped, and revised counts, plus the full list of ReviewOutcome records.",
+          "sources": [
+            {
+              "file": "wikifi/deriver.py",
+              "lines": [
+                57,
+                62
+              ],
+              "fingerprint": "0b7f4f5abb09"
+            }
+          ]
+        },
+        {
+          "text": "WalkReport aggregates the introspection result, extraction statistics, aggregation statistics, derivation statistics, the live cache state, and the repository import graph; it is the single return value of a completed wiki-generation run.",
+          "sources": [
+            {
+              "file": "wikifi/orchestrator.py",
+              "lines": [
+                54,
+                61
+              ],
+              "fingerprint": "6ed682a87356"
+            },
+            {
+              "file": "wikifi/cli.py",
+              "lines": [
+                118,
+                153
+              ],
+              "fingerprint": "f326383c7da1"
+            }
+          ]
+        },
+        {
+          "text": "ChatMessage carries a role and content field, representing a single turn in a multi-turn conversation.",
+          "sources": [
+            {
+              "file": "wikifi/providers/base.py",
+              "lines": [
+                28,
+                30
+              ],
+              "fingerprint": "2750f0f56327"
+            }
+          ]
+        },
+        {
+          "text": "LoadedSection pairs a Section descriptor with its rendered markdown body.",
+          "sources": [
+            {
+              "file": "wikifi/chat.py",
+              "lines": [
+                42,
+                45
+              ],
+              "fingerprint": "0333e700a046"
+            }
+          ]
+        },
+        {
+          "text": "ChatSession holds a provider reference, a frozen system prompt built from wiki sections, and an accumulated conversation history of ChatMessage records; it supports appending turns and clearing history while retaining wiki context.",
+          "sources": [
+            {
+              "file": "wikifi/chat.py",
+              "lines": [
+                46,
+                57
+              ],
+              "fingerprint": "0333e700a046"
+            }
+          ]
+        },
+        {
+          "text": "Specialised extractors surface domain entities from structured artifacts: SQL CREATE TABLE statements are treated as domain entities capturing table name, columns, foreign keys, and storage constraints; ALTER TABLE statements track schema evolution per entity.",
+          "sources": [
+            {
+              "file": "wikifi/specialized/sql.py",
+              "lines": [
+                64,
+                84
+              ],
+              "fingerprint": "1ef5e77c4038"
+            },
+            {
+              "file": "wikifi/specialized/sql.py",
+              "lines": [
+                99,
+                111
+              ],
+              "fingerprint": "1ef5e77c4038"
+            }
+          ]
+        },
+        {
+          "text": "GraphQL object types (excluding operation roots), interfaces, input types, and enums are each treated as distinct entity-level constructs by the GraphQL specialised extractor.",
+          "sources": [
+            {
+              "file": "wikifi/specialized/graphql.py",
+              "lines": [
+                32,
+                81
+              ],
+              "fingerprint": "bbb305e0d47f"
+            }
+          ]
+        },
+        {
+          "text": "Protobuf message types and enum types are extracted from interface definition files, grouped by package namespace, with counts truncated after 25 items.",
+          "sources": [
+            {
+              "file": "wikifi/specialized/protobuf.py",
+              "lines": [
+                44,
+                68
+              ],
+              "fingerprint": "e20d5913745a"
+            }
+          ]
+        },
+        {
+          "text": "OpenAPI component schemas are extracted as canonical data models (up to 25, with overflow count) and surfaced as entity-level findings.",
+          "sources": [
+            {
+              "file": "wikifi/specialized/openapi.py",
+              "lines": [
+                94,
+                108
+              ],
+              "fingerprint": "ae97781309c4"
+            }
+          ]
+        }
+      ],
+      "contradictions": []
+    }
+  }
+}
