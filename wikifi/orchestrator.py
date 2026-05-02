@@ -188,10 +188,15 @@ def build_provider(settings: Settings) -> LLMProvider:
     if settings.provider == "openai":
         from wikifi.providers.openai_provider import OpenAIProvider
 
-        # Same default-swap guard as the Anthropic path: a user opting
-        # in to OpenAI shouldn't 404 because the Ollama model id is
-        # still in their config.
-        model = settings.model if _looks_like_openai_model(settings.model) else "gpt-4o"
+        # Same default-swap guard as the Anthropic path, but inverted:
+        # only swap when the model id is *obviously* an Ollama
+        # identifier (the user opted into openai but forgot to update
+        # WIKIFI_MODEL). Anything else passes through unchanged so
+        # Azure-OpenAI / proxy deployments — which use arbitrary
+        # deployment IDs like ``prod-gpt4o`` or ``eastus-chat`` that
+        # don't match the upstream OpenAI naming convention — keep
+        # working.
+        model = "gpt-4o" if _looks_like_ollama_model(settings.model) else settings.model
         return OpenAIProvider(
             model=model,
             api_key=settings.openai_api_key,
@@ -203,7 +208,12 @@ def build_provider(settings: Settings) -> LLMProvider:
     raise ValueError(f"unknown provider {settings.provider!r}; expected 'ollama', 'anthropic', or 'openai'")
 
 
-def _looks_like_openai_model(model: str) -> bool:
-    """Heuristic — covers gpt-*, o1/o3/o4 reasoning, and ft: variants."""
-    lowered = model.lower()
-    return lowered.startswith(("gpt-", "o1", "o3", "o4", "ft:"))
+def _looks_like_ollama_model(model: str) -> bool:
+    """Heuristic — Ollama uses ``family:tag`` (e.g. ``qwen3.6:27b``).
+
+    Fine-tuned OpenAI models also contain ``:`` (``ft:gpt-4o:...``)
+    so we exclude that prefix. Anything else without a ``:`` —
+    upstream OpenAI ids, Azure deployment names, plain proxy aliases —
+    is left alone.
+    """
+    return ":" in model and not model.lower().startswith("ft:")

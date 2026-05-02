@@ -1,7 +1,23 @@
-"""Runtime settings loaded from environment / .env.
+"""Runtime settings loaded from environment / .env / target's .wikifi/config.toml.
 
 Defaults assume a local Ollama server with qwen3.6:27b. Override any field via
-WIKIFI_* env vars or a .env file in the target project's CWD.
+WIKIFI_* env vars, a .env file in the target project's CWD, or by writing
+provider/model entries into ``<target>/.wikifi/config.toml`` (the file
+``wikifi init`` scaffolds — and what callers expect to be authoritative for
+that wiki).
+
+Resolution order, highest precedence first:
+
+1. ``<target>/.wikifi/config.toml``
+2. ``WIKIFI_*`` environment variables (and ``.env``)
+3. Field defaults
+
+The wiki's own ``config.toml`` wins over per-session env vars: a wiki
+initialized for a hosted backend should still drive its own runs even
+when the user happens to have ``WIKIFI_PROVIDER=ollama`` exported in
+their shell. This matches the contract printed at the top of every
+generated ``config.toml`` ("overrides WIKIFI_* environment variables
+when present").
 
 Hosted providers are opt-in:
 - ``WIKIFI_PROVIDER=anthropic`` (plus ``ANTHROPIC_API_KEY``)
@@ -10,10 +26,16 @@ Hosted providers are opt-in:
 
 from __future__ import annotations
 
+import logging
+import tomllib
 from functools import lru_cache
+from pathlib import Path
+from typing import Any
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+log = logging.getLogger("wikifi.config")
 
 
 class Settings(BaseSettings):
@@ -144,3 +166,47 @@ def reset_settings_cache() -> None:
     Used by tests that mutate ``WIKIFI_*`` env vars between cases.
     """
     get_settings.cache_clear()
+
+
+# Field names a wiki's ``config.toml`` is allowed to override. We accept
+# only the fields ``wikifi init`` writes today (provider, model,
+# ollama_host) so a stale or hand-edited config can't silently start
+# overriding behavior the user didn't sign up for.
+_TARGET_CONFIG_FIELDS: frozenset[str] = frozenset({"provider", "model", "ollama_host"})
+
+
+def load_target_settings(target: Path) -> Settings:
+    """Return :class:`Settings` for a wiki at ``target``.
+
+    Reads ``<target>/.wikifi/config.toml`` (when present) and layers
+    its values on top of the env-derived defaults — the wiki's own
+    config wins over per-session env vars, matching the contract
+    printed at the top of every generated ``config.toml``.
+
+    Without this, ``wikifi report --score <target>`` (and the other
+    target-aware commands) would build a provider from the process-wide
+    defaults regardless of what the target wiki was actually
+    initialized with — fine when target equals CWD, but wrong when the
+    user is operating against another project's wiki.
+    """
+    base = get_settings()
+    overrides = _read_target_config(target)
+    if not overrides:
+        return base
+    effective: dict[str, Any] = {field: value for field, value in overrides.items() if field in _TARGET_CONFIG_FIELDS}
+    if not effective:
+        return base
+    return base.model_copy(update=effective)
+
+
+def _read_target_config(target: Path) -> dict[str, Any]:
+    """Parse ``<target>/.wikifi/config.toml``; return ``{}`` on any failure."""
+    config_path = target / ".wikifi" / "config.toml"
+    if not config_path.exists():
+        return {}
+    try:
+        with config_path.open("rb") as handle:
+            return tomllib.load(handle)
+    except (OSError, tomllib.TOMLDecodeError) as exc:
+        log.warning("could not read %s: %s; falling back to env-only settings", config_path, exc)
+        return {}

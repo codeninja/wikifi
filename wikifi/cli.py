@@ -23,7 +23,7 @@ from rich.table import Table
 from wikifi import __version__
 from wikifi.cache import reset as reset_cache
 from wikifi.chat import run_repl
-from wikifi.config import get_settings
+from wikifi.config import get_settings, load_target_settings
 from wikifi.orchestrator import build_provider, init_wiki, run_walk
 from wikifi.report import build_report
 from wikifi.wiki import WikiLayout
@@ -102,7 +102,7 @@ def walk(
 ) -> None:
     """Walk the target codebase and populate every wiki section."""
     target = target or Path.cwd()
-    settings = get_settings()
+    settings = load_target_settings(target)
     if no_cache:
         settings = settings.model_copy(update={"use_cache": False})
         reset_cache(WikiLayout(root=target))
@@ -169,7 +169,7 @@ def chat(target: TargetArg = None) -> None:
         )
         raise typer.Exit(code=1)
 
-    settings = get_settings()
+    settings = load_target_settings(target)
     provider = build_provider(settings)
     run_repl(layout=layout, provider=provider, console=console)
 
@@ -192,7 +192,7 @@ def report(
         )
         raise typer.Exit(code=1)
 
-    settings = get_settings()
+    settings = load_target_settings(target)
     provider = build_provider(settings) if score else None
     wiki_report = build_report(layout=layout, provider=provider, score=score)
     console.print(Markdown(wiki_report.render()))
