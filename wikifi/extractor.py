@@ -156,6 +156,7 @@ def extract_repo(
 
     for rel in files:
         stats.files_seen += 1
+        log.info("- extracting: ./%s", rel.as_posix())
         full = repo_root / rel
         try:
             data = full.read_text(encoding="utf-8", errors="replace")
