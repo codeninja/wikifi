@@ -1,49 +1,56 @@
 # External-System Dependencies
 
-The system integrates with up to three language-model inference backends — exactly one active at a time — selected at configuration time. An additional soft dependency covers structured API-contract parsing.
+The system depends on three mutually-exclusive inference backends and one optional data-parsing service. The active backend is selected at configuration time; the remaining two are inactive.
 
 ## Inference Backends
 
-### Local Inference Service (default)
+### Local Self-Hosted Inference (default)
 
-By default, all language-model calls are routed to a locally-hosted **Ollama** inference service reached over HTTP at a configurable host address. No API key is required. The service must support three interaction modes: schema-constrained structured output, free-text generation, and multi-turn conversation. Models are identified using a `family:tag` naming convention. A configurable connection timeout (default: 900 seconds) accommodates long reasoning traces on large models.
+By default, all language-model calls are routed to a locally-hosted inference service. The service is addressed over HTTP at a configurable host endpoint and a configurable model identifier. No API key is required. The local backend handles schema-constrained structured output, free-text completion, multi-turn dialogue, and an optional reasoning-trace mode.[3] A per-call timeout is configurable.
 
-### Anthropic API — Hosted Inference (opt-in)
+### Anthropic Hosted API (opt-in)
 
-Anthropic's hosted inference API is an opt-in alternative. It requires an API key supplied via configuration or the runtime environment. The integration exposes adaptive thinking controls — allowing reasoning depth to be traded against latency on a per-call basis — and supports configurable per-call output token budgets. The system defaults to a specific known-good model when no explicit identifier is provided, preventing routing failures caused by locally-formatted model names being submitted to the hosted endpoint. A configurable network timeout (default: 900 seconds) covers extended-thinking and structured-output calls.
+An Anthropic-hosted inference service is available as an opt-in backend. It requires an API key supplied via an environment variable. When the configured model identifier is not recognized as a valid Anthropic model name, the system automatically substitutes a known-good default (claude-opus-4-7) to prevent request failures. The backend supports adaptive reasoning, with a thinking-effort level (low / medium / high / max) mapped onto the provider's native feature. A per-call output-token cap is configurable.
 
-### OpenAI API — Hosted Inference (opt-in)
+### OpenAI-Compatible Hosted API (opt-in)
 
-OpenAI's hosted API is a second opt-in alternative. It exposes two surfaces: a schema-constrained structured-output endpoint returning pre-validated typed responses, and a standard chat-completion endpoint for free text and multi-turn conversation. The API key is sourced from the runtime environment. The integration supports standard hosted endpoints, enterprise cloud deployments (e.g. Azure-hosted variants), and arbitrary proxy deployments via a configurable base URL; deployment identifiers are forwarded unchanged to preserve compatibility. When a locally-formatted model identifier is detected, the system substitutes a known-good hosted model to prevent request failures; explicit deployment identifiers bypass this substitution.
+An OpenAI-compatible hosted inference service is a second opt-in backend. It requires an API key from the environment and accepts an optional base-URL override, which allows the system to target Azure OpenAI endpoints, proxy deployments, or other compatible services. When a model identifier uses a local-service naming convention (family:tag), it is automatically replaced with a provider-appropriate default; all other identifiers — including Azure deployment names — pass through unchanged. The backend supports all three interaction modes: schema-constrained structured output, free-text completion, and multi-turn dialogue.
 
-## API-Contract Parsing
+## Inference Backend Comparison
 
-When processing structured API-contract files, the system can optionally rely on an external YAML-parsing library. If the library is absent at runtime, a built-in minimal parser handles the relevant document subset, making this a soft dependency — the capability remains functional without the library installed.
+| Attribute | Local (default) | Anthropic | OpenAI-compatible |
+|---|---|---|---|
+| Requires API key | No | Yes (env var) | Yes (env var) |
+| Custom endpoint | Yes (host URL) | No | Yes (base URL override) |
+| Adaptive reasoning | Yes (optional) | Yes (effort levels) | — |
+| Per-call token cap | — | Yes | Yes |
+| Azure / proxy support | — | — | Yes |
+
+## Optional Data-Parsing Service
+
+When processing OpenAPI/Swagger contract files, the system can delegate YAML parsing to an external library if one is present in the runtime environment. If that library is absent, a built-in minimal parser handles the specific structural subset required. This means the capability degrades gracefully rather than failing; no external service endpoint or credential is involved.
 
 ## Supporting claims
-- A locally-hosted Ollama inference service is the default language-model backend, requiring no API key and no hosted service subscription. [1][2][3]
-- The Ollama service is reached over HTTP at a configurable host address. [1][3]
-- The Ollama backend must support schema-constrained structured output, free-text generation, and multi-turn conversation. [3]
-- Ollama models are identified using a family:tag naming convention. [2]
-- The Ollama backend carries a configurable connection timeout defaulting to 900 seconds. [3]
-- Anthropic's hosted inference API is an opt-in alternative that requires an API key from configuration or environment. [4][5][6]
-- The Anthropic integration supports adaptive thinking modes and configurable per-call output token budgets. [4][6]
-- When no explicit model identifier is provided for the Anthropic backend, the system substitutes a specific default model to avoid routing errors from locally-formatted model names. [5][6]
-- The Anthropic backend carries a configurable network timeout defaulting to 900 seconds to accommodate extended-thinking and structured-output calls. [6]
-- OpenAI's hosted API is a second opt-in inference backend; its API key is sourced from the runtime environment. [7][8][9]
-- The OpenAI integration exposes two API surfaces: a schema-constrained structured-output endpoint and a standard chat-completion endpoint for free text and multi-turn conversation. [9]
-- The OpenAI integration supports standard hosted endpoints, enterprise cloud deployments, and proxy deployments via a configurable base URL; arbitrary deployment identifiers are forwarded unchanged. [7][8]
-- When a locally-formatted model identifier is detected, the OpenAI backend substitutes a known-good hosted model; explicit deployment identifiers are passed through unchanged. [8]
-- An external YAML-parsing library is an optional soft dependency for processing API-contract files; a built-in fallback parser handles the required document subset when the library is absent. [10]
+- By default, all language-model calls are routed to a locally-hosted inference service addressed over HTTP at a configurable host endpoint and model identifier. [1][2][3]
+- The local backend requires no API key. [2][3]
+- A per-call timeout is configurable for the local backend. [3]
+- The Anthropic-hosted inference service requires an API key supplied via an environment variable. [4][5]
+- When the configured model identifier is not recognized as a valid Anthropic model name, the system substitutes a known-good default (claude-opus-4-7). [6][5]
+- The Anthropic backend maps a thinking-effort level (low/medium/high/max) to the provider's adaptive thinking feature. [4]
+- A per-call output-token cap is configurable for the Anthropic backend. [4]
+- The OpenAI-compatible backend requires an API key from the environment and accepts an optional base-URL override for Azure, proxy, or other compatible deployments. [7][8][9]
+- When a model identifier uses a local-service naming convention, it is automatically replaced with a provider-appropriate default; all other identifiers pass through unchanged. [8]
+- The OpenAI-compatible backend supports schema-constrained structured output, free-text completion, and multi-turn dialogue. [9]
+- When processing OpenAPI/Swagger contract files, the system uses an external YAML-parsing library if present, falling back to a built-in minimal parser that covers the required structural subset. [10]
 
 ## Sources
-1. `wikifi/config.py:51-53`
-2. `wikifi/orchestrator.py:255-264`
-3. `wikifi/providers/ollama_provider.py:48-57`
-4. `wikifi/config.py:151-166`
-5. `wikifi/orchestrator.py:265-277`
-6. `wikifi/providers/anthropic_provider.py:75-100`
-7. `wikifi/config.py:170-181`
-8. `wikifi/orchestrator.py:278-299`
-9. `wikifi/providers/openai_provider.py:111-135`
-10. `wikifi/specialized/openapi.py:131-153`
+1. `wikifi/config.py:55-58`
+2. `wikifi/orchestrator.py:243-251`
+3. `wikifi/providers/ollama_provider.py:54-57`
+4. `wikifi/config.py:155-178`
+5. `wikifi/providers/anthropic_provider.py:97-115`
+6. `wikifi/orchestrator.py:252-264`
+7. `wikifi/config.py:180-197`
+8. `wikifi/orchestrator.py:265-285`
+9. `wikifi/providers/openai_provider.py:1-10`
+10. `wikifi/specialized/openapi.py:148-167`

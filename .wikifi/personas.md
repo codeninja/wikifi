@@ -1,148 +1,128 @@
 # User Personas
 
-Three distinct personas emerge from the aggregate of capabilities, integrations, and stated intent. Each is grounded in what the system demonstrably does; roles the upstreams are silent on are noted as gaps at the end.
+Three primary personas are named explicitly in the upstream content, and a fourth is strongly implied by the operational surface the system exposes. Each is described below with goals, needs, pain points, and the system capabilities that serve them.
 
 ---
 
-## Persona 1 — The Onboarding Developer
+## Persona 1 — The Systems Architect
 
-> *"I have inherited a large codebase I did not write. I need to understand what it does before I can safely change it."*
-
-### Profile
-A developer who joins a project mid-life and must build a mental model of an unfamiliar system. The codebase may be a long-lived monorepo where operational knowledge is scattered across files and never captured as coherent documentation.
+**Who they are.** A senior technical authority responsible for understanding what a large or legacy codebase actually does, independent of how it was implemented. They are typically engaged early in a migration or re-implementation programme to produce an auditable record of system behaviour.
 
 ### Goals
-- Quickly form an accurate picture of what the system accomplishes for its users.
-- Navigate cross-module flows without reading every file individually.
-- Ask follow-up questions when the static documentation raises new ones.
+- Produce a technology-agnostic, citable account of the system's domain intent, entities, and contracts.
+- Identify areas where the codebase contradicts itself — schema definitions that diverge from application usage, contracts defined one way and consumed another.
+- Verify that the resulting documentation is grounded in source evidence, not paraphrased from memory or tribal knowledge.
 
 ### Needs
-| Need | How the system addresses it |
-|---|---|
-| Intent over implementation | Wiki describes what the system does, not how it is built, so the developer's mental model survives future technology changes |
-| Cross-module flow descriptions | The cross-file reference graph is consulted per file so findings describe flows between modules rather than treating each file in isolation |
-| Trustworthy claims | Every assertion is anchored to a specific source file and line range, so the developer can verify any claim without trusting unsourced documentation |
-| Interactive clarification | An interactive conversational session grounded in the wiki content supports multi-turn questions, with only fully populated sections included to prevent placeholder content from diluting answers |
+- **Full traceability** — every claim in the generated wiki must be traceable to a specific file and line range so the architect can verify any assertion against the original codebase.
+- **Explicit contradiction surfacing** — disagreements between source files must be visible, not silently merged; these are high-priority signals marking undocumented behaviour and accumulated drift.
+- **Technology-agnostic output** — the wiki must be expressed in domain terms so the architect can reason about system behaviour without knowledge of the implementation language or runtime.
 
-### Pain Points
-- Sheer volume of source material makes manual review impractical.
-- Existing documentation, where it exists, describes implementation rather than intent.
-- Tribal knowledge is hidden in inconsistencies scattered across files.
+### Pain points
+- Manually reading a large repository (potentially tens of thousands of files) to extract domain intent is prohibitively slow and error-prone.
+- Implicit knowledge encoded in the shape of data models, API contracts, and schema migrations is the hardest kind to recover and the most important for migration.
+- Without structured citations, any documentation produced cannot be trusted or audited.
 
-### Primary Use Cases
-- Reading primary wiki sections (domains, intent, capabilities, entities) to build an initial model.
-- Querying the interactive chat session to chase down specific flows or clarify ambiguous sections.
-- Reviewing contradiction blocks to understand where the source itself is inconsistent, rather than receiving a silently resolved answer.
+### Use cases served
+- Initiating a full pipeline run to generate the primary wiki sections (business domains, system intent, capabilities, external dependencies, integrations, cross-cutting concerns, core entities, hard specifications).
+- Reviewing generated sections with citation markers to trace any assertion back to its source file and line range.
+- Inspecting surfaced contradictions to identify where the codebase has drifted from its intended contracts.
+- Consulting the interactive chat mode to ask precise questions about system behaviour, knowing answers are grounded in wiki content rather than invented.
 
 ---
 
-## Persona 2 — The Migration Lead or Architect
+## Persona 2 — The Migration Lead
 
-> *"Before I can scope this re-implementation, I need to know the analysis covered the full system and that the resulting wiki is trustworthy enough to act on."*
-
-### Profile
-A technical decision-maker — lead architect, principal engineer, or programme manager — who must scope, fund, or execute a re-implementation of a legacy system. They are not reading the source themselves; they are reading the wiki as the evidentiary basis for consequential decisions.
+**Who they are.** A programme or delivery lead who must decide whether a re-implementation project is ready to proceed. They are not necessarily reading the generated wiki in detail; they need to answer two specific gate questions before committing resources.
 
 ### Goals
-- Confirm that the analysis walk covered the full system, not just the easy-to-parse parts.
-- Verify that every claim in the wiki can be traced back to a specific source location.
-- Identify where the source itself contains contradictions that a migration team will need to resolve.
-- Assess documentation quality before committing to use the wiki as migration input.
+- Determine whether the entire codebase was covered by the analysis — no significant portion silently excluded.
+- Determine whether the resulting wiki is complete and reliable enough to act on as a specification for re-implementation.
 
 ### Needs
-| Need | How the system addresses it |
-|---|---|
-| Coverage assurance | A coverage and quality report summarises, per section, how many files contributed findings and how complete the analysis was |
-| Traceability | Every wiki assertion is rendered with inline citation markers linked to a numbered source footer; any claim can be traced to the originating file and line range |
-| Contradiction visibility | Where two or more sources assert incompatible things, the system surfaces an explicit conflict block rather than silently reconciling the disagreement |
-| Quality scoring | An optional critic-and-reviser cycle scores section bodies against a structured rubric, producing per-section quality scores and unsupported-claim flags alongside an overall mean score |
-| Technology agnosticism | Observations are expressed in domain terms, keeping the wiki legible and actionable even when the underlying technology stack is replaced entirely |
+- **Coverage statistics** — total files analysed, files with at least one finding, per-section finding and contributing-file counts.
+- **Quality scores** — an overall floating-point quality score and per-section integer scores (0–10) with summaries of unsupported claims and gaps.
+- **Gap reporting** — explicit identification of sections that are empty or under-evidenced, so the lead can decide whether to accept the gap or request additional analysis.
 
-### Pain Points
-- Cannot act on documentation that lacks a verifiable source — any unsourced claim introduces risk into a re-implementation plan.
-- A partial analysis walk that silently skips complex or malformed files produces a false sense of completeness.
-- Silent conflict resolution hides exactly the ambiguities a migration team most needs to know about.
+### Pain points
+- Without a structured report, it is impossible to know whether the pipeline covered the whole codebase or silently skipped significant portions.
+- Qualitative assurances about documentation completeness are not fundable; numeric coverage and quality metrics are.
+- A wiki that looks complete but contains speculative or unsupported claims is worse than a wiki that declares its gaps explicitly.
 
-### Primary Use Cases
-- Running or reviewing a quality report (with the critic loop enabled) before sign-off.
-- Inspecting the coverage report to confirm file contribution counts per section.
-- Using contradiction blocks as an explicit work-item list for the migration team.
-- Reviewing derivative sections (personas, user stories, diagrams) synthesized from the aggregated primaries.
+### Use cases served
+- Running the report command to obtain the `WikiReport` and `WikiQualityReport`, including overall and per-section quality scores and coverage statistics.
+- Reviewing the critic-generated lists of unsupported claims and suggested edits to assess the risk of acting on the current documentation state.
+- Using the coverage percentage (files-with-findings divided by total files) from the quality-review subsystem to determine whether the analysis was sufficiently comprehensive.
 
 ---
 
-## Persona 3 — The Legacy System Maintainer
+## Persona 3 — The Re-implementation Engineer
 
-> *"The system keeps changing. I cannot afford to rewrite the documentation by hand every time, and I need to know when something has gone inconsistent."*
-
-### Profile
-A developer or small team responsible for keeping a production system running over months or years. The codebase changes continuously; documentation written at one point in time drifts out of date and becomes a liability rather than an asset.
+**Who they are.** A developer working on the re-implementation project who needs authoritative, precise answers about the behaviour of the existing system — without reading every source file themselves.
 
 ### Goals
-- Keep the wiki accurate as the codebase evolves, without manual documentation effort.
-- Know when a recent change has introduced an inconsistency.
-- Avoid paying the full analysis cost on every run when only a small part of the codebase changed.
+- Get fast, accurate answers to specific questions about system behaviour, entity contracts, and integration touchpoints.
+- Understand what the existing system's API surface, data schemas, and event streams look like, expressed in domain terms they can target in the new implementation.
+- Identify any known contradictions or gaps in the documentation before writing code that depends on an assumption.
 
 ### Needs
-| Need | How the system addresses it |
-|---|---|
-| Automated currency | The system re-analyses changed files on each run without any manual authoring |
-| Incremental efficiency | Only files whose content has changed are re-processed; unchanged sections are served from cache; a run in which nothing has changed is a complete no-op |
-| Surgical preservation | When only a small subset of findings changes, targeted in-place edits preserve established prose, citation numbering, and unaffected paragraphs verbatim |
-| Inconsistency surfacing | Contradiction blocks make newly introduced conflicts visible immediately after the next run |
-| Crash resilience | Cache state is persisted after each file, so a crash at any stage resumes from the last completed file rather than restarting from scratch; malformed files are flagged for manual review rather than halting the run |
+- **Interactive query access** — a conversational interface that answers questions grounded in the wiki content, acknowledging gaps rather than inventing answers.
+- **Structured entity and contract documentation** — clear descriptions of core entities, foreign-key couplings, HTTP endpoints, remote-procedure-call operations (with request/response types and streaming directions), and real-time subscription surfaces.
+- **Traceable, non-speculative claims** — any assertion the engineer relies on must be verifiable against the source codebase.
 
-### Pain Points
-- Full rewrites of documentation on every run would erase carefully reviewed prose and reset citation numbering.
-- A pipeline that halts on a single unparseable file blocks the entire team.
-- Re-running a full analysis on a large codebase just because one file changed is economically and practically unacceptable.
+### Pain points
+- Reading tens of thousands of source files to find the answer to a single domain question is impractical.
+- Documentation that silently fills gaps with plausible-sounding but unsupported assertions causes implementation errors that are expensive to fix.
+- Contract information spread across schema files, API specifications, and application logic is inconsistent in legacy systems; engineers need to know where disagreements exist before designing the replacement.
 
-### Primary Use Cases
-- Scheduling incremental re-runs after code merges to keep the wiki current.
-- Reviewing the post-run report to spot newly surfaced contradictions or newly empty sections.
-- Checking flagged files that could not be parsed to decide whether manual review is warranted.
+### Use cases served
+- Using the chat REPL (the `chat` command) to ask targeted questions about entity relationships, API contracts, integration touchpoints, and business rules, receiving answers grounded in loaded wiki sections.
+- Reading the entities section to understand the domain object model and the integrations section to understand inbound and outbound contract surfaces.
+- Reviewing surfaced contradictions to understand where the existing system's behaviour is ambiguous before encoding assumptions into the re-implementation.
 
 ---
 
 ## Persona 4 — The Pipeline Operator
 
-> *"This needs to run in an automated environment. I cannot babysit it, and it must not modify content during a reporting pass."*
-
-### Profile
-An engineer or team responsible for integrating wiki generation into an automated workflow — for example, a scheduled job that runs after each significant merge. They interact with the system primarily through the command-line interface and configuration, not through the interactive chat.
+**Who they are.** A technically proficient practitioner — often an architect, a senior engineer, or a platform engineer — responsible for configuring, running, and maintaining the analysis pipeline against the target repository. This persona is implied by the breadth of operational controls the system exposes: provider selection, model configuration, caching behaviour, incremental update strategies, and the multi-command CLI surface.
 
 ### Goals
-- Run the full pipeline unattended without human intervention.
-- Swap the inference backend without changing any pipeline logic.
-- Control cost by governing which provider is active and whether prompt caching is used.
-- Ensure the reporting pass does not modify any wiki content (making it safe for automated pipelines).
+- Initialise and run the pipeline reliably against large repositories without incurring prohibitive cost or latency.
+- Keep the generated wiki up to date incrementally as the source repository evolves, without triggering full re-analysis of unchanged files.
+- Configure the pipeline appropriately for the environment: provider selection (hosted or on-premises), model identity, file-size thresholds, chunk sizes, and feature flags.
 
 ### Needs
-| Need | How the system addresses it |
-|---|---|
-| Single entry point | The command-line interface is the sole external entry point; it delegates entirely to internal modules and contains no domain logic |
-| Layered configuration | Configuration is resolved from a per-target config file, environment variables, and built-in defaults in strict precedence order, so each analysed repository can drive its own settings |
-| Backend flexibility | The inference backend is selected at runtime via configuration; the abstract provider contract means swapping backends requires no pipeline changes |
-| Cost control | Prompt-cache reuse and adaptive reasoning modes make large-scale walks economically viable; the operator can tune these via settings |
-| Safe reporting | The reporting pass reads wiki content and notes without modifying them, making it safe to run in automated pipelines |
-| Graceful degradation | Synthesis failures preserve raw extracted notes rather than producing blank sections; the run always yields some output |
+- **Incremental caching** — content-addressed caching that skips unchanged files on re-runs, reducing hours-long full walks to minutes-long incremental updates; surgical editing that patches only the affected portions of cached prose.
+- **Provider flexibility** — the ability to select among multiple AI backends (hosted options or a fully on-premises local model service) without changing pipeline behaviour.
+- **Operational visibility** — structured run statistics (files seen, cache hits, sections written, sections surgically edited, sections served from cache) to understand what the pipeline did and at what cost.
 
-### Pain Points
-- A backend that cannot be swapped creates vendor lock-in at the infrastructure level.
-- Calling a hosted inference service for hundreds of per-file passes without cost controls would be cost-prohibitive.
-- A pipeline that produces blank sections or halts on failure cannot be trusted in an automated context.
+### Pain points
+- AI-backed analysis of large repositories is inherently expensive; without caching and incremental strategies the cost is prohibitive at scale.
+- Switching AI backends for cost, latency, or data-residency reasons should not require changes to the pipeline logic.
+- Without operational metrics it is impossible to diagnose why a run was slow, expensive, or incomplete.
 
-### Primary Use Cases
-- Configuring and scheduling unattended wiki generation runs.
-- Selecting and rotating inference backends via configuration.
-- Reviewing the walk report and coverage statistics as pipeline outputs rather than as interactive documents.
+### Use cases served
+- Running the `init` command to create the browsable wiki stub before any analysis runs, making the structure available regardless of pipeline state.
+- Running the `walk` command to execute the four-stage pipeline (introspection → extraction → aggregation → derivation), with caching and incremental update behaviour governed by settings.
+- Configuring provider identity, model, inference endpoint, request timeout, chunk sizes, and feature flags (caching, graph construction, specialised extractors, review loop, surgical edits) via the layered settings model.
+- Monitoring `WalkReport` and `AggregationStats` / `DerivationStats` outputs to understand run coverage, cache efficiency, and section-level outcomes.
 
 ---
 
-## Gaps
+## Persona–Capability Matrix
 
-The upstream sections are silent on the following potential audiences. These personas cannot be inferred from the available evidence and are declared here as gaps rather than invented:
+| Capability | Architect | Migration Lead | Engineer | Operator |
+|---|:---:|:---:|:---:|:---:|
+| Four-stage wiki generation pipeline | ✓ | | | ✓ |
+| Per-claim citation markers and source traceability | ✓ | | ✓ | |
+| Explicit contradiction surfacing | ✓ | ✓ | ✓ | |
+| Interactive chat (grounded Q&A) | ✓ | | ✓ | |
+| Coverage and quality reporting | | ✓ | | ✓ |
+| Incremental caching and surgical updates | | | | ✓ |
+| Specialised contract and schema extraction | ✓ | | ✓ | |
+| Provider and model selection | | | | ✓ |
+| Derivative content (personas, user stories, diagrams) | ✓ | ✓ | | |
 
-- **End users of the documented system** — the wiki describes what the system does for its users, but those end users are not themselves users of the wiki-generation system as described in the upstreams.
-- **Product managers or business stakeholders** — no upstream section describes non-technical readers consuming the generated wiki for product-level decision-making.
-- **Security or compliance reviewers** — no upstream section describes use of the wiki for audit, compliance, or security assessment purposes.
+---
+
+> **Gap note.** The upstream sections do not describe any persona who consumes the generated wiki without also being involved in the migration programme (for example, a product owner or external auditor). If such a consumer exists, their needs are not evidenced in the current documentation and cannot be inferred from the available upstream content.

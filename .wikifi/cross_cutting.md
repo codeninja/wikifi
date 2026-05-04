@@ -1,164 +1,174 @@
 # Cross-Cutting Concerns
 
-### Observability
+The cross-cutting concerns span six domains: observability, cache and data integrity, crash survivability, graceful degradation, auditability, and storage invariants. Each represents a non-functional requirement that any migration must explicitly preserve.
 
-Structured logging is enabled globally across all pipeline stages through a single startup hook, with a verbosity flag that switches between standard and debug output levels. Each subsystem registers its own log namespace (conversation, reporting, derivation, and others), so failures are attributable to their origin. Provider-level errors are normalized by a shared formatting helper that includes the vendor-assigned request identifier when available, ensuring consistent and traceable diagnostics regardless of which backend is active.
+### Observability and Monitoring
 
-Token-budget issues are diagnosed explicitly at the provider level: when a structured response comes back empty, the system surfaces the stop reason, output token count, and the active limit, together with hints that distinguish budget exhaustion from a model refusal.
+Structured logging is configured globally before any processing begins, gated by a verbosity flag. Log entries are emitted at every major pipeline stage boundary—scope classification, dependency graph construction, extraction, aggregation, derivative synthesis, and short-circuit decisions—providing continuous operational visibility into pipeline progress.
 
-The quality-reporting command is strictly read-only and never modifies the wiki, making it safe to invoke repeatedly in automated pipelines or monitoring hooks without risk of data mutation.
+Cache efficiency is tracked per pipeline scope (extraction, aggregation, derivation) through hit and miss counters, giving operators a quantitative view of work reused versus recomputed across runs.
 
----
+Error reporting from external AI service calls is normalised across all backends: every diagnostic includes the provider name, a request identifier where available, and the error message, ensuring consistent observability regardless of which backend is active. When a structured response returns empty, the system inspects the stop reason and output token count and surfaces actionable remediation hints at the failure site.
 
-### Resilience and Graceful Degradation
+The reporting subsystem enforces a strict read-only invariant over the wiki: it consumes notes, section markdown, and the walk cache but never writes to any of them. Quality scoring is decoupled from structural coverage reporting; the structural report is usable in automated pipelines without any AI dependency, while scoring is opt-in and requires a live provider.
 
-The pipeline is designed to produce output under partial failure at every stage:
+### Cache and Data Integrity
 
-- **Synthesis failures** during aggregation are caught and logged; affected sections degrade to raw-note preservation rather than raising an exception.
-- **Critic and reviser failures** fall back to a zero-score sentinel and the original body, respectively; a score-regression guard prevents a poorly-guided rewrite from replacing better-quality existing content.
-- **Per-chunk extraction failures** are logged as warnings; the file continues with whatever chunks succeeded, and a fully failed file increments a counter rather than being silently dropped.
-- **Configuration parse failures** are logged as warnings and the system falls back gracefully to environment-derived settings.
-- **Provider failures during interactive sessions** are reported to the user without terminating the session.
+The persistence layer is content-addressed with several explicit integrity invariants:
 
-Incremental cache persistence — a per-section callback invoked after each successfully aggregated section — converts a mid-stage crash or out-of-memory event into a survivable event, preserving all aggregation progress up to the last completed section.
+- **Atomic writes**: Cache files are first committed to a sibling temporary file, then renamed over the target, preventing a half-written file from corrupting subsequent runs.
+- **Schema versioning**: The cache carries an explicit integer version number. Entries whose stored version does not match the current version are silently dropped and recomputed on the next run, with a documented change history.
+- **Fingerprint coherence**: A single shared fingerprinting primitive covers cache key generation, evidence citation, and the dependency graph, so a change to any source file triggers correct cross-file invalidation across all subsystems.[12]
+- **Partial-failure protection**: A file's cache entry is written only when every processing chunk succeeds; a partial failure leaves the file uncached so the next run reprocesses it in full.[13]
+- **Error-body exclusion**: Bodies produced by failed synthesis attempts are never stored in the cache, preventing a transient failure from being replayed until upstream content changes.[14]
+- **Empty-section tracking**: Sections with no notes receive a dedicated cache entry recording zero notes seen, distinguishing them from sections that were never aggregated and preventing stale prose from persisting undetected when a file deletion drains a section's evidence.
+- **Derivative cache validation**: Derivative section cache freshness is validated on two axes simultaneously—a hash of upstream section bodies (content integrity) and a flag recording whether a critic review loop ran (review-mode parity). A cache hit requires both to match the current run's parameters.
+- **Selective invalidation**: A runtime flag disables cache reads and resets the entire persisted cache state, ensuring stale findings are never carried forward.[17]
+- **Scope pruning**: Out-of-scope files are removed from the extraction cache at the start of each walk, keeping cache size proportional to the live in-scope file set.[18]
 
----
+Citation integrity is separately maintained across incremental section updates: surviving cached claims are tracked, new claims are resolved against their source references, and the contradiction list is replaced wholesale so the citation footer never references evidence that no longer exists.
 
-### Data Integrity and Evidence Traceability
+The orchestrator enforces five strict conditions before short-circuiting downstream stages: caching must be enabled, at least one file must have been seen, every file must have been cache-served or deterministically extracted (no new AI output), the scope classification hash must match the prior walk's, and every primary and derivative section's cache must be fresh. This prevents a previously crashed mid-pipeline run from silently perpetuating stale content.
 
-Every finding produced by the pipeline carries a structured source reference containing the originating file path, an optional line range, and a content fingerprint captured at extraction time. This fingerprint is a 12-character prefix of a cryptographic hash — providing 48 bits of entropy, sufficient to be collision-resistant across any realistic repository — and allows any claim to be re-verified against the original source after a subsequent repository walk.
+Empty-placeholder detection during derivative synthesis uses a multi-pattern heuristic covering distinct shapes of "no real content" text produced at different pipeline stages, preventing downstream sections from treating placeholder strings as substantive evidence.
 
-Deduplication is enforced within each file: identical (section, finding-text) pairs arising from overlapping processing chunks are discarded before being written to the notes store, preventing count inflation.
+For schema-centric artefacts, entities and capabilities defined across multiple partial schema files via composition directives are explicitly handled, ensuring nothing is silently dropped when schemas are assembled from many partial sources.
 
-Contradictions between source files are never silently merged. They are surfaced as high-priority signals in the rendered output, on the explicit rationale that legacy systems routinely hide tribal knowledge in disagreements; making contradictions visible is therefore a non-functional invariant of the documentation pipeline.
+### Crash Survivability
 
-Introspection-stage responses are validated against a strict schema, making that stage's output deterministic to validate and straightforward to diff between successive runs — a consistency guarantee that carries forward into extraction.
+Crash resumability is a first-class design property implemented at every stage boundary. During extraction, the cache is persisted after each file completes, allowing interrupted runs to resume from the last successful file.[22] During aggregation, an incremental-persist callback fires after each successful section update, so a mid-run crash loses at most the current section's work. Each pipeline stage also persists its own cache slice immediately upon completion, leaving the on-disk state in the most-advanced-consistent position rather than requiring all stages to succeed atomically.
 
-After incremental (surgical) edits, citation integrity is actively maintained: cached claims are preserved or selectively dropped, new claims carry resolved source references, and contradiction records are fully replaced rather than partially updated. A companion content-integrity invariant requires that any sentence in the cached body not affected by a changed finding must appear verbatim in the revised output.
+### Graceful Degradation
 
-A heuristic scans upstream section bodies for known sentinel strings before synthesis begins, preventing derivative sections from being generated from boilerplate or placeholder content and guarding against fabricated findings.
+Failures are isolated rather than propagated:
 
-All per-file extraction notes are persisted with a UTC timestamp on every record, providing a lightweight audit trail of when each finding was recorded.
+- Extraction failures are scoped per-file and per-chunk; they are logged and counted as skipped without aborting the overall walk.[25] An orchestrator-level invariant ensures a failed specialized extraction does not increment the specialized-files counter, which the pipeline uses as proof that no AI work was silently lost.
+- Aggregation failures are logged as warnings; the incremental-edit path falls through to a full rewrite on any exception so sections are never silently absent from the output.
+- Critic and reviser failures are logged as warnings; a failed critic returns a score of zero with a diagnostic summary rather than halting execution.[28]
+- AI service failures during interactive sessions are reported to the user without terminating the session; conversation history is preserved in memory for the lifetime of the session.
 
-A startup validation routine enforces referential integrity across the section dependency graph, raising a descriptive error if any cross-reference names an unknown or out-of-order section. This check runs at module load time so misconfiguration is detected before any pipeline work begins.
+All AI service calls are subject to a per-request timeout to prevent indefinite hangs. Files exceeding a configurable size threshold are unconditionally skipped as likely vendored or generated noise; files whose content falls below a minimum byte count after stripping are skipped to avoid runaway reasoning on stubs.
 
----
+Directory traversal prunes ignored subtrees before descent, so excluded directories are never visited at all; this is both a performance and a correctness invariant that must be preserved across any reimplementation.
 
-### Cache and Storage Integrity
+### Auditability and Traceability
 
-All cache writes are atomic: content is first written to a sibling temporary file and then renamed into place, so a crash during writing leaves the previous valid cache file intact. Cache files are stored in a dedicated subdirectory co-located with the wiki output; a programmatically managed ignore file ensures that only the final section markdown is committed to source control, while intermediate extraction notes and the cache are excluded. Missing or corrupt cache files are silently treated as empty (a fresh start), and malformed individual entries are logged as warnings and dropped.
+Every generated claim is structurally required to carry source references back to specific files and optional line ranges. Unsupported claims are explicitly distinguishable via a predicate, making auditability a structural invariant of the pipeline rather than a best-effort annotation.
 
-A monotonically incremented schema version gates all cache reads: any cache file written under an older version is rejected entirely and treated as empty, forcing a clean re-run rather than consuming structurally incompatible data. Cache entries for files that leave scope are pruned at the start of each walk to prevent unbounded growth.
+All specialized extractors share a uniform output contract that includes provenance (source file path, fingerprint, and line range), ensuring every wiki note can be traced to its exact origin regardless of which extractor produced it.
 
-Derivation cache entries are keyed by both the hash of upstream section bodies and a flag recording whether the critic-review loop ran; entries from non-reviewed runs are not reused when a reviewed run is requested, preserving quality parity across run modes.
+Per-file extraction notes are timestamped at write time in coordinated universal time, providing an audit trail of when each finding was recorded.[34] The scope classification stage produces output under a strict typed schema, making its results deterministic to parse and straightforward to diff across runs.
 
-The short-circuit predicate that skips aggregation and derivation enforces five simultaneous conditions: caching must be enabled, at least one file must have been processed, all files must have been cache hits or handled by deterministic extractors, the introspection scope hash must match the prior walk's, and every aggregation and derivation cache entry must be fresh. This prevents a mid-run crash from permanently locking in stale sections. Introspection results are persisted to disk before extraction begins so that this predicate remains evaluable even after a crash.
+The section dependency graph's referential integrity is enforced eagerly at module load time: unknown upstream references and out-of-order dependencies both raise errors before any files are processed, preventing silent misconfiguration.
 
-For structured-output inference calls the temperature is pinned to zero, ensuring identical inputs produce identical outputs across runs. Free-text and conversational calls use the model's default temperature and may therefore vary between runs.
+Empty or unpopulated sections are detected by scanning body text for known sentinel strings and are excluded from quality scoring while being explicitly flagged in coverage reports.[37]
 
-Prompt caching at the service level — achieved by placing the large, repeated system prompt in a predictable position in every request — reduces the cost and latency of the many per-file calls that make up a single pipeline run.
-
----
-
-### Configuration Integrity
-
-Target-specific configuration overrides are allowlisted to a small set of fields; any additional or unrecognized fields in a hand-edited or stale configuration file are silently ignored to prevent unintended behavior changes. Configuration parse failures are logged as warnings and the system falls back to environment-derived settings rather than crashing. A process-wide settings singleton is used to avoid redundant reads, with an explicit invalidation mechanism to support isolated test execution when environment variables are mutated between cases.
-
----
+Notes and cache directories are excluded from version control via a managed ignore file, with a backfill mechanism that appends missing entries to existing ignore files during initialization. Only finalized section markdown is committed.
 
 ### Authentication and Authorization
 
-Authentication and authorization contracts are extracted from API specification files: the set of scheme types (bearer tokens, API keys, OAuth flows, and similar mechanisms) that external consumers must present to access the system is surfaced as explicit wiki findings. This ensures that access-control requirements are visible to migration teams as first-class documented facts rather than being implicit in raw specification files.
+Authentication contracts discovered in API contract files are formally captured as cross-cutting invariants. The declared authentication mechanisms—including API key schemes, bearer tokens, and OAuth flows—are surfaced as structured wiki findings and are explicitly treated as requirements that must be preserved through any migration.
 
----
+### Storage Invariants
 
-### Data-Quality Invariants
+Unique and non-null constraints on table definitions are recorded as storage invariants the replacement system must honour. Indexes are separately recorded as query-time performance invariants. Both categories carry precise line-level citations back to the schema source.
 
-File selection applies a cheapest-first filter chain (path pattern → size check → content read) that enforces a minimum content threshold before any analysis pass runs. This threshold is explicitly motivated by inference model behaviour — preventing speculative or runaway outputs on near-empty files — making it a data-quality invariant that must be preserved through any migration of the analysis pipeline.
+Database migration scripts are distinguished from general schema definition files, enabling the wiki to separate the current authoritative schema from the forward-only incremental change history.[42] This distinction is recognized for a wide range of common migration tooling conventions.
 
-Relational schema extractors capture UNIQUE and NOT NULL constraints as storage invariants and indexes as performance invariants, both annotated with the explicit requirement that they must survive migration to the target system.
+### Cost Control and Reproducibility
 
-The tech-agnostic output invariant — that synthesized prose must express all observations in domain terms and must never name specific technologies — is enforced both in the inference system prompt and as a stated structural design goal of the incremental update subsystem.
+Cost control is treated as a first-class non-functional requirement. The large, repeated system prompt is placed at a consistent message position across all call types to exploit upstream API prefix-caching, amortising prompt processing costs across every per-file call in a walk.
+
+Structured-output calls pin temperature to zero, ensuring the same input produces identical structured results across runs. Free-text and conversational calls leave temperature at the model default, accepting variability in exchange for naturalness.
+
+A reasoning-depth parameter serves as a system-wide quality-versus-latency tradeoff knob; the system's stated preference is output quality over wall-clock speed, particularly for derivative-section generation. Operators must be aware that adjusting this parameter affects both schema adherence and processing duration.
+
+A configurable churn-ratio threshold determines when incremental section editing is safe versus when a full rewrite is required; exceeding the threshold forces complete re-synthesis to prevent latent inconsistencies from being silently preserved. Finding identifiers that are empty strings unconditionally force a full rewrite to avoid identity collisions.
 
 ## Supporting claims
-- Structured logging is enabled globally through a single startup hook with a verbosity flag; each subsystem registers its own log namespace. [1][2][3][4]
-- Provider-level errors are normalized by a shared formatting helper that includes the vendor-assigned request identifier when available. [5]
-- Token-budget issues are diagnosed explicitly: stop reason, output token count, active limit, and disambiguation hints are surfaced. [6]
-- The quality-reporting command is strictly read-only and never modifies the wiki. [7]
-- Synthesis failures during aggregation degrade to raw-note preservation rather than raising an exception. [8]
-- Critic and reviser failures fall back to a zero-score sentinel and the original body respectively; a score-regression guard is present. [9]
-- Per-chunk extraction failures are logged as warnings and do not abort the file walk; fully failed files increment a counter. [10]
-- Configuration parse failures are logged as warnings and the system falls back to environment-derived settings. [11]
-- Provider failures during interactive sessions are reported to the user without terminating the session. [12]
-- Incremental cache persistence via a per-section callback makes mid-stage crashes survivable by preserving all aggregation progress up to the last completed section. [13]
-- Every finding carries a structured source reference with file path, optional line range, and a content fingerprint captured at extraction time. [14][15][16][17]
-- The content fingerprint is a 12-character prefix of a cryptographic hash, providing 48 bits of entropy and collision resistance across any realistic repository. [18][19]
-- Deduplication of findings within each file is enforced by tracking (section, finding-text) pairs across all processing chunks. [20]
-- Contradictions between source files are surfaced as high-priority signals and never silently merged; their visibility is a stated non-functional invariant. [21]
-- Introspection-stage LLM responses are validated against a strict schema, making that output deterministic to validate and easy to diff between runs. [22]
-- After surgical edits, citation integrity is maintained by re-anchoring references; a content-integrity invariant requires unchanged sentences to appear verbatim. [23][24]
-- A heuristic scans upstream bodies for sentinel strings to prevent synthesis from placeholder or boilerplate content. [25]
-- All per-file extraction notes are persisted with a UTC timestamp on every record. [26]
-- A startup validation routine enforces referential integrity of the section dependency graph at module load time. [27]
-- All cache writes are atomic: content is written to a sibling temporary file and then renamed into place. [28]
-- Cache files are stored in a dedicated subdirectory co-located with the wiki; only final section markdown is committed to source control via a programmatically managed ignore file. [29][30]
-- A monotonically incremented schema version gates all cache reads; older versions are rejected entirely and treated as empty. [31]
-- Cache entries for files that leave scope are pruned at the start of each walk. [32]
-- Derivation cache entries are keyed by upstream section body hash and a critic-review flag; non-reviewed entries are not reused for reviewed runs. [33]
-- The short-circuit predicate enforces five simultaneous conditions before skipping aggregation and derivation stages. [34][35]
-- Introspection results are persisted to disk before the extraction stage begins so the short-circuit predicate remains evaluable after a crash. [36]
-- For structured-output inference calls the temperature is pinned to zero; free-text and conversational calls may vary between runs. [37]
-- Prompt caching at the service level is achieved by placing the system prompt in a predictable position in every request, reducing cost and latency across many per-file calls. [38][39]
-- Target-specific configuration overrides are allowlisted; unknown fields are silently ignored and parse failures fall back to environment-derived settings. [40][11]
-- A process-wide settings singleton includes an explicit invalidation mechanism to support isolated test execution. [41]
-- Authentication and authorization contracts are extracted from API specification files, surfacing scheme types as explicit wiki findings. [42]
-- File selection applies a cheapest-first filter chain enforcing a minimum content threshold as a data-quality invariant motivated by inference model behaviour. [43]
-- Relational schema extractors capture UNIQUE and NOT NULL constraints as storage invariants and indexes as performance invariants, both annotated with a migration-preservation requirement. [44]
-- The tech-agnostic output invariant — no technology names in synthesized prose — is enforced in the inference system prompt and as a structural design goal. [45]
+- Structured logging is configured globally before any processing begins, controlled by a verbosity flag. [1]
+- Log entries are emitted at every major pipeline stage boundary, including scope classification, graph construction, extraction, aggregation, derivative synthesis, and short-circuit decisions. [2]
+- Cache efficiency is tracked per pipeline scope (extraction, aggregation, derivation) via hit and miss counters. [3]
+- Error reporting from external AI service calls is normalised across all backends, including provider name, request identifier, and error message. [4][5][6]
+- When a structured response returns empty, the system diagnoses the root cause by inspecting the stop reason and token count and surfaces actionable remediation hints at the failure site. [7]
+- The reporting subsystem enforces a strict read-only invariant over the wiki, never writing to notes, section markdown, or the walk cache. [8]
+- Quality scoring is decoupled from structural coverage reporting; the structural report is usable in automated pipelines without any AI dependency. [9]
+- All cache files are written atomically via a sibling temporary file and rename, preventing half-written files from corrupting subsequent runs. [10]
+- The cache carries an explicit integer version number; entries whose stored version does not match the current version are silently dropped and recomputed on the next run. [11]
+- Sections with no notes receive a dedicated cache entry recording zero notes seen, distinguishing them from sections that were never aggregated. [15]
+- Derivative section cache freshness is validated on two axes simultaneously: a hash of upstream section bodies and a flag recording whether the critic review loop ran. [16]
+- Citation integrity is maintained across incremental section updates: surviving cached claims are tracked, new claims resolved against source references, and the contradiction list replaced wholesale. [19]
+- The orchestrator enforces five strict conditions before short-circuiting downstream stages: caching enabled, files seen, all files cache-served or deterministically extracted, scope hash matching prior walk, and all section caches fresh. [20]
+- Empty-placeholder detection in derivative synthesis uses a multi-pattern heuristic covering distinct shapes of 'no real content' text, preventing downstream sections from treating placeholders as substantive evidence. [21]
+- An incremental-persist callback fires after each successful section update during aggregation, so a mid-run crash loses at most the current section's work. [23]
+- Each pipeline stage persists its own cache slice immediately upon completion, leaving on-disk state in the most-advanced-consistent position rather than requiring all stages to succeed atomically. [24]
+- An orchestrator-level invariant ensures a failed specialized extraction does not increment the specialized-files counter, preserving the pipeline's accounting proof that no AI work was silently lost. [26]
+- Aggregation failures are logged as warnings and the incremental-edit path falls through to a full rewrite on any exception, so sections are never silently absent. [27]
+- AI service failures during interactive sessions are reported to the user without terminating the session; conversation history is preserved in memory for the session lifetime. [29]
+- All AI service calls are subject to a per-request timeout; files exceeding a size threshold are unconditionally skipped; files below a minimum content byte count are also skipped. [30]
+- Directory traversal prunes ignored subtrees before descent, so excluded directories are never visited; this is both a performance and correctness invariant. [31]
+- Every generated claim is structurally required to carry source references back to specific files and optional line ranges; unsupported claims are explicitly distinguishable via a predicate. [32]
+- All specialized extractors share a uniform output contract that includes provenance (source file path, fingerprint, and line range), ensuring traceability regardless of which extractor produced the note. [33]
+- The scope classification stage produces output under a strict typed schema, making results deterministic to parse and straightforward to diff across runs. [35]
+- The section dependency graph's referential integrity is enforced eagerly at module load time; unknown upstream references and out-of-order dependencies raise errors before any files are processed. [36]
+- Notes and cache directories are excluded from version control via a managed ignore file, with a backfill mechanism that appends missing entries during initialization. [38][34][39]
+- Authentication contracts from API contract files—including API key, bearer token, and OAuth flows—are surfaced as structured wiki findings and treated as cross-cutting invariants that must be preserved through migration. [40]
+- Unique and non-null constraints on table definitions are recorded as storage invariants the replacement system must honour; indexes are separately recorded as query-time performance invariants, both with line-level citations. [41]
+- The large system prompt is placed at a consistent message position across all call types to exploit upstream API prefix-caching, amortising prompt processing costs across every per-file call. [43][44]
+- Structured-output calls pin temperature to zero, ensuring the same input produces identical structured results across runs; free-text and conversational calls leave temperature at the model default. [45]
+- A reasoning-depth parameter serves as a quality-versus-latency tradeoff knob; the system's stated preference is output quality over wall-clock speed, particularly for derivative-section generation. [46]
+- A configurable churn-ratio threshold determines when incremental section editing is safe versus when a full rewrite is required; empty finding identifiers unconditionally force a full rewrite to avoid identity collisions. [47][48]
+- Section-level caching uses a digest of the notes payload; the cache key is intentionally left stale when only line ranges or summaries drift to prevent the orchestrator from locking stale citations in place. [49]
+- Entities and capabilities defined across multiple partial schema files via composition directives are explicitly handled, ensuring nothing is silently dropped when schemas are assembled from many partial sources. [50]
 
 ## Sources
-1. `wikifi/chat.py:22`
-2. `wikifi/cli.py:52-62`
-3. `wikifi/deriver.py:88-95`
-4. `wikifi/report.py:22`
-5. `wikifi/providers/base.py:59-68`
-6. `wikifi/providers/anthropic_provider.py:250-275`
-7. `wikifi/report.py:13-15`
-8. `wikifi/aggregator.py:195-204`
-9. `wikifi/critic.py:128-145`
-10. `wikifi/extractor.py:271-282`
-11. `wikifi/config.py:223-227`
-12. `wikifi/chat.py:126-132`
-13. `wikifi/aggregator.py:162-170`
-14. `wikifi/evidence.py:41-46`
-15. `wikifi/extractor.py:254-265`
-16. `wikifi/specialized/graphql.py:54-68`
-17. `wikifi/specialized/protobuf.py:13-14`
-18. `wikifi/fingerprint.py:1-17`
-19. `wikifi/fingerprint.py:22-24`
-20. `wikifi/extractor.py:249-253`
-21. `wikifi/evidence.py:73-79`
-22. `wikifi/introspection.py:43-62`
-23. `wikifi/surgical.py:46-67`
-24. `wikifi/surgical.py:196-234`
-25. `wikifi/deriver.py:186-200`
-26. `wikifi/wiki.py:135-142`
-27. `wikifi/sections.py:143-156`
-28. `wikifi/cache.py:298-302`
-29. `wikifi/cache.py:36-42`
-30. `wikifi/wiki.py:102-128`
-31. `wikifi/cache.py:54-68`
-32. `wikifi/orchestrator.py:120-140`
-33. `wikifi/deriver.py:95-115`
-34. `wikifi/aggregator.py:305-328`
-35. `wikifi/orchestrator.py:243-300`
-36. `wikifi/orchestrator.py:144-152`
-37. `wikifi/providers/ollama_provider.py:59-69`
-38. `wikifi/providers/anthropic_provider.py:195-211`
-39. `wikifi/providers/openai_provider.py:8-13`
-40. `wikifi/config.py:196-200`
-41. `wikifi/config.py:185-193`
-42. `wikifi/specialized/openapi.py:112-121`
-43. `wikifi/walker.py:89-115`
-44. `wikifi/specialized/sql.py:100-121`
-45. `wikifi/surgical.py:57-59`
+1. `wikifi/cli.py:54-63`
+2. `wikifi/orchestrator.py:93-218`
+3. `wikifi/cache.py:148-155`
+4. `wikifi/providers/anthropic_provider.py:147-157`
+5. `wikifi/providers/base.py:58-68`
+6. `wikifi/providers/openai_provider.py:126-135`
+7. `wikifi/providers/anthropic_provider.py:271-296`
+8. `wikifi/report.py:13-15`
+9. `wikifi/report.py:78-85`
+10. `wikifi/cache.py:323-327`
+11. `wikifi/cache.py:52-63`
+12. `wikifi/fingerprint.py:1-18`
+13. `wikifi/extractor.py:317-330`
+14. `wikifi/deriver.py:181-186`
+15. `wikifi/aggregator.py:143-157`
+16. `wikifi/deriver.py:141-162`
+17. `wikifi/cli.py:119-122`
+18. `wikifi/orchestrator.py:117-121`
+19. `wikifi/surgical.py:222-270`
+20. `wikifi/orchestrator.py:197-232`
+21. `wikifi/deriver.py:208-219`
+22. `wikifi/extractor.py:163-168`
+23. `wikifi/aggregator.py:116-121`
+24. `wikifi/orchestrator.py:148-226`
+25. `wikifi/extractor.py:207-215`
+26. `wikifi/extractor.py:218-227`
+27. `wikifi/aggregator.py:193-209`
+28. `wikifi/critic.py:143-148`
+29. `wikifi/chat.py:130-138`
+30. `wikifi/config.py:60-83`
+31. `wikifi/walker.py:127-145`
+32. `wikifi/evidence.py:60-67`
+33. `wikifi/specialized/models.py:16-26`
+34. `wikifi/wiki.py:131-143`
+35. `wikifi/introspection.py:7-10`
+36. `wikifi/sections.py:155-166`
+37. `wikifi/report.py:111-119`
+38. `wikifi/cache.py:285-298`
+39. `wikifi/wiki.py:110-130`
+40. `wikifi/specialized/openapi.py:111-120`
+41. `wikifi/specialized/sql.py:109-141`
+42. `wikifi/repograph.py:97-115`
+43. `wikifi/providers/anthropic_provider.py:200-218`
+44. `wikifi/providers/openai_provider.py:10-20`
+45. `wikifi/providers/ollama_provider.py:59-69`
+46. `wikifi/providers/ollama_provider.py:6-31`
+47. `wikifi/config.py:88-94`
+48. `wikifi/surgical.py:130-185`
+49. `wikifi/aggregator.py:155-175`
+50. `wikifi/specialized/graphql.py:7-11`
