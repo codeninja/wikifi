@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import json
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass
 
 from pydantic import BaseModel, Field
@@ -107,6 +108,7 @@ def aggregate_all(
     layout: WikiLayout,
     provider: LLMProvider,
     cache: WalkCache | None = None,
+    persist_cache: Callable[[], None] | None = None,
 ) -> AggregationStats:
     """Aggregate every primary section from its accumulated notes.
 
@@ -117,6 +119,12 @@ def aggregate_all(
     When ``cache`` is supplied and the section's note digest is unchanged
     from the prior walk, the cached body and evidence are reused without
     invoking the LLM.
+
+    When ``persist_cache`` is supplied, it is invoked after each successful
+    section's cache update — that turns a Ctrl-C / OOM mid-stage-3 into a
+    survivable event. Without incremental persistence, every aggregation
+    cache update from this stage would be lost if anything raised before
+    the orchestrator's final ``save`` at the end of the walk.
     """
     stats = AggregationStats()
     for section in PRIMARY_SECTIONS:
@@ -164,6 +172,8 @@ def aggregate_all(
                 claims=[c.model_dump() for c in bundle.claims],
                 contradictions=[c.model_dump() for c in bundle.contradictions],
             )
+            if persist_cache is not None:
+                persist_cache()
 
     return stats
 
@@ -276,6 +286,32 @@ def _fallback_body(section: Section, notes: list[dict], *, error: str) -> str:
     return "\n".join(lines)
 
 
+def aggregation_fully_cached(layout: WikiLayout, cache: WalkCache) -> bool:
+    """Return True only if every primary section is covered by a fresh cache entry.
+
+    "Fresh" means: live notes hash matches the cached ``notes_hash``.
+    Sections with no notes count as covered (the aggregator writes the
+    empty-body placeholder either way; no LLM work is needed).
+
+    The orchestrator's short-circuit relies on this: a walk that crashed
+    mid-stage-3 leaves some sections aggregated and others stale, and a
+    weaker predicate (just "extraction was 100% cached") would let the
+    next walk skip stages 3 & 4 with stale prose still on disk.
+    """
+    for section in PRIMARY_SECTIONS:
+        notes = read_notes(layout, section)
+        if not notes:
+            # Empty-note sections render the same placeholder every walk
+            # — no aggregation work to short-circuit around.
+            continue
+        entry = cache.aggregation.get(section.id)
+        if entry is None:
+            return False
+        if entry.notes_hash != hash_section_notes(notes):
+            return False
+    return True
+
+
 __all__ = [
     "AGGREGATION_SYSTEM_PROMPT",
     "AggregatedClaim",
@@ -283,6 +319,7 @@ __all__ = [
     "AggregationStats",
     "SectionBody",
     "aggregate_all",
+    "aggregation_fully_cached",
 ]
 # json kept for downstream debugging needs
 _ = json

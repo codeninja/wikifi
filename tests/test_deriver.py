@@ -2,6 +2,7 @@
 
 import re
 
+from wikifi.cache import WalkCache, hash_upstream_bodies
 from wikifi.deriver import DerivedSection, derive_all
 from wikifi.sections import DERIVATIVE_SECTIONS, SECTIONS_BY_ID
 from wikifi.wiki import WikiLayout, initialize, write_section
@@ -138,3 +139,117 @@ def test_user_stories_can_consume_derived_personas(tmp_path, mock_provider_facto
     # The user_stories prompt must include the *derived* personas content,
     # confirming Stage 4 cascades correctly.
     assert "Derived body for personas." in seen["user_stories"]
+
+
+def test_derive_uses_cache_when_upstream_bodies_unchanged(tmp_path, mock_provider_factory):
+    """A second derive run with identical upstreams replays the cached body, no LLM call."""
+    layout = _setup(tmp_path)
+    for section in DERIVATIVE_SECTIONS:
+        _populate_upstreams(layout, section)
+
+    cache = WalkCache()
+    call_count = {"n": 0}
+
+    def factory(schema, system, user):
+        call_count["n"] += 1
+        return DerivedSection(body="First-pass body.")
+
+    provider = mock_provider_factory(json_factory=factory)
+    derive_all(layout=layout, provider=provider, cache=cache)
+    first_calls = call_count["n"]
+    assert first_calls == len(DERIVATIVE_SECTIONS)
+
+    # Second pass — same upstreams, same cache → zero LLM calls.
+    derive_all(layout=layout, provider=provider, cache=cache)
+    assert call_count["n"] == first_calls
+    # Stats should reflect that this run cached every section.
+    stats = derive_all(layout=layout, provider=provider, cache=cache)
+    assert stats.sections_cached == len(DERIVATIVE_SECTIONS)
+    assert call_count["n"] == first_calls  # still no new calls
+
+
+def test_derive_cache_misses_when_upstream_changes(tmp_path, mock_provider_factory):
+    """Editing an upstream body invalidates the derivative cache for that section."""
+    layout = _setup(tmp_path)
+    section = DERIVATIVE_SECTIONS[0]
+    _populate_upstreams(layout, section)
+
+    cache = WalkCache()
+    upstream_bodies = {
+        upstream_id: layout.section_path(upstream_id).read_text() for upstream_id in section.derived_from
+    }
+    cache.record_derivation(
+        section.id,
+        upstream_hash=hash_upstream_bodies(upstream_bodies),
+        body="Cached body.",
+        revised=False,
+    )
+
+    # Mutate one upstream — cache should miss and the LLM should be called.
+    first_upstream = SECTIONS_BY_ID[section.derived_from[0]]
+    write_section(layout, first_upstream, "Edited upstream content.")
+
+    call_count = {"n": 0}
+
+    def factory(schema, system, user):
+        call_count["n"] += 1
+        return DerivedSection(body="Re-synthesized body.")
+
+    provider = mock_provider_factory(json_factory=factory)
+    derive_all(layout=layout, provider=provider, cache=cache)
+    assert call_count["n"] >= 1
+    body = layout.section_path(section).read_text()
+    assert "Re-synthesized body." in body
+
+
+def test_derive_review_walk_does_not_reuse_unrevised_cached_body(tmp_path, mock_provider_factory):
+    """``--review`` must not silently inherit a cache entry produced without the critic."""
+    from wikifi.critic import Critique
+
+    layout = _setup(tmp_path)
+    section = DERIVATIVE_SECTIONS[0]
+    _populate_upstreams(layout, section)
+    upstream_bodies = {
+        upstream_id: layout.section_path(upstream_id).read_text() for upstream_id in section.derived_from
+    }
+
+    cache = WalkCache()
+    cache.record_derivation(
+        section.id,
+        upstream_hash=hash_upstream_bodies(upstream_bodies),
+        body="Unrevised cached body.",
+        revised=False,
+    )
+
+    call_count = {"n": 0}
+
+    def factory(schema, system, user):
+        call_count["n"] += 1
+        if schema is Critique:
+            return Critique(score=9, summary="ok")
+        return DerivedSection(body="New body under review.")
+
+    provider = mock_provider_factory(json_factory=factory)
+    derive_all(layout=layout, provider=provider, cache=cache, review=True)
+    # Review-mode walk forces re-synthesis even though the upstream hash
+    # matches the cache.
+    assert call_count["n"] >= 1
+
+
+def test_derive_persist_cache_called_after_each_section(tmp_path, mock_provider_factory):
+    """Stage 4's persist callback fires once per derivative cache update."""
+    layout = _setup(tmp_path)
+    for section in DERIVATIVE_SECTIONS:
+        _populate_upstreams(layout, section)
+
+    cache = WalkCache()
+    persist_calls = {"n": 0}
+
+    def persist():
+        persist_calls["n"] += 1
+
+    provider = mock_provider_factory(
+        json_factory=lambda schema, system, user: DerivedSection(body="body"),
+    )
+    derive_all(layout=layout, provider=provider, cache=cache, persist_cache=persist)
+    assert persist_calls["n"] == len(DERIVATIVE_SECTIONS)

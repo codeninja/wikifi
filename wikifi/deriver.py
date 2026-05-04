@@ -18,10 +18,12 @@ the derivative section's brief, and writes the resulting markdown.
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass, field
 
 from pydantic import BaseModel, Field
 
+from wikifi.cache import WalkCache, hash_upstream_bodies
 from wikifi.critic import ReviewOutcome, review_section
 from wikifi.providers.base import LLMProvider
 from wikifi.sections import DERIVATIVE_SECTIONS, SECTIONS_BY_ID, Section
@@ -62,6 +64,7 @@ class DerivationStats:
     sections_derived: int = 0
     sections_skipped: int = 0
     sections_revised: int = 0
+    sections_cached: int = 0
     review_outcomes: list[ReviewOutcome] = field(default_factory=list)
 
 
@@ -71,6 +74,8 @@ def derive_all(
     provider: LLMProvider,
     review: bool = False,
     review_min_score: int = 7,
+    cache: WalkCache | None = None,
+    persist_cache: Callable[[], None] | None = None,
 ) -> DerivationStats:
     """Synthesize every derivative section from its upstream primary sections.
 
@@ -78,6 +83,12 @@ def derive_all(
     reviser loop after synthesis. The critic loop is the highest-leverage
     quality lever for derivative sections — personas and Gherkin stories
     are exactly where single-shot synthesis tends to hallucinate.
+
+    When ``cache`` is supplied and the upstream bodies are unchanged from
+    the prior walk (and ``review`` parity holds — see
+    :meth:`WalkCache.lookup_derivation`), the cached body is replayed
+    rather than re-synthesized. Combined with the aggregator's cache,
+    this is what makes a no-change re-walk a no-op LLM-wise.
     """
     stats = DerivationStats()
     for section in DERIVATIVE_SECTIONS:
@@ -91,6 +102,18 @@ def derive_all(
             write_section(layout, section, _empty_body(section))
             stats.sections_skipped += 1
             continue
+
+        upstream_hash = hash_upstream_bodies(upstream_bodies)
+        if cache is not None:
+            cached = cache.lookup_derivation(section.id, upstream_hash, expect_revised=review)
+            if cached is not None:
+                write_section(layout, section, cached.body)
+                stats.sections_cached += 1
+                stats.sections_derived += 1
+                if cached.revised:
+                    stats.sections_revised += 1
+                continue
+
         try:
             body = provider.complete_json(
                 system=DERIVATION_SYSTEM_PROMPT,
@@ -101,6 +124,7 @@ def derive_all(
             log.warning("derivation failed for %s: %s", section.id, exc)
             body = _fallback_body(section, upstream_bodies, error=str(exc))
 
+        revised = False
         if review:
             outcome = review_section(
                 section=section,
@@ -113,10 +137,47 @@ def derive_all(
             stats.review_outcomes.append(outcome)
             if outcome.revised:
                 stats.sections_revised += 1
+                revised = True
 
         write_section(layout, section, body)
         stats.sections_derived += 1
+
+        if cache is not None:
+            cache.record_derivation(
+                section.id,
+                upstream_hash=upstream_hash,
+                body=body,
+                revised=revised,
+            )
+            if persist_cache is not None:
+                persist_cache()
     return stats
+
+
+def derivation_fully_cached(layout: WikiLayout, cache: WalkCache, *, review: bool) -> bool:
+    """Return True only if every derivative section is covered by a fresh cache entry.
+
+    Mirrors :func:`wikifi.aggregator.aggregation_fully_cached`. A section
+    counts as covered when its cache entry's ``upstream_hash`` matches
+    the hash of the upstream bodies currently on disk *and* the
+    ``revised`` flag matches the requested review mode (so a
+    ``--review`` re-walk doesn't silently inherit a non-revised body).
+
+    Sections with no upstream content count as covered — they always
+    render the same placeholder body, no LLM work to skip.
+    """
+    for section in DERIVATIVE_SECTIONS:
+        upstream_bodies = _collect_upstream(layout, section)
+        if not upstream_bodies:
+            continue
+        entry = cache.derivation.get(section.id)
+        if entry is None:
+            return False
+        if entry.upstream_hash != hash_upstream_bodies(upstream_bodies):
+            return False
+        if review and not entry.revised:
+            return False
+    return True
 
 
 def _collect_upstream(layout: WikiLayout, section: Section) -> dict[str, str]:

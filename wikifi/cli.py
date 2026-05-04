@@ -141,20 +141,34 @@ def walk(
         f"specialized={report.extraction.specialized_files}"
     )
     table.add_row("2. Extraction", extraction_row)
-    table.add_row(
-        "3. Aggregation",
-        f"sections_written={report.aggregation.sections_written} "
-        f"sections_empty={report.aggregation.sections_empty} "
-        f"sections_cached={report.aggregation.sections_cached}",
-    )
-    derivation_row = (
-        f"sections_derived={report.derivation.sections_derived} "
-        f"sections_skipped={report.derivation.sections_skipped} "
-        f"sections_revised={report.derivation.sections_revised}"
-    )
-    table.add_row("4. Derivation", derivation_row)
+    if report.fully_cached:
+        table.add_row(
+            "3. Aggregation",
+            "[dim]skipped — every file cache-hit and introspection scope unchanged[/dim]",
+        )
+        table.add_row(
+            "4. Derivation",
+            "[dim]skipped — see stage 3[/dim]",
+        )
+    else:
+        table.add_row(
+            "3. Aggregation",
+            f"sections_written={report.aggregation.sections_written} "
+            f"sections_empty={report.aggregation.sections_empty} "
+            f"sections_cached={report.aggregation.sections_cached}",
+        )
+        derivation_row = (
+            f"sections_derived={report.derivation.sections_derived} "
+            f"sections_skipped={report.derivation.sections_skipped} "
+            f"sections_cached={report.derivation.sections_cached} "
+            f"sections_revised={report.derivation.sections_revised}"
+        )
+        table.add_row("4. Derivation", derivation_row)
     console.print(table)
-    console.print(f"\n[green]Done.[/green] Wiki at [bold]{target}/.wikifi/[/bold]")
+    if report.fully_cached:
+        console.print(f"\n[green]No changes detected.[/green] Wiki at [bold]{target}/.wikifi/[/bold] is current.")
+    else:
+        console.print(f"\n[green]Done.[/green] Wiki at [bold]{target}/.wikifi/[/bold]")
 
 
 @app.command()

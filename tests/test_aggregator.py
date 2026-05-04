@@ -159,3 +159,71 @@ def test_aggregate_records_cache_entry_after_synthesis(tmp_path, mock_provider_f
     )
     aggregate_all(layout=layout, provider=provider, cache=cache)
     assert section.id in cache.aggregation
+
+
+def test_aggregate_persist_cache_called_after_each_section(tmp_path, mock_provider_factory):
+    """The persist callback fires once per cache update.
+
+    This is the contract that turns a Ctrl-C mid-stage-3 into a
+    survivable event — without per-section persistence, every
+    aggregation entry computed in this stage would be lost if anything
+    raised before the final walk-end save.
+    """
+    layout = _setup(tmp_path)
+    # Populate two primary sections so we get two persist invocations.
+    s1, s2 = PRIMARY_SECTIONS[0], PRIMARY_SECTIONS[1]
+    append_note(layout, s1, {"file": "a.py", "summary": "x", "finding": "Entity A."})
+    append_note(layout, s2, {"file": "b.py", "summary": "x", "finding": "Capability B."})
+
+    cache = WalkCache()
+    persist_calls = {"n": 0}
+
+    def persist():
+        persist_calls["n"] += 1
+
+    provider = mock_provider_factory(
+        json_factory=lambda schema, system, user: SectionBody(body="body"),
+    )
+    aggregate_all(layout=layout, provider=provider, cache=cache, persist_cache=persist)
+    assert persist_calls["n"] == 2  # one per section that got a cache update
+
+
+def test_aggregate_persist_cache_survives_mid_stage_failure(tmp_path, mock_provider_factory):
+    """Sections that *did* aggregate before a crash must still be on disk.
+
+    Simulate the deriver-stage Ctrl-C scenario: after section 1 succeeds
+    and persists, section 2's LLM call raises. The cache file on disk
+    should contain section 1's entry — that's the resumability gain.
+    """
+    from wikifi.cache import load as load_cache
+    from wikifi.cache import save_aggregation
+
+    layout = _setup(tmp_path)
+    s1, s2 = PRIMARY_SECTIONS[0], PRIMARY_SECTIONS[1]
+    append_note(layout, s1, {"file": "a.py", "summary": "x", "finding": "Entity A."})
+    append_note(layout, s2, {"file": "b.py", "summary": "x", "finding": "Capability B."})
+
+    cache = WalkCache()
+    call_count = {"n": 0}
+
+    def factory(schema, system, user):
+        call_count["n"] += 1
+        if call_count["n"] >= 2:
+            raise RuntimeError("simulated mid-stage-3 crash")
+        return SectionBody(body="Synthesized.")
+
+    provider = mock_provider_factory(json_factory=factory)
+    aggregate_all(
+        layout=layout,
+        provider=provider,
+        cache=cache,
+        persist_cache=lambda: save_aggregation(layout, cache),
+    )
+
+    # Reload from disk to confirm section 1's body persisted before the
+    # second section's failure rolled the in-memory cache back.
+    on_disk = load_cache(layout)
+    assert s1.id in on_disk.aggregation
+    # Section 2's per-section catch wrote a fallback body, so its cache
+    # entry was never recorded.
+    assert s2.id not in on_disk.aggregation
