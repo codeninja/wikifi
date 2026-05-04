@@ -92,6 +92,16 @@ def walk(
         bool,
         typer.Option("--review/--no-review", help="Run the critic + reviser loop on derivative sections."),
     ] = False,
+    no_surgical: Annotated[
+        bool,
+        typer.Option(
+            "--no-surgical",
+            help=(
+                "Disable the surgical-edit path. When some findings change in a section, "
+                "fall back to a full LLM rewrite instead of editing the cached body in place."
+            ),
+        ),
+    ] = False,
     provider: Annotated[
         str | None,
         typer.Option(
@@ -108,6 +118,8 @@ def walk(
         reset_cache(WikiLayout(root=target))
     if review:
         settings = settings.model_copy(update={"review_derivatives": True})
+    if no_surgical:
+        settings = settings.model_copy(update={"use_surgical_edits": False})
     if provider:
         settings = settings.model_copy(update={"provider": provider})
 
@@ -117,7 +129,8 @@ def walk(
             f"provider=[cyan]{settings.provider}[/cyan] model=[cyan]{settings.model}[/cyan]\n"
             f"cache=[cyan]{settings.use_cache}[/cyan] graph=[cyan]{settings.use_graph}[/cyan] "
             f"specialized=[cyan]{settings.use_specialized_extractors}[/cyan] "
-            f"review=[cyan]{settings.review_derivatives}[/cyan]",
+            f"review=[cyan]{settings.review_derivatives}[/cyan] "
+            f"surgical=[cyan]{settings.use_surgical_edits}[/cyan]",
             title="starting",
         )
     )
@@ -141,20 +154,36 @@ def walk(
         f"specialized={report.extraction.specialized_files}"
     )
     table.add_row("2. Extraction", extraction_row)
-    table.add_row(
-        "3. Aggregation",
-        f"sections_written={report.aggregation.sections_written} "
-        f"sections_empty={report.aggregation.sections_empty} "
-        f"sections_cached={report.aggregation.sections_cached}",
-    )
-    derivation_row = (
-        f"sections_derived={report.derivation.sections_derived} "
-        f"sections_skipped={report.derivation.sections_skipped} "
-        f"sections_revised={report.derivation.sections_revised}"
-    )
-    table.add_row("4. Derivation", derivation_row)
+    if report.fully_cached:
+        table.add_row(
+            "3. Aggregation",
+            "[dim]skipped — every file cache-hit or specialized, introspection scope unchanged[/dim]",
+        )
+        table.add_row(
+            "4. Derivation",
+            "[dim]skipped — see stage 3[/dim]",
+        )
+    else:
+        table.add_row(
+            "3. Aggregation",
+            f"sections_written={report.aggregation.sections_written} "
+            f"sections_empty={report.aggregation.sections_empty} "
+            f"sections_cached={report.aggregation.sections_cached} "
+            f"sections_edited={report.aggregation.sections_edited} "
+            f"sections_rewritten={report.aggregation.sections_rewritten}",
+        )
+        derivation_row = (
+            f"sections_derived={report.derivation.sections_derived} "
+            f"sections_skipped={report.derivation.sections_skipped} "
+            f"sections_cached={report.derivation.sections_cached} "
+            f"sections_revised={report.derivation.sections_revised}"
+        )
+        table.add_row("4. Derivation", derivation_row)
     console.print(table)
-    console.print(f"\n[green]Done.[/green] Wiki at [bold]{target}/.wikifi/[/bold]")
+    if report.fully_cached:
+        console.print(f"\n[green]No changes detected.[/green] Wiki at [bold]{target}/.wikifi/[/bold] is current.")
+    else:
+        console.print(f"\n[green]Done.[/green] Wiki at [bold]{target}/.wikifi/[/bold]")
 
 
 @app.command()

@@ -120,6 +120,27 @@ class Settings(BaseSettings):
         default=7,
         description="Minimum critic score below which the reviser is invoked.",
     )
+    use_surgical_edits: bool = Field(
+        default=True,
+        description=(
+            "When some findings change in a section but most are unchanged, edit the cached "
+            "section body in place around the delta instead of rewriting from scratch. "
+            "Preserves established prose and citation numbering. Disabling this only gates "
+            "the LLM-side surgical edit path; the no-LLM cache-reuse paths (full cache hit "
+            "and unchanged-finding-set re-render) still fire regardless of this flag."
+        ),
+    )
+    surgical_edit_threshold: float = Field(
+        default=0.3,
+        ge=0.0,
+        le=1.0,
+        description=(
+            "Maximum churn ratio (added+removed findings divided by live findings) that "
+            "still routes to the surgical-edit path. Above this a section falls back to "
+            "full re-aggregation, which produces a cleaner narrative when the underlying "
+            "evidence has shifted substantially."
+        ),
+    )
 
     # ----- Anthropic provider knobs -----
 

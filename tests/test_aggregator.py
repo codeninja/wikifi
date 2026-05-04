@@ -3,10 +3,11 @@ from wikifi.aggregator import (
     AggregatedContradiction,
     SectionBody,
     aggregate_all,
+    aggregation_fully_cached,
 )
 from wikifi.cache import WalkCache, hash_section_notes
 from wikifi.sections import PRIMARY_SECTIONS
-from wikifi.wiki import WikiLayout, append_note, initialize, read_notes
+from wikifi.wiki import WikiLayout, append_note, initialize, read_notes, reset_notes
 
 
 def _setup(tmp_path):
@@ -159,3 +160,135 @@ def test_aggregate_records_cache_entry_after_synthesis(tmp_path, mock_provider_f
     )
     aggregate_all(layout=layout, provider=provider, cache=cache)
     assert section.id in cache.aggregation
+
+
+def test_aggregate_persist_cache_called_after_each_section(tmp_path, mock_provider_factory):
+    """The persist callback fires once per cache update.
+
+    This is the contract that turns a Ctrl-C mid-stage-3 into a
+    survivable event — without per-section persistence, every
+    aggregation entry computed in this stage would be lost if anything
+    raised before the final walk-end save. Empty-notes sections also
+    persist a cache entry so the next walk can tell "we wrote the
+    placeholder last time" apart from "stage 3 never ran for this
+    section."
+    """
+    layout = _setup(tmp_path)
+    # Populate two primary sections so we get two persist invocations.
+    s1, s2 = PRIMARY_SECTIONS[0], PRIMARY_SECTIONS[1]
+    append_note(layout, s1, {"file": "a.py", "summary": "x", "finding": "Entity A."})
+    append_note(layout, s2, {"file": "b.py", "summary": "x", "finding": "Capability B."})
+
+    cache = WalkCache()
+    persist_calls = {"n": 0}
+
+    def persist():
+        persist_calls["n"] += 1
+
+    provider = mock_provider_factory(
+        json_factory=lambda schema, system, user: SectionBody(body="body"),
+    )
+    aggregate_all(layout=layout, provider=provider, cache=cache, persist_cache=persist)
+    # Every primary section persists — two from synthesis, the rest from
+    # the empty-notes path that now also records a cache entry.
+    assert persist_calls["n"] == len(PRIMARY_SECTIONS)
+
+
+def test_aggregate_persist_cache_survives_mid_stage_failure(tmp_path, mock_provider_factory):
+    """Sections that *did* aggregate before a crash must still be on disk.
+
+    Simulate the deriver-stage Ctrl-C scenario: after section 1 succeeds
+    and persists, section 2's LLM call raises. The cache file on disk
+    should contain section 1's entry — that's the resumability gain.
+    """
+    from wikifi.cache import load as load_cache
+    from wikifi.cache import save_aggregation
+
+    layout = _setup(tmp_path)
+    s1, s2 = PRIMARY_SECTIONS[0], PRIMARY_SECTIONS[1]
+    append_note(layout, s1, {"file": "a.py", "summary": "x", "finding": "Entity A."})
+    append_note(layout, s2, {"file": "b.py", "summary": "x", "finding": "Capability B."})
+
+    cache = WalkCache()
+    call_count = {"n": 0}
+
+    def factory(schema, system, user):
+        call_count["n"] += 1
+        if call_count["n"] >= 2:
+            raise RuntimeError("simulated mid-stage-3 crash")
+        return SectionBody(body="Synthesized.")
+
+    provider = mock_provider_factory(json_factory=factory)
+    aggregate_all(
+        layout=layout,
+        provider=provider,
+        cache=cache,
+        persist_cache=lambda: save_aggregation(layout, cache),
+    )
+
+    # Reload from disk to confirm section 1's body persisted before the
+    # second section's failure rolled the in-memory cache back.
+    on_disk = load_cache(layout)
+    assert s1.id in on_disk.aggregation
+    # Section 2's per-section catch wrote a fallback body, so its cache
+    # entry was never recorded.
+    assert s2.id not in on_disk.aggregation
+
+
+def test_aggregation_fully_cached_rejects_uncached_empty_section(tmp_path):
+    """A section with no notes and no cache entry must defeat the short-circuit.
+
+    The deletion case: prior walk had findings for section X, then the
+    contributing file was removed. Stage 2 of the new walk produces zero
+    notes for X, but the on-disk markdown still holds last walk's prose.
+    The predicate has to surface this as "not fresh" so stage 3 runs and
+    rewrites the file to the empty placeholder.
+    """
+    layout = _setup(tmp_path)
+    cache = WalkCache()
+    # No cache entries seeded → no section can be considered covered.
+    assert not aggregation_fully_cached(layout, cache)
+
+
+def test_aggregation_fully_cached_accepts_cached_empty_state(tmp_path, mock_provider_factory):
+    """Once stage 3 runs against zero notes, the predicate flips to True.
+
+    The aggregator records an empty-notes entry whose ``notes_hash``
+    matches ``hash_section_notes([])``. A re-walk with the same empty
+    notes can then short-circuit.
+    """
+    layout = _setup(tmp_path)
+    cache = WalkCache()
+    provider = mock_provider_factory()  # never called — every section is empty
+    aggregate_all(layout=layout, provider=provider, cache=cache)
+    assert aggregation_fully_cached(layout, cache)
+
+
+def test_aggregation_fully_cached_detects_drained_notes(tmp_path, mock_provider_factory):
+    """Notes that were non-empty last walk and are empty this walk must not be 'covered'.
+
+    Concrete scenario: walk 1 aggregates section X from one note. Walk 2
+    runs against an empty notes file (the contributing file was deleted
+    or the extractor produced nothing). The cached ``notes_hash`` is for
+    the non-empty payload, so it no longer matches the empty payload's
+    hash and the predicate must return False — otherwise the orchestrator
+    would skip stage 3 and freeze last walk's prose forever.
+    """
+    layout = _setup(tmp_path)
+    section = PRIMARY_SECTIONS[0]
+    append_note(layout, section, {"file": "a.py", "summary": "x", "finding": "Entity A."})
+
+    cache = WalkCache()
+    provider = mock_provider_factory(
+        json_factory=lambda schema, system, user: SectionBody(body="body"),
+    )
+    aggregate_all(layout=layout, provider=provider, cache=cache)
+    # First walk: predicate is happy because every section has a fresh entry.
+    assert aggregation_fully_cached(layout, cache)
+
+    # Simulate a stage-2 outcome where the contributing file disappeared:
+    # the notes file is reset (and never re-appended).
+    reset_notes(layout)
+    assert not aggregation_fully_cached(layout, cache), (
+        "drained notes must defeat the predicate so stage 3 re-runs and rewrites the section to the empty placeholder"
+    )

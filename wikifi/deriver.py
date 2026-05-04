@@ -18,10 +18,12 @@ the derivative section's brief, and writes the resulting markdown.
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass, field
 
 from pydantic import BaseModel, Field
 
+from wikifi.cache import WalkCache, hash_upstream_bodies
 from wikifi.critic import ReviewOutcome, review_section
 from wikifi.providers.base import LLMProvider
 from wikifi.sections import DERIVATIVE_SECTIONS, SECTIONS_BY_ID, Section
@@ -62,6 +64,7 @@ class DerivationStats:
     sections_derived: int = 0
     sections_skipped: int = 0
     sections_revised: int = 0
+    sections_cached: int = 0
     review_outcomes: list[ReviewOutcome] = field(default_factory=list)
 
 
@@ -71,6 +74,8 @@ def derive_all(
     provider: LLMProvider,
     review: bool = False,
     review_min_score: int = 7,
+    cache: WalkCache | None = None,
+    persist_cache: Callable[[], None] | None = None,
 ) -> DerivationStats:
     """Synthesize every derivative section from its upstream primary sections.
 
@@ -78,6 +83,12 @@ def derive_all(
     reviser loop after synthesis. The critic loop is the highest-leverage
     quality lever for derivative sections — personas and Gherkin stories
     are exactly where single-shot synthesis tends to hallucinate.
+
+    When ``cache`` is supplied and the upstream bodies are unchanged from
+    the prior walk (and ``review`` parity holds — see
+    :meth:`WalkCache.lookup_derivation`), the cached body is replayed
+    rather than re-synthesized. Combined with the aggregator's cache,
+    this is what makes a no-change re-walk a no-op LLM-wise.
     """
     stats = DerivationStats()
     for section in DERIVATIVE_SECTIONS:
@@ -88,9 +99,46 @@ def derive_all(
                 section.id,
                 section.derived_from,
             )
-            write_section(layout, section, _empty_body(section))
+            empty_body = _empty_body(section)
+            write_section(layout, section, empty_body)
             stats.sections_skipped += 1
+            # Record an empty-state cache entry so the orchestrator's
+            # full-cache short-circuit can tell "we wrote the empty
+            # placeholder last walk too" apart from "we never ran stage
+            # 4 for this section, body on disk is stale." Mirrors the
+            # empty-notes path in the aggregator.
+            #
+            # ``revised=review`` is set to the requested mode (not
+            # whether a critic ran — none did, the empty path skipped
+            # the loop). Storing it this way keeps the next
+            # ``--review`` walk's freshness check from rejecting this
+            # entry as "unreviewed"; the empty placeholder body has no
+            # claims for a critic to evaluate either way.
+            if cache is not None:
+                cache.record_derivation(
+                    section.id,
+                    upstream_hash=hash_upstream_bodies({}),
+                    body=empty_body,
+                    revised=review,
+                )
+                if persist_cache is not None:
+                    persist_cache()
             continue
+
+        upstream_hash = hash_upstream_bodies(upstream_bodies)
+        if cache is not None:
+            cached = cache.lookup_derivation(section.id, upstream_hash, expect_revised=review)
+            if cached is not None:
+                write_section(layout, section, cached.body)
+                stats.sections_cached += 1
+                stats.sections_derived += 1
+                # ``sections_revised`` counts reviser work performed in
+                # this walk. Replay from cache means no critic ran, so
+                # the counter stays put even if the cached body went
+                # through review on a prior walk.
+                continue
+
+        derivation_failed = False
         try:
             body = provider.complete_json(
                 system=DERIVATION_SYSTEM_PROMPT,
@@ -100,7 +148,14 @@ def derive_all(
         except Exception as exc:
             log.warning("derivation failed for %s: %s", section.id, exc)
             body = _fallback_body(section, upstream_bodies, error=str(exc))
+            derivation_failed = True
 
+        # ``revised`` records whether the critic + reviser loop ran on
+        # this body, not whether the reviser changed any text. A walk
+        # invoked with ``--review`` whose critic accepts the draft
+        # unchanged has still passed review; treating it as "unrevised"
+        # would force the next ``--review`` walk to redo the loop.
+        reviewed = False
         if review:
             outcome = review_section(
                 section=section,
@@ -111,12 +166,53 @@ def derive_all(
             )
             body = outcome.body
             stats.review_outcomes.append(outcome)
+            reviewed = True
             if outcome.revised:
                 stats.sections_revised += 1
 
         write_section(layout, section, body)
         stats.sections_derived += 1
+
+        # Don't cache an error body — caching it would let later walks
+        # replay or short-circuit around a transient stage-4 outage
+        # until the upstream bodies change.
+        if cache is not None and not derivation_failed:
+            cache.record_derivation(
+                section.id,
+                upstream_hash=upstream_hash,
+                body=body,
+                revised=reviewed,
+            )
+            if persist_cache is not None:
+                persist_cache()
     return stats
+
+
+def derivation_fully_cached(layout: WikiLayout, cache: WalkCache, *, review: bool) -> bool:
+    """Return True only if every derivative section is covered by a fresh cache entry.
+
+    Mirrors :func:`wikifi.aggregator.aggregation_fully_cached`. A section
+    counts as covered when its cache entry's ``upstream_hash`` matches
+    the hash of the upstream bodies currently on disk *and* the
+    ``revised`` flag matches the requested review mode (so a
+    ``--review`` re-walk doesn't silently inherit a non-reviewed body).
+
+    Sections with no upstream content require a cache entry too — the
+    empty-upstream path in :func:`derive_all` records one with the
+    empty-payload hash so an aggregation that drains a derivative's
+    upstreams forces re-derivation rather than freezing stale prose.
+    """
+    for section in DERIVATIVE_SECTIONS:
+        upstream_bodies = _collect_upstream(layout, section)
+        upstream_hash = hash_upstream_bodies(upstream_bodies)
+        entry = cache.derivation.get(section.id)
+        if entry is None:
+            return False
+        if entry.upstream_hash != upstream_hash:
+            return False
+        if review and not entry.revised:
+            return False
+    return True
 
 
 def _collect_upstream(layout: WikiLayout, section: Section) -> dict[str, str]:

@@ -192,6 +192,322 @@ def test_run_walk_persists_cache_for_resumability(mini_target, mock_provider_fac
     assert extraction_calls["n"] == first
 
 
+def test_run_walk_short_circuits_when_fully_cached(mini_target, mock_provider_factory):
+    """A second walk with no source changes skips stages 3 & 4 entirely.
+
+    Concretely: the first walk extracts and aggregates from scratch.
+    The second walk hits the per-file cache for every file and finds
+    the prior introspection scope on disk — so stages 3 and 4 don't
+    run, and no aggregation/derivation LLM calls fire even though the
+    in-memory aggregation/derivation caches are empty in the mock
+    provider's bookkeeping.
+    """
+    settings = _settings()
+    introspection = IntrospectionResult(
+        include=["src/"], exclude=[], primary_languages=["python"], likely_purpose="demo", rationale="ok"
+    )
+    call_log = {"intro": 0, "extract": 0, "aggregate": 0, "derive": 0}
+
+    def factory(schema, system, user):
+        if schema is IntrospectionResult:
+            call_log["intro"] += 1
+            return introspection
+        if schema is FileFindings:
+            call_log["extract"] += 1
+            return FileFindings(
+                summary="role",
+                findings=[SectionFinding(section_id="entities", finding="Order entity.")],
+            )
+        if schema is SectionBody:
+            call_log["aggregate"] += 1
+            return SectionBody(body="Synthesized.")
+        if schema is DerivedSection:
+            call_log["derive"] += 1
+            return DerivedSection(body="Derived.")
+        raise AssertionError(f"unexpected {schema}")
+
+    provider = mock_provider_factory(json_factory=factory)
+    first = run_walk(root=mini_target, settings=settings, provider=provider)
+    assert first.fully_cached is False
+    assert call_log["aggregate"] >= 1
+    assert call_log["derive"] >= 1
+
+    aggregate_baseline = call_log["aggregate"]
+    derive_baseline = call_log["derive"]
+
+    second = run_walk(root=mini_target, settings=settings, provider=provider)
+    assert second.fully_cached is True
+    # Stages 3 and 4 are skipped entirely on the no-change re-walk.
+    assert call_log["aggregate"] == aggregate_baseline
+    assert call_log["derive"] == derive_baseline
+
+
+def test_run_walk_introspection_scope_change_defeats_short_circuit(mini_target, mock_provider_factory):
+    """A scope shift forces stages 3 & 4 to run even on full-extraction-cache hits."""
+    settings = _settings()
+    intro_v1 = IntrospectionResult(
+        include=["src/"], exclude=[], primary_languages=["python"], likely_purpose="demo", rationale="ok"
+    )
+    # Stage 1 returns a different exclude list on the second walk.
+    intro_v2 = IntrospectionResult(
+        include=["src/"],
+        exclude=["fixtures/"],
+        primary_languages=["python"],
+        likely_purpose="demo",
+        rationale="ok",
+    )
+    intro_calls = {"n": 0}
+    aggregate_calls = {"n": 0}
+
+    def factory(schema, system, user):
+        if schema is IntrospectionResult:
+            intro_calls["n"] += 1
+            return intro_v1 if intro_calls["n"] == 1 else intro_v2
+        if schema is FileFindings:
+            return FileFindings(
+                summary="role",
+                findings=[SectionFinding(section_id="entities", finding="Order entity.")],
+            )
+        if schema is SectionBody:
+            aggregate_calls["n"] += 1
+            return SectionBody(body="Synthesized.")
+        if schema is DerivedSection:
+            return DerivedSection(body="Derived.")
+        raise AssertionError(f"unexpected {schema}")
+
+    provider = mock_provider_factory(json_factory=factory)
+    run_walk(root=mini_target, settings=settings, provider=provider)
+
+    # Second walk: extraction is 100% cached but scope changed → the
+    # short-circuit must not fire. The aggregator's per-section cache
+    # still hits (notes are byte-identical), so we assert via
+    # ``fully_cached`` and ``sections_cached`` rather than counting
+    # aggregator LLM calls.
+    report = run_walk(root=mini_target, settings=settings, provider=provider)
+    assert report.fully_cached is False
+    assert report.aggregation.sections_cached > 0
+
+
+def test_run_walk_does_not_short_circuit_when_aggregation_cache_partial(mini_target, mock_provider_factory):
+    """A walk that previously crashed mid-stage-3 must re-aggregate stale sections.
+
+    Reproduces the "interrupted walk leaves stale prose" bug:
+    extraction is 100% cached, scope matches, but one section's
+    aggregation entry is missing (or stale) on disk. The early-out
+    would skip stages 3 & 4 if it only checked extraction; the
+    strengthened predicate must catch the gap and re-run.
+    """
+    from wikifi.cache import load as load_cache
+    from wikifi.cache import save as save_cache
+
+    settings = _settings()
+    introspection = IntrospectionResult(
+        include=["src/"], exclude=[], primary_languages=["python"], likely_purpose="demo", rationale="ok"
+    )
+    aggregate_calls = {"n": 0}
+
+    def factory(schema, system, user):
+        if schema is IntrospectionResult:
+            return introspection
+        if schema is FileFindings:
+            return FileFindings(
+                summary="role",
+                findings=[
+                    SectionFinding(section_id="entities", finding="Order entity."),
+                    SectionFinding(section_id="capabilities", finding="Order capability."),
+                ],
+            )
+        if schema is SectionBody:
+            aggregate_calls["n"] += 1
+            return SectionBody(body="Synthesized.")
+        if schema is DerivedSection:
+            return DerivedSection(body="Derived.")
+        raise AssertionError(f"unexpected {schema}")
+
+    provider = mock_provider_factory(json_factory=factory)
+    run_walk(root=mini_target, settings=settings, provider=provider)
+    baseline = aggregate_calls["n"]
+
+    # Simulate a mid-stage-3 crash: drop one section's aggregation cache
+    # entry from disk. Live notes are untouched, extraction cache is
+    # untouched, only the aggregation entry for "entities" goes missing.
+    layout = WikiLayout(root=mini_target)
+    cache = load_cache(layout)
+    assert "entities" in cache.aggregation
+    del cache.aggregation["entities"]
+    save_cache(layout, cache)
+
+    report = run_walk(root=mini_target, settings=settings, provider=provider)
+    assert report.fully_cached is False, "missing aggregation entry must defeat short-circuit"
+    # Stage 3 ran; the missing section was re-aggregated (others hit the
+    # remaining cache entries).
+    assert aggregate_calls["n"] > baseline
+
+
+def test_run_walk_does_not_short_circuit_when_aggregation_cache_stale(mini_target, mock_provider_factory):
+    """If a cached ``notes_hash`` no longer matches live notes, force re-aggregation.
+
+    This is the symmetric case to the missing-entry test: the entry is
+    present on disk but its hash is from a prior set of notes. The
+    early-out must not fire.
+    """
+    from wikifi.cache import load as load_cache
+    from wikifi.cache import save as save_cache
+
+    settings = _settings()
+    introspection = IntrospectionResult(
+        include=["src/"], exclude=[], primary_languages=["python"], likely_purpose="demo", rationale="ok"
+    )
+
+    def factory(schema, system, user):
+        if schema is IntrospectionResult:
+            return introspection
+        if schema is FileFindings:
+            return FileFindings(
+                summary="role",
+                findings=[SectionFinding(section_id="entities", finding="Order entity.")],
+            )
+        if schema is SectionBody:
+            return SectionBody(body="Synthesized.")
+        if schema is DerivedSection:
+            return DerivedSection(body="Derived.")
+        raise AssertionError(f"unexpected {schema}")
+
+    provider = mock_provider_factory(json_factory=factory)
+    run_walk(root=mini_target, settings=settings, provider=provider)
+
+    layout = WikiLayout(root=mini_target)
+    cache = load_cache(layout)
+    # Forge a stale hash on a section that has notes.
+    cache.aggregation["entities"].notes_hash = "stale-hash-from-a-prior-walk"
+    save_cache(layout, cache)
+
+    report = run_walk(root=mini_target, settings=settings, provider=provider)
+    assert report.fully_cached is False
+
+
+def test_run_walk_does_not_short_circuit_when_derivation_cache_missing(mini_target, mock_provider_factory):
+    """A missing derivation cache entry must defeat the short-circuit too."""
+    from wikifi.cache import load as load_cache
+    from wikifi.cache import save as save_cache
+
+    settings = _settings()
+    introspection = IntrospectionResult(
+        include=["src/"], exclude=[], primary_languages=["python"], likely_purpose="demo", rationale="ok"
+    )
+
+    def factory(schema, system, user):
+        if schema is IntrospectionResult:
+            return introspection
+        if schema is FileFindings:
+            return FileFindings(
+                summary="role",
+                findings=[SectionFinding(section_id="entities", finding="Order entity.")],
+            )
+        if schema is SectionBody:
+            return SectionBody(body="Synthesized.")
+        if schema is DerivedSection:
+            return DerivedSection(body="Derived.")
+        raise AssertionError(f"unexpected {schema}")
+
+    provider = mock_provider_factory(json_factory=factory)
+    run_walk(root=mini_target, settings=settings, provider=provider)
+
+    layout = WikiLayout(root=mini_target)
+    cache = load_cache(layout)
+    # Drop derivation entries to simulate a stage-4 crash.
+    cache.derivation.clear()
+    save_cache(layout, cache)
+
+    report = run_walk(root=mini_target, settings=settings, provider=provider)
+    assert report.fully_cached is False
+
+
+def test_run_walk_first_walk_is_never_fully_cached(mini_target, mock_provider_factory):
+    """Without a prior introspection on disk, the early-out cannot fire."""
+    settings = _settings()
+    introspection = IntrospectionResult(
+        include=["src/"], exclude=[], primary_languages=["python"], likely_purpose="demo", rationale="ok"
+    )
+
+    def factory(schema, system, user):
+        if schema is IntrospectionResult:
+            return introspection
+        if schema is FileFindings:
+            return FileFindings(findings=[SectionFinding(section_id="entities", finding="Order.")])
+        if schema is SectionBody:
+            return SectionBody(body="Synthesized.")
+        if schema is DerivedSection:
+            return DerivedSection(body="Derived.")
+        raise AssertionError(f"unexpected {schema}")
+
+    provider = mock_provider_factory(json_factory=factory)
+    report = run_walk(root=mini_target, settings=settings, provider=provider)
+    assert report.fully_cached is False
+
+
+def test_run_walk_does_not_short_circuit_when_contributing_file_deleted(mini_target, mock_provider_factory):
+    """Deleting a contributing file between walks must force stage 3 to rewrite the section.
+
+    Reproduces the empty-notes blind spot that the aggregator's
+    full-cache predicate previously had: walk 1 produces findings for
+    section X from one file. The file is deleted before walk 2. Stage 2
+    of walk 2 produces zero notes for X, but the on-disk markdown still
+    holds last walk's prose. Without the empty-state cache assertion,
+    the orchestrator's short-circuit would fire and freeze the stale
+    body in place.
+    """
+    settings = _settings()
+    introspection = IntrospectionResult(
+        include=["src/"], exclude=[], primary_languages=["python"], likely_purpose="demo", rationale="ok"
+    )
+
+    # Only src/ files produce "entities" findings — manifests stay silent.
+    # Without this, replaying README/pyproject cache entries would keep
+    # the section's notes non-empty after the src/ deletion and obscure
+    # the bug we're guarding against.
+    def factory(schema, system, user):
+        if schema is IntrospectionResult:
+            return introspection
+        if schema is FileFindings:
+            if "src/fakeapp" in user:
+                return FileFindings(
+                    summary="domain code",
+                    findings=[SectionFinding(section_id="entities", finding="Order entity inferred.")],
+                )
+            return FileFindings()  # manifests / readme contribute nothing
+        if schema is SectionBody:
+            return SectionBody(body="Order is a real thing.")
+        if schema is DerivedSection:
+            return DerivedSection(body="Derived from Order.")
+        raise AssertionError(f"unexpected {schema}")
+
+    provider = mock_provider_factory(json_factory=factory)
+    run_walk(root=mini_target, settings=settings, provider=provider)
+
+    layout = WikiLayout(root=mini_target)
+    entities_after_first = layout.section_path("entities").read_text()
+    assert "Order is a real thing." in entities_after_first
+
+    # Delete every src/ file that contributed findings. The next walk's
+    # stage 2 produces zero notes for "entities" (the surviving manifests
+    # contribute nothing), so stage 3's empty-notes branch is what should
+    # run. The short-circuit must not fire.
+    for src_file in (mini_target / "src" / "fakeapp").rglob("*.py"):
+        src_file.unlink()
+
+    second = run_walk(root=mini_target, settings=settings, provider=provider)
+    assert second.fully_cached is False, (
+        "deleting the contributing files must force stage 3 to re-run; "
+        "otherwise the prior walk's prose stays on disk forever"
+    )
+
+    entities_after_second = layout.section_path("entities").read_text()
+    assert "Order is a real thing." not in entities_after_second
+    # The aggregator's empty-body placeholder is what should be on disk now.
+    assert "No findings were extracted" in entities_after_second
+
+
 def test_run_walk_review_flag_invokes_critic(mini_target, mock_provider_factory):
     """With ``review_derivatives=True`` the deriver runs the critic loop."""
     from wikifi.critic import Critique

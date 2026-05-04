@@ -1,105 +1,132 @@
 # Integrations
 
-## Outbound Integrations
+## External Integrations
 
-### Language-Model Providers
+### Outbound: Language-Model Providers
 
-The system maintains a uniform provider abstraction that isolates every pipeline stage from the concrete inference backend. Three selectable backends are supported — a locally-hosted model service, a hosted Anthropic-compatible service, and an OpenAI-compatible service — each implementing the same three-method contract: structured JSON completion, free-text completion, and multi-turn chat. The active backend is chosen by configuration; the orchestrator and all downstream stages call into it without branching on which concrete provider is live.
+All communication with external or locally-hosted language models is routed through a single shared provider abstraction that declares three call surfaces: schema-validated structured output, unstructured free-text completion, and stateful multi-turn conversation. Every pipeline stage that needs inference (extraction, aggregation, derivation, quality critique, surgical editing, and the chat REPL) calls exclusively through this interface rather than directly into any particular backend.
 
-Every stage that performs inference uses this abstraction:
+Three concrete provider backends are available and are selected at runtime via configuration:
 
-| Stage | Operation |
-|---|---|
-| Introspection (Stage 1) | Structured JSON completion to classify repository paths |
-| Extraction (Stage 2) | Structured JSON completion against a findings schema, per file |
-| Aggregation (Stage 3) | Structured JSON completion against a section-body schema |
-| Derivation (Stage 4) | Structured completion for personas, user stories, and diagrams |
-| Critic / Reviser | Structured completion for rubric scoring and body revision |
-| Chat session | Multi-turn chat grounded in populated wiki content |
+| Backend | Activation | Destination |
+|---|---|---|
+| Hosted (large-model API) | Default or explicit flag | External hosted inference API |
+| Alternative hosted | Provider selector | Separate external hosted API |
+| Local | Provider selector | Locally-running inference service |
 
-### External Tool and Capability Servers
+All three backends normalize API errors into uniform runtime errors before surfacing them, so the rest of the pipeline can apply a single fallback strategy regardless of which provider is active. The hosted backends additionally support features such as prompt caching and adaptive reasoning modes to make large-scale codebase walks economically viable.
 
-At the development and runtime boundary, the system is configured as a client that fans out to multiple external capability providers via a tool-server protocol. Four integrations are declared: a local AI utility, a local web crawler, a remote documentation context service, and a remote stitching/search service. This makes the system both a producer of wiki content and a consumer of external knowledge services during operation.
+### Inbound: CLI Entry Point
 
-### Filesystem and Layout Abstraction
-
-All pipeline stages read and write through a shared filesystem layout abstraction rather than addressing paths directly. Extraction findings are appended to a notes store; aggregated section bodies are written back through the same abstraction; the report and chat components read section markdown from the same on-disk layout. The cache layer uses this abstraction to locate its storage directory, and all cache reads and writes (keyed on file fingerprints and section-content hashes) pass through it.
-
-### Import Graph
-
-The extraction stage integrates with a repository-wide import/reference graph. For each file being analysed, the graph supplies the file's direct neighbors — files it depends on and files that depend on it — which are injected into the extraction prompt to enable cross-file flow descriptions. The graph also drives the specialized-extractor dispatch path by classifying each file's structural kind before routing.
-
-### Per-Project Configuration
-
-Project-specific provider selection, model preferences, caching behavior, and feature flags are read from a TOML configuration file stored inside each managed project's wiki directory. Parse failures fall back gracefully to environment-derived defaults rather than aborting the pipeline.
+The command-line interface is the sole external entry point for human operators. It exposes four sub-commands and delegates entirely to internal modules — it contains no domain logic of its own. Configuration is resolved from up to three sources in strict precedence order: a per-target config file stored inside the target repository's own wiki directory, process-level environment variables (including a `.env` file), and built-in field defaults. The per-target config wins, so each analysed repository can drive its own pipeline settings.
 
 ---
 
-## Inbound Integrations
+## Internal Integration Topology
 
-The primary entry point is the command-line interface, which exposes four subcommands (`init`, `walk`, `chat`, `report`). It constructs the provider instance and passes it directly into the chat and report capabilities. All other pipeline stages are driven by the orchestrator, which sequences introspection → extraction → aggregation → derivation and is itself invoked by the CLI `walk` subcommand.
+### Orchestrator as Central Hub
+
+The orchestrator is the primary internal integration point. It sequences five subsystems in order:
+
+1. **Repository introspection** — classifies the directory tree and decides which paths are worth analysing.
+2. **Extraction** — walks each included file, calling the provider for structured findings or delegating to deterministic specialized extractors.
+3. **Aggregation** — synthesizes per-file notes into coherent, citation-backed section bodies.
+4. **Derivation** — generates derivative content (personas, user stories, diagrams) from the finished primary sections.
+5. **Cache layer** — consulted and updated at every stage to avoid redundant work.
+
+### On-Disk State via the Wiki Layout
+
+All read and write access to wiki artifacts — section markdown files, per-section extraction note stores (JSONL), and related paths — flows through a single canonical layout abstraction. The extraction, aggregation, caching, orchestration, derivation, chat, and CLI modules all resolve their file paths through this shared type, making it the de facto integration bus for persistent state between pipeline stages.
+
+### Cache and Fingerprint Subsystems
+
+The cache module is consumed by the orchestrator, extractor, aggregator, and deriver to check and record results. It delegates all content hashing to a dedicated fingerprinting subsystem (stable short-form SHA-256 prefixes). The fingerprinting subsystem is also used independently by the evidence citation layer (pairing source paths with fingerprints and line ranges) and by the dependency graph subsystem (propagating cache invalidation across files that import one another).
+
+### Extraction Stage
+
+The extractor calls the language-model provider once per file chunk for unstructured source files and writes results to the notes store via an `append_note` interface consumed downstream by the aggregator. For structured file kinds (relational schema, API contract, service definition, graph schema, and migration files), it delegates to a dispatch layer that selects a deterministic specialized extractor and bypasses the model entirely. The dispatch layer in turn depends on the file classifier from the repository analysis module.
+
+The repository analysis module also builds an import/reference graph. The orchestrator uses this graph to inject neighbor-file context into each extraction prompt.
+
+### Aggregation and Surgical Editing
+
+The aggregator coordinates with three internal subsystems: the cache (to determine whether a full rewrite or a surgical patch is needed), the surgical editor (which sits between the cache and the rendering layer for small deltas, calling the provider for targeted JSON-output edits), and the evidence renderer (which formats citation footers and conflict blocks from structured claim data).
+
+### Quality Reporting and Critic
+
+The report module reads section markdown and notes files from disk via the wiki layout, reads the walk cache to determine total files processed, and optionally calls the critic subsystem to score section bodies. For derivative sections, the report also collects upstream section text to give the critic the context needed to evaluate how well the derivative synthesizes its sources. The critic and reviser themselves call the shared provider abstraction with structured schemas, keeping the quality pipeline independent of the active model.
+
+### Chat REPL
+
+The interactive chat feature has two integration dependencies: it reads all populated section files from disk via the wiki layout to assemble a grounding context, and it delegates each user turn to the configured provider through the shared interface, passing the full message history on every call.
+
+### Walker
+
+The filesystem walker is called by the introspection stage (to produce a compressed structural summary) and by the orchestrator/extractor stages (to supply the actual file list). It has no outbound integrations beyond the local filesystem and applies gitignore semantics plus hardcoded exclusion rules before any model pass runs.
 
 ---
 
 ## Integration Surfaces Detected in Analysed Codebases
 
-When the system analyses a target repository, it surfaces the following categories of integration touchpoint:
+When the system analyses a target codebase, several specialized extractors surface integration touchpoints in the target's own code:
 
-- **HTTP API endpoints** — each parsed API contract contributes a finding recording the number of endpoints the analysed system exposes to external consumers, forming the inbound integration inventory.
-- **RPC service blocks** — each service definition is treated as an integration touchpoint; individual operations are described with their request and response types, including streaming direction where declared.
-- **Event-driven subscriptions** — subscription roots in schema definition files are mapped specifically to the integrations section, reflecting that they represent event-driven touchpoints rather than direct request/response capabilities.
-- **Relational foreign-key links** — cross-table references are recorded as hard relational links between entities, surfacing constraints that affect how components may be separated or migrated independently.
-
-The specialized extractor dispatch layer acts as the internal routing hub between the upstream file classifier (which tags file kinds) and the downstream extractors responsible for each artifact type. Files that do not match a recognized kind fall through to the general LLM extraction path.
+- **Service definition files** — each declared service and its remote-procedure calls are recorded as integration touchpoints, including input/output message types and streaming direction per operation.
+- **API contract files** — the total number of endpoints exposed to external HTTP consumers is recorded, characterising the inbound HTTP integration surface.
+- **Graph schema files** — subscription roots are classified as integration touchpoints (event-driven outbound signals or real-time feeds) rather than as capabilities.
+- **Relational schema files** — foreign-key references between tables are emitted as directed relational links, recording the exact columns that form each join.
 
 ## Supporting claims
-- Three selectable LLM backends are supported — a locally-hosted model service, a hosted Anthropic-compatible service, and an OpenAI-compatible service. [1][2][3]
-- Each backend implements the same three-method contract: structured JSON completion, free-text completion, and multi-turn chat. [1][2][3]
-- The orchestrator and all downstream stages call into the provider without branching on which concrete provider is active. [4][1][2][3]
-- The introspection stage uses structured JSON completion to classify repository paths. [5]
-- The extraction stage uses structured JSON completion against a findings schema, per file. [6]
-- The aggregation stage uses structured JSON completion against a section-body schema. [7]
-- The critic/reviser uses structured completions for rubric scoring and body revision. [8]
-- The chat session uses multi-turn chat grounded in populated wiki content. [9]
-- Four external tool-server integrations are declared: a local AI utility, a local web crawler, a remote documentation context service, and a remote stitching/search service, making the system an MCP client that fans out to multiple capability providers. [10]
-- All pipeline stages read and write through a shared filesystem layout abstraction; the cache layer uses this abstraction to locate its storage directory. [11][12][13][14][15][16]
-- The extraction stage integrates with a repository-wide import/reference graph; each file's neighbors are injected into the extraction prompt. [17][18]
-- The import graph also drives the specialized-extractor dispatch path by classifying each file's structural kind. [18][19]
-- Project-specific settings are read from a TOML configuration file inside each managed project's wiki directory; parse failures fall back gracefully to defaults. [20][21]
-- The CLI constructs the provider instance and passes it directly into the chat and report capabilities. [4]
-- Each parsed API contract contributes a finding recording the number of HTTP endpoints the analysed system exposes to external consumers. [22]
-- Each RPC service block in a protocol definition is treated as an integration touchpoint, with operations described including streaming direction. [23]
-- Subscription roots are mapped specifically to the integrations section, reflecting event-driven touchpoints. [24]
-- Cross-table foreign-key references are recorded as hard relational links between entities, surfacing migration constraints. [25]
-- The specialized extractor dispatch layer routes recognized file kinds to dedicated extractors; unrecognized files fall through to the general LLM extraction path. [26][19][27]
-- Derivative sections are excluded from the aggregation stage and are instead populated by a separate deriver stage that runs afterwards. [28][14]
+- All communication with language models is routed through a single shared provider abstraction that declares three call surfaces: schema-validated structured output, unstructured free-text completion, and stateful multi-turn conversation. [1]
+- Every pipeline stage that needs inference (extraction, aggregation, derivation, quality critique, surgical editing, and the chat REPL) calls exclusively through this interface. [2][3][4][5][6][1]
+- Three concrete provider backends are available: two externally hosted and one local, selected at runtime via configuration. [7][8][9]
+- All three backends normalize API errors into uniform runtime errors before surfacing them. [7][9]
+- The command-line interface is the sole external entry point and delegates entirely to internal modules, containing no domain logic of its own. [10]
+- Configuration is resolved from up to three sources in strict precedence order: a per-target config file, process-level environment variables, and built-in field defaults, with the per-target config winning. [11]
+- The orchestrator sequences five internal subsystems: introspection, extraction, aggregation, derivation, and the cache layer. [12]
+- All read and write access to wiki artifacts flows through a single canonical wiki layout abstraction shared by extraction, aggregation, caching, orchestration, derivation, chat, and CLI modules. [13]
+- The cache module is consumed by the orchestrator, extractor, aggregator, and deriver, and delegates all content hashing to a dedicated fingerprinting subsystem. [14][15]
+- The fingerprinting subsystem is also used by the evidence citation layer and the dependency graph subsystem. [15]
+- For structured file kinds, the extractor delegates to a deterministic dispatch layer that bypasses the language model entirely. [16][17]
+- The dispatch layer depends on the file classifier from the repository analysis module. [18][17]
+- The repository analysis module builds an import/reference graph used by the orchestrator to inject neighbor-file context into extraction prompts. [18]
+- Completed extraction results are written to a notes store (one JSONL file per section) via an append_note interface consumed downstream by the aggregator. [19]
+- The aggregator coordinates with the cache, the surgical editor, and the evidence renderer as internal subsystems. [2]
+- The surgical editor sits between the cache and the rendering layer for small deltas, calling the provider for targeted structured edits. [6][20]
+- The report module reads section files and notes from disk, reads the walk cache for total file counts, and optionally calls the critic to score section bodies. [21]
+- For derivative sections, the report collects upstream section text to give the critic context-aware scoring capability. [22]
+- The chat REPL reads all populated section files from disk via the wiki layout and delegates each user turn to the configured provider with the full message history. [23][3]
+- The filesystem walker is called by the introspection stage and by the orchestrator/extractor stages, and has no outbound integrations beyond the local filesystem. [24]
+- Service definition files surface each declared service and its remote-procedure calls as integration touchpoints, including input/output message types and streaming direction per operation. [25]
+- API contract files surface the total number of endpoints exposed to external HTTP consumers as an inbound integration surface finding. [26]
+- Graph schema subscription roots are classified as integration touchpoints rather than capabilities, reflecting their event-driven nature. [27]
+- Relational schema foreign-key references are emitted as directed relational links recording the exact columns that form each join. [28]
 
 ## Sources
-1. `wikifi/providers/anthropic_provider.py:83-106`
-2. `wikifi/providers/ollama_provider.py:44-46`
-3. `wikifi/providers/openai_provider.py:1-9`
-4. `wikifi/cli.py:176-179`
-5. `wikifi/introspection.py:61-70`
-6. `wikifi/extractor.py:220-235`
-7. `wikifi/aggregator.py:136-141`
-8. `wikifi/critic.py:30-32`
-9. `wikifi/chat.py:52-55`
-10. `.mcp.json:2-36`
-11. `wikifi/aggregator.py:109-160`
-12. `wikifi/cache.py:30-32`
-13. `wikifi/chat.py:63-82`
-14. `wikifi/deriver.py:73-107`
-15. `wikifi/extractor.py`
-16. `wikifi/report.py:78-130`
-17. `wikifi/extractor.py:213-215`
-18. `wikifi/repograph.py:1-10`
-19. `wikifi/specialized/dispatch.py:36-62`
-20. `wikifi/cli.py:103-105`
-21. `wikifi/config.py:169-200`
-22. `wikifi/specialized/openapi.py:96-103`
-23. `wikifi/specialized/protobuf.py:64-90`
-24. `wikifi/specialized/graphql.py:108-110`
-25. `wikifi/specialized/sql.py:88-98`
-26. `wikifi/specialized/__init__.py:7-8`
-27. `wikifi/specialized/models.py:30-31`
-28. `wikifi/aggregator.py:111-116`
+1. `wikifi/providers/base.py:37-57`
+2. `wikifi/aggregator.py:118-210`
+3. `wikifi/chat.py:50-55`
+4. `wikifi/critic.py:27-29`
+5. `wikifi/extractor.py:228-241`
+6. `wikifi/surgical.py:196-220`
+7. `wikifi/providers/anthropic_provider.py:117-145`
+8. `wikifi/providers/ollama_provider.py:43-100`
+9. `wikifi/providers/openai_provider.py:1-20`
+10. `wikifi/cli.py:21-29`
+11. `wikifi/config.py:1-26`
+12. `wikifi/orchestrator.py:57-240`
+13. `wikifi/wiki.py:54-76`
+14. `wikifi/cache.py`
+15. `wikifi/fingerprint.py:1-17`
+16. `wikifi/extractor.py:216-235`
+17. `wikifi/specialized/dispatch.py:18-60`
+18. `wikifi/repograph.py:1-16`
+19. `wikifi/extractor.py:265-268`
+20. `wikifi/surgical.py:196-234`
+21. `wikifi/report.py:72-130`
+22. `wikifi/report.py:153-163`
+23. `wikifi/chat.py:62-82`
+24. `wikifi/walker.py:1-11`
+25. `wikifi/specialized/protobuf.py:66-97`
+26. `wikifi/specialized/openapi.py:90-96`
+27. `wikifi/specialized/graphql.py:103-106`
+28. `wikifi/specialized/sql.py:87-98`
