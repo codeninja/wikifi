@@ -1,56 +1,62 @@
 # Domains and Subdomains
 
-## Core Domain
+The system is organized around a single **core domain**: automated codebase documentation — the systematic transformation of a living software repository into a structured, technology-agnostic wiki that is kept coherent as the codebase evolves.
 
-The system's core domain is **automated documentation synthesis**: ingesting an arbitrary source repository and producing a structured, intent-bearing wiki that describes the codebase in technology-agnostic terms. The central concern is not the mechanics of reading files, but the act of surfacing *business intent* — distinguishing what a system does from the accidental details of how it is implemented.
+Within that core domain, five supporting subdomains have been identified.
 
-## Subdomains
+---
 
-### Repository Introspection
-Before any analysis begins, the system must decide which parts of a repository carry production intent and which represent infrastructure, tooling, or generated artefacts. This subdomain owns that classification decision. A defining constraint is **tech-agnosticism**: the introspection logic must not rely on recognising specific languages, frameworks, or conventions, so that it generalises across any codebase.
+### Codebase Analysis
 
-### Knowledge Extraction
-Once relevant files are identified, this subdomain is responsible for extracting structured, intent-bearing findings from each one. It encompasses file classification, content chunking, querying an inference backend for structured observations, and persisting those observations with precise citations for downstream use. The output of this subdomain is the raw evidential record.
+This subdomain is responsible for reading every source file and producing structured, section-aligned findings. It breaks into two tightly coupled concerns:
 
-### Section Synthesis
-The documentation produced by the system is split along a clear dependency boundary:
+- **File Classification** — assigning each file a semantic kind (e.g., schema definition, migration script, API contract, or general prose). Path-level disambiguation handles ambiguous files.
+- **Knowledge Extraction** — consuming the classification to select the appropriate reading strategy (a specialized structured extractor or a general prose extraction path), then producing normalized findings for each predefined wiki section.
 
-| Subdomain tier | Description | Pipeline position |
+### Source Traceability
+
+This subdomain bridges raw analysis and the human-readable wiki. Every claim written into a section must be anchored to a precise location in the source code. The subdomain also surfaces contradictions — cases where two sources make incompatible assertions about the same topic — so that the final wiki reflects genuine uncertainty rather than silent resolution.
+
+### Incremental Content Maintenance
+
+When the underlying evidence for a section changes, this subdomain decides how much of the previously synthesized content to preserve. It models the decision as a three-way classification — **unchanged**, **surgical** (small targeted edits), or **rewrite** (full regeneration) — driven by a churn ratio derived from the delta in the finding set.
+
+### Wiki Persistence
+
+This subdomain owns the authoritative on-disk representation of the wiki: directory naming and layout conventions, idempotent scaffolding, and all read/write operations against section bodies, per-file extraction notes, configuration, and the cache directory.
+
+### Knowledge Presentation
+
+Once a wiki exists, this subdomain makes it accessible. It encompasses two capabilities: conversational question-and-answer over the generated content, and coverage or quality reporting that surfaces gaps or weak sections.
+
+---
+
+### Domain Relationships
+
+| Subdomain | Depends on | Feeds into |
 |---|---|---|
-| **Primary sections** | Built from per-file evidence produced by the extraction subdomain | Stages 2–3 |
-| **Derivative sections** | Synthesised by aggregating across all primary-section findings | Stage 4 |
+| File Classification | — | Knowledge Extraction |
+| Knowledge Extraction | File Classification | Source Traceability, Wiki Persistence |
+| Source Traceability | Knowledge Extraction | Wiki Persistence, Knowledge Presentation |
+| Incremental Content Maintenance | Wiki Persistence, Knowledge Extraction | Wiki Persistence |
+| Wiki Persistence | All upstream | Knowledge Presentation |
+| Knowledge Presentation | Wiki Persistence | (end user) |
 
-This ordering is a first-class design constraint: derivative sections cannot be produced until all primary evidence is available. The boundary between the two tiers is enforced structurally, not merely by convention.
-
-### Artefact Persistence
-Two distinct storage concerns are separated within the system. *Committed wiki content* — the section markdown files that are versioned alongside the target project — is kept apart from *local working state*, which includes per-file extraction notes and a content-addressed cache. The persistence subdomain owns this boundary and ensures that working state is never accidentally treated as part of the published record.
-
-## Subdomain Relationships
-
-The subdomains form a directed dependency chain:
-
-```
-Repository Introspection
-        ↓
-  Knowledge Extraction  →  Artefact Persistence (working state)
-        ↓
-  Section Synthesis
-        ↓
-  Artefact Persistence (committed wiki content)
-```
-
-No subdomain reaches backwards in this chain; the pipeline ordering is the authoritative expression of inter-subdomain dependency.
+The boundaries described here are defined by domain responsibility, not by any particular module or technology choice.
 
 ## Supporting claims
-- The core domain is automated documentation synthesis: extracting business intent from a source repository and producing a technology-agnostic wiki. [1][2]
-- The repository introspection subdomain decides which parts of a codebase encode business intent versus infrastructure or tooling. [2]
-- A defining constraint of repository introspection is tech-agnosticism — the analysis must not depend on recognising any specific language or framework. [2]
-- The knowledge extraction subdomain covers file classification, content chunking, inference-backend querying, and persisting findings with citations. [1]
-- Documentation sections are divided into primary sections (built from per-file evidence) and derivative sections (synthesised from aggregates of primary sections), with the ordering enforced as a structural constraint. [3]
-- Two distinct storage concerns exist: committed wiki content and local working state (extraction notes and cache); the persistence subdomain enforces this boundary. [4]
+- The core domain is automated codebase documentation: the systematic transformation of a software repository into a structured, technology-agnostic wiki. [1][2]
+- A file classification subdomain tags every file with a semantic kind and handles path-level disambiguation for ambiguous files. [3]
+- A knowledge extraction subdomain consumes the file classification to select the appropriate reading strategy and produces normalized findings per wiki section. [2][3]
+- A source traceability subdomain anchors every narrative claim to a precise codebase location and surfaces contradictions between sources. [4]
+- An incremental content maintenance subdomain classifies section updates as unchanged, surgical, or rewrite based on a churn ratio derived from changes in the finding set. [5]
+- A wiki persistence subdomain owns the authoritative on-disk layout, idempotent scaffolding, and all read/write operations for section bodies, extraction notes, configuration, and cache. [6]
+- A knowledge presentation subdomain provides conversational Q&A over the generated wiki and coverage/quality reporting. [1]
 
 ## Sources
-1. `wikifi/extractor.py`
-2. `wikifi/introspection.py:19-44`
-3. `wikifi/sections.py:1-19`
-4. `wikifi/wiki.py:1-50`
+1. `wikifi/cli.py:1-11`
+2. `wikifi/extractor.py:1-20`
+3. `wikifi/specialized/dispatch.py:36-60`
+4. `wikifi/evidence.py:1-18`
+5. `wikifi/surgical.py:1-34`
+6. `wikifi/wiki.py:1-55`
