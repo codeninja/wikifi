@@ -189,13 +189,19 @@ def extract_repo(
         # ---- specialized routing ----
         specialized_fn = select_specialized(kind, rel_path=rel.as_posix()) if use_specialized_extractors else None
         if specialized_fn is not None:
-            stats.specialized_files += 1
             try:
                 result = specialized_fn(rel.as_posix(), data)
             except Exception as exc:  # specialized failures don't kill the walk
                 log.warning("specialized extraction failed for %s: %s", rel, exc)
                 stats.files_skipped += 1
                 continue
+            # Only count as specialized after the extractor returned —
+            # the orchestrator's full-cache short-circuit treats
+            # ``cache_hits + specialized_files == files_seen`` as proof
+            # that no LLM-side work was lost; counting failed extractions
+            # here would let a silently-dropped file satisfy that
+            # predicate.
+            stats.specialized_files += 1
 
             cached_findings = []
             file_had_findings = False
@@ -321,7 +327,11 @@ def extract_repo(
             # chunked files lose some chunks we still keep what we got.
             stats.files_skipped += 1
 
-        if cache is not None and fingerprint and chunks_done > 0:
+        # Only record the extraction cache when every chunk succeeded.
+        # Recording after a partial failure would let the next walk
+        # cache-hit the file with incomplete findings and let the
+        # orchestrator's short-circuit treat that as "no work needed."
+        if cache is not None and fingerprint and chunks_done > 0 and not any_chunk_failed:
             cache.record_extraction(
                 rel.as_posix(),
                 fingerprint=fingerprint,

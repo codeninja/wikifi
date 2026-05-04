@@ -533,3 +533,85 @@ def test_extract_repo_use_specialized_extractors_false_falls_back_to_llm(tmp_pat
     assert stats.specialized_files == 0
     notes = read_notes(layout, "entities")
     assert any("Routed to LLM." in n["finding"] for n in notes)
+
+
+def test_extract_repo_does_not_cache_when_any_chunk_fails(tmp_path, mock_provider_factory):
+    """A file with a failed chunk must not land in the extraction cache.
+
+    The full-cache short-circuit treats every cache hit as proof that
+    last walk's findings for this file are complete. Recording an entry
+    after a partial failure would let the next walk satisfy that
+    predicate with fewer findings than the file actually contains.
+    """
+    layout = _layout(tmp_path)
+    body = "x = 1\n" * 1_000
+    (tmp_path / "flaky.py").write_text(body)
+
+    call_count = {"n": 0}
+
+    def factory(schema, system, user):
+        call_count["n"] += 1
+        if call_count["n"] == 2:
+            raise RuntimeError("simulated mid-chunk outage")
+        return FileFindings(
+            summary="role",
+            findings=[SectionFinding(section_id="entities", finding=f"chunk-{call_count['n']}-finding")],
+        )
+
+    cache = WalkCache()
+    provider = mock_provider_factory(json_factory=factory)
+    stats = extract_repo(
+        layout=layout,
+        provider=provider,
+        files=[Path("flaky.py")],
+        repo_root=tmp_path,
+        chunk_size_bytes=500,
+        chunk_overlap_bytes=50,
+        cache=cache,
+    )
+
+    assert stats.chunks_processed >= 1, "at least one chunk should have succeeded"
+    assert "flaky.py" not in cache.extraction, (
+        "a partial-failure walk must not record an extraction cache entry; the next walk should retry the file fresh"
+    )
+
+
+def test_extract_repo_does_not_count_failed_specialized_extraction(tmp_path, monkeypatch, mock_provider_factory):
+    """A specialized extractor that raises must not be counted as 'specialized'.
+
+    The orchestrator's full-cache short-circuit reads
+    ``cache_hits + specialized_files`` as proof that no LLM-side work
+    was lost. Counting failed specialized extractions in that total
+    would let a silently-dropped file satisfy the predicate.
+    """
+    from wikifi import extractor as extractor_module
+
+    layout = _layout(tmp_path)
+    (tmp_path / "schema.sql").write_text("CREATE TABLE customer (id INTEGER);")
+
+    def boom(rel_path, data):
+        raise RuntimeError("specialized parser crashed")
+
+    # Patch the binding inside extractor.py's module namespace so the
+    # extractor sees the raising selector regardless of how dispatch is
+    # otherwise wired up.
+    monkeypatch.setattr(
+        extractor_module,
+        "select_specialized",
+        lambda kind, *, rel_path: boom if kind.value == "sql" else None,
+    )
+
+    provider = mock_provider_factory(
+        json_factory=lambda schema, system, user: FileFindings(),
+    )
+    stats = extract_repo(
+        layout=layout,
+        provider=provider,
+        files=[Path("schema.sql")],
+        repo_root=tmp_path,
+    )
+
+    assert stats.specialized_files == 0, (
+        "a specialized extractor that raised must not increment the counter the short-circuit predicate relies on"
+    )
+    assert stats.files_skipped == 1

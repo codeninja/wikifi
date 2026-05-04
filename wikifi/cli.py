@@ -144,7 +144,7 @@ def walk(
     if report.fully_cached:
         table.add_row(
             "3. Aggregation",
-            "[dim]skipped — every file cache-hit and introspection scope unchanged[/dim]",
+            "[dim]skipped — every file cache-hit or specialized, introspection scope unchanged[/dim]",
         )
         table.add_row(
             "4. Derivation",

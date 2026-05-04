@@ -3,7 +3,7 @@
 import re
 
 from wikifi.cache import WalkCache, hash_upstream_bodies
-from wikifi.deriver import DerivedSection, derive_all
+from wikifi.deriver import DerivedSection, derivation_fully_cached, derive_all
 from wikifi.sections import DERIVATIVE_SECTIONS, SECTIONS_BY_ID
 from wikifi.wiki import WikiLayout, initialize, write_section
 
@@ -166,6 +166,10 @@ def test_derive_uses_cache_when_upstream_bodies_unchanged(tmp_path, mock_provide
     stats = derive_all(layout=layout, provider=provider, cache=cache)
     assert stats.sections_cached == len(DERIVATIVE_SECTIONS)
     assert call_count["n"] == first_calls  # still no new calls
+    # ``sections_revised`` counts reviser work performed in this walk.
+    # A pure cache replay does no critic work, so the counter must stay
+    # at zero even if the cached entries went through review previously.
+    assert stats.sections_revised == 0
 
 
 def test_derive_cache_misses_when_upstream_changes(tmp_path, mock_provider_factory):
@@ -253,3 +257,82 @@ def test_derive_persist_cache_called_after_each_section(tmp_path, mock_provider_
     )
     derive_all(layout=layout, provider=provider, cache=cache, persist_cache=persist)
     assert persist_calls["n"] == len(DERIVATIVE_SECTIONS)
+
+
+def test_derive_does_not_cache_when_provider_raises(tmp_path, mock_provider_factory):
+    """A failed derivation must not poison the cache with the error body.
+
+    Without this guard, a transient stage-4 outage gets recorded as the
+    cached result for the section's current upstream hash, and later
+    walks would replay (or short-circuit around) the error message
+    until the upstream bodies themselves change.
+    """
+    layout = _setup(tmp_path)
+    section = DERIVATIVE_SECTIONS[0]
+    _populate_upstreams(layout, section)
+
+    def raiser(schema, system, user):
+        raise RuntimeError("model unavailable")
+
+    cache = WalkCache()
+    provider = mock_provider_factory(json_factory=raiser)
+    derive_all(layout=layout, provider=provider, cache=cache)
+
+    body_on_disk = layout.section_path(section).read_text()
+    assert "Derivation failed" in body_on_disk
+    assert section.id not in cache.derivation, "an error body must not be persisted as the cached derivation"
+
+
+def test_derive_review_records_reviewed_flag_even_when_critic_accepts(tmp_path, mock_provider_factory):
+    """A ``--review`` walk where the critic accepts unchanged still counts as reviewed.
+
+    The cached ``revised`` field is the predicate that distinguishes
+    "this body has been through the critic loop" from "this body never
+    saw a reviewer." Tying it to whether the reviser changed text would
+    make every ``--review`` walk redo the loop on a clean draft, which
+    defeats the cache for the most common case.
+    """
+    from wikifi.critic import Critique
+
+    layout = _setup(tmp_path)
+    section = DERIVATIVE_SECTIONS[0]
+    _populate_upstreams(layout, section)
+
+    def factory(schema, system, user):
+        if schema is Critique:
+            # Score above the threshold → critic accepts, reviser doesn't run.
+            return Critique(score=9, summary="ok")
+        return DerivedSection(body="A clean draft the critic likes.")
+
+    cache = WalkCache()
+    provider = mock_provider_factory(json_factory=factory)
+    derive_all(layout=layout, provider=provider, cache=cache, review=True, review_min_score=7)
+
+    entry = cache.derivation[section.id]
+    assert entry.revised is True, (
+        "a body that went through the critic loop must be flagged as reviewed "
+        "even when the critic accepted without changes"
+    )
+
+
+def test_derivation_fully_cached_rejects_uncached_empty_section(tmp_path):
+    """A derivative with no upstream content and no cache entry must defeat the short-circuit.
+
+    Mirrors the aggregator's empty-state guard: a stage-4 crash before
+    the first walk wrote the empty placeholder, or an aggregation that
+    drained a derivative's upstreams between walks, would otherwise let
+    the orchestrator skip stage 4 with stale prose still on disk.
+    """
+    layout = _setup(tmp_path)
+    cache = WalkCache()
+    assert not derivation_fully_cached(layout, cache, review=False)
+
+
+def test_derivation_fully_cached_accepts_cached_empty_state(tmp_path, mock_provider_factory):
+    """Once stage 4 records the empty-upstream state, the predicate flips to True."""
+    layout = _setup(tmp_path)
+    cache = WalkCache()
+    # No upstreams populated → every derivative goes down the empty path.
+    provider = mock_provider_factory()  # would crash if called
+    derive_all(layout=layout, provider=provider, cache=cache)
+    assert derivation_fully_cached(layout, cache, review=False)

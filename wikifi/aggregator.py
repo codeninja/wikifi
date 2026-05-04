@@ -130,8 +130,25 @@ def aggregate_all(
     for section in PRIMARY_SECTIONS:
         notes = read_notes(layout, section)
         if not notes:
-            write_section(layout, section, _empty_body(section))
+            empty_body = _empty_body(section)
+            write_section(layout, section, empty_body)
             stats.sections_empty += 1
+            # Record an empty-state cache entry so a subsequent walk can
+            # tell "this section was aggregated against zero notes" apart
+            # from "this section was never aggregated, body on disk is
+            # stale." Without this, a deletion that empties a section's
+            # notes would let the orchestrator's full-cache short-circuit
+            # skip stage 3 while leaving the prior walk's prose in place.
+            if cache is not None:
+                cache.record_aggregation(
+                    section.id,
+                    notes_hash=hash_section_notes([]),
+                    body=empty_body,
+                    claims=[],
+                    contradictions=[],
+                )
+                if persist_cache is not None:
+                    persist_cache()
             continue
 
         notes_hash = hash_section_notes(notes)
@@ -290,8 +307,10 @@ def aggregation_fully_cached(layout: WikiLayout, cache: WalkCache) -> bool:
     """Return True only if every primary section is covered by a fresh cache entry.
 
     "Fresh" means: live notes hash matches the cached ``notes_hash``.
-    Sections with no notes count as covered (the aggregator writes the
-    empty-body placeholder either way; no LLM work is needed).
+    Empty-note sections count as covered only when a cache entry already
+    asserts that the prior walk also saw zero notes — otherwise a file
+    deletion that drains a section's notes would let the orchestrator
+    skip stage 3 while last walk's prose is still on disk.
 
     The orchestrator's short-circuit relies on this: a walk that crashed
     mid-stage-3 leaves some sections aggregated and others stale, and a
@@ -300,14 +319,11 @@ def aggregation_fully_cached(layout: WikiLayout, cache: WalkCache) -> bool:
     """
     for section in PRIMARY_SECTIONS:
         notes = read_notes(layout, section)
-        if not notes:
-            # Empty-note sections render the same placeholder every walk
-            # — no aggregation work to short-circuit around.
-            continue
+        notes_hash = hash_section_notes(notes)
         entry = cache.aggregation.get(section.id)
         if entry is None:
             return False
-        if entry.notes_hash != hash_section_notes(notes):
+        if entry.notes_hash != notes_hash:
             return False
     return True
 

@@ -114,10 +114,15 @@ class CachedDerivation:
 
     ``upstream_hash`` covers the concatenated bodies of the upstream
     primary sections this derivative was synthesized from. ``revised``
-    records whether the critic + reviser loop ran on this body, so a
-    cached body produced under ``--review`` is not silently reused on a
-    subsequent walk that turns review off (the bodies are similar but
-    the contract differs).
+    records whether the critic + reviser loop ran on this body — true
+    even when the critic accepted the draft unchanged.
+
+    The asymmetry the lookup enforces (see :meth:`WalkCache.lookup_derivation`):
+    a cached body that has *not* been through review is rejected when
+    the current walk asks for ``--review`` (the user explicitly opted
+    in to the critic loop, so we owe them the loop). The inverse —
+    reusing a reviewed cached body on a walk that runs without review —
+    is fine, since a reviewed body is strictly higher quality.
     """
 
     upstream_hash: str

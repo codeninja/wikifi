@@ -446,6 +446,68 @@ def test_run_walk_first_walk_is_never_fully_cached(mini_target, mock_provider_fa
     assert report.fully_cached is False
 
 
+def test_run_walk_does_not_short_circuit_when_contributing_file_deleted(mini_target, mock_provider_factory):
+    """Deleting a contributing file between walks must force stage 3 to rewrite the section.
+
+    Reproduces the empty-notes blind spot that the aggregator's
+    full-cache predicate previously had: walk 1 produces findings for
+    section X from one file. The file is deleted before walk 2. Stage 2
+    of walk 2 produces zero notes for X, but the on-disk markdown still
+    holds last walk's prose. Without the empty-state cache assertion,
+    the orchestrator's short-circuit would fire and freeze the stale
+    body in place.
+    """
+    settings = _settings()
+    introspection = IntrospectionResult(
+        include=["src/"], exclude=[], primary_languages=["python"], likely_purpose="demo", rationale="ok"
+    )
+
+    # Only src/ files produce "entities" findings — manifests stay silent.
+    # Without this, replaying README/pyproject cache entries would keep
+    # the section's notes non-empty after the src/ deletion and obscure
+    # the bug we're guarding against.
+    def factory(schema, system, user):
+        if schema is IntrospectionResult:
+            return introspection
+        if schema is FileFindings:
+            if "src/fakeapp" in user:
+                return FileFindings(
+                    summary="domain code",
+                    findings=[SectionFinding(section_id="entities", finding="Order entity inferred.")],
+                )
+            return FileFindings()  # manifests / readme contribute nothing
+        if schema is SectionBody:
+            return SectionBody(body="Order is a real thing.")
+        if schema is DerivedSection:
+            return DerivedSection(body="Derived from Order.")
+        raise AssertionError(f"unexpected {schema}")
+
+    provider = mock_provider_factory(json_factory=factory)
+    run_walk(root=mini_target, settings=settings, provider=provider)
+
+    layout = WikiLayout(root=mini_target)
+    entities_after_first = layout.section_path("entities").read_text()
+    assert "Order is a real thing." in entities_after_first
+
+    # Delete every src/ file that contributed findings. The next walk's
+    # stage 2 produces zero notes for "entities" (the surviving manifests
+    # contribute nothing), so stage 3's empty-notes branch is what should
+    # run. The short-circuit must not fire.
+    for src_file in (mini_target / "src" / "fakeapp").rglob("*.py"):
+        src_file.unlink()
+
+    second = run_walk(root=mini_target, settings=settings, provider=provider)
+    assert second.fully_cached is False, (
+        "deleting the contributing files must force stage 3 to re-run; "
+        "otherwise the prior walk's prose stays on disk forever"
+    )
+
+    entities_after_second = layout.section_path("entities").read_text()
+    assert "Order is a real thing." not in entities_after_second
+    # The aggregator's empty-body placeholder is what should be on disk now.
+    assert "No findings were extracted" in entities_after_second
+
+
 def test_run_walk_review_flag_invokes_critic(mini_target, mock_provider_factory):
     """With ``review_derivatives=True`` the deriver runs the critic loop."""
     from wikifi.critic import Critique
