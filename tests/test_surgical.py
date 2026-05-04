@@ -294,7 +294,6 @@ def test_aggregate_records_finding_ids_on_cache_write(tmp_path, mock_provider_fa
 def test_aggregate_takes_unchanged_path_when_only_notes_hash_differs(tmp_path, mock_provider_factory):
     """Same finding ids, different ``notes_hash`` (e.g. line range moved) → no LLM call."""
     from wikifi.aggregator import SectionBody
-    from wikifi.cache import hash_section_notes
 
     layout = _layout(tmp_path)
     section = PRIMARY_SECTIONS[0]
@@ -334,19 +333,14 @@ def test_aggregate_takes_unchanged_path_when_only_notes_hash_differs(tmp_path, m
     assert stats.sections_cached == 1
     body = layout.section_path(section).read_text()
     assert "Cached body that should survive." in body
-    # And the cache key is refreshed to the new notes_hash so the next
-    # walk hits the fast path (Plan A) instead of doing this work again.
-    expected_hash = hash_section_notes(
-        [
-            {
-                "file": "a.py",
-                "summary": "x",
-                "finding": "Order entity.",
-                "sources": [{"file": "a.py", "lines": [10, 20], "fingerprint": "abc"}],
-            }
-        ]
-    )
-    assert cache.aggregation[section.id].notes_hash == expected_hash
+    # Cache key is *not* refreshed here. The cached claims still carry
+    # SourceRefs from the prior walk's notes (e.g. lines=[10, 20] when
+    # current lines could be [12, 22]); refreshing notes_hash to match
+    # live notes would let ``aggregation_fully_cached`` flag the entry
+    # as fresh and let the orchestrator's short-circuit lock those
+    # stale citations in place. Leaving the key alone keeps the
+    # predicate honest until a real Path 4 rewrite refreshes citations.
+    assert cache.aggregation[section.id].notes_hash == "stale-hash-from-prior-walk"
 
 
 def test_aggregate_takes_surgical_path_for_small_delta(tmp_path, mock_provider_factory):
@@ -569,3 +563,135 @@ def test_surgical_edit_preserves_unchanged_paragraphs_when_model_honors_contract
     assert original in bundle.body
     # And the new content is present.
     assert "Third paragraph integrating the added finding." in bundle.body
+
+
+# ---------- PR review regressions ----------
+
+
+def test_note_finding_ids_returns_empty_for_malformed_notes():
+    """Notes missing ``file`` or ``finding`` get an empty-string id.
+
+    Without this, hashing empty strings via :func:`compute_finding_id`
+    produces a deterministic non-empty id that would let two malformed
+    notes from different walks compare equal as "unchanged" findings —
+    routing a section onto the cache/surgical paths despite having no
+    real identity to anchor on.
+    """
+    notes = [
+        _note("a.py", "real finding"),
+        {"file": "", "summary": "x", "finding": "no file"},
+        {"file": "b.py", "summary": "x", "finding": ""},
+        {"summary": "x"},  # neither file nor finding present
+        {"file": "c.py", "summary": "x", "finding": None},  # null finding
+    ]
+    ids = note_finding_ids(notes, section_id="entities")
+    assert ids[0] != ""
+    assert ids[1] == ""
+    assert ids[2] == ""
+    assert ids[3] == ""
+    assert ids[4] == ""
+
+
+def test_classify_force_rewrites_when_any_finding_id_is_empty():
+    """A malformed/legacy note (empty id) in either set forces a rewrite.
+
+    Two empty-string ids would otherwise compare equal in the
+    set-symmetric-difference computation and let the section land on
+    the cache/surgical paths. The classifier must short-circuit to
+    rewrite when it detects any empty id.
+    """
+    cached = CachedSection(notes_hash="h", body="cached", finding_ids=["real_id_a", ""])
+    change = classify_section_change(cached=cached, live_finding_ids=["real_id_a", ""], surgical_threshold=0.3)
+    assert change.decision == "rewrite", (
+        "empty finding_id on either side must force rewrite, even when cached and live look superficially identical"
+    )
+
+
+def test_section_change_churn_ratio_max_when_everything_removed():
+    """``total_live == 0`` plus removed_ids → max churn (1.0), not 0.0.
+
+    Mirrors the classifier's ``max(total_live, 1)`` guard. Without
+    this, downstream code reading ``churn_ratio`` for a "removed
+    everything" section would see 0.0 and treat it as a no-change
+    case.
+    """
+    from wikifi.surgical import SectionChange
+
+    removed_only = SectionChange(
+        decision="rewrite",
+        added_indices=[],
+        removed_ids=["a", "b"],
+        unchanged_count=0,
+        total_live=0,
+    )
+    assert removed_only.churn_ratio == 1.0
+
+    # Truly empty section (no cached, no live) stays at 0.0.
+    empty = SectionChange(
+        decision="rewrite",
+        added_indices=[],
+        removed_ids=[],
+        unchanged_count=0,
+        total_live=0,
+    )
+    assert empty.churn_ratio == 0.0
+
+
+def test_aggregate_path2_does_not_refresh_cache_key(tmp_path, mock_provider_factory):
+    """The unchanged-finding-ids path must leave the cache entry alone.
+
+    Refreshing ``notes_hash`` to match live notes would let
+    :func:`aggregation_fully_cached` think the section is fresh and
+    skip stage 3 on the next walk — locking in cached citations whose
+    line ranges / fingerprints have drifted since the prior walk.
+    Leaving the cache key unchanged keeps the orchestrator's
+    short-circuit honest until a real Path 4 rewrite refreshes
+    citations.
+    """
+    from wikifi.aggregator import SectionBody, aggregation_fully_cached
+
+    layout = _layout(tmp_path)
+    section = PRIMARY_SECTIONS[0]
+    append_note(
+        layout,
+        section,
+        {
+            "file": "a.py",
+            "summary": "x",
+            "finding": "Order entity.",
+            "sources": [{"file": "a.py", "lines": [10, 20], "fingerprint": "abc"}],
+        },
+    )
+    cache = WalkCache()
+    cache.record_aggregation(
+        section.id,
+        notes_hash="prior-walk-hash",
+        body="Cached body.",
+        claims=[],
+        contradictions=[],
+        finding_ids=[compute_finding_id(file="a.py", section_id=section.id, finding="Order entity.")],
+    )
+    # Empty cache entries on every other primary section so the
+    # aggregator doesn't crash trying to look them up.
+    for other in PRIMARY_SECTIONS[1:]:
+        from wikifi.cache import hash_section_notes
+
+        cache.record_aggregation(
+            other.id,
+            notes_hash=hash_section_notes([]),
+            body="",
+            claims=[],
+            contradictions=[],
+        )
+
+    provider = mock_provider_factory(
+        json_factory=lambda schema, system, user: SectionBody(body="x"),
+    )
+    aggregate_all(layout=layout, provider=provider, cache=cache)
+
+    # Cache key untouched.
+    assert cache.aggregation[section.id].notes_hash == "prior-walk-hash"
+    # And aggregation_fully_cached refuses to flag the section as fresh.
+    assert not aggregation_fully_cached(layout, cache), (
+        "Path 2 must not be reachable as 'fully cached' until a real Path 4 rewrite refreshes citations"
+    )

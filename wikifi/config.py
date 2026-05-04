@@ -125,8 +125,9 @@ class Settings(BaseSettings):
         description=(
             "When some findings change in a section but most are unchanged, edit the cached "
             "section body in place around the delta instead of rewriting from scratch. "
-            "Preserves established prose and citation numbering. Disable to force the prior "
-            "(pre-Plan-B) behavior of full rewrites on any note change."
+            "Preserves established prose and citation numbering. Disabling this only gates "
+            "the LLM-side surgical edit path; the no-LLM cache-reuse paths (full cache hit "
+            "and unchanged-finding-set re-render) still fire regardless of this flag."
         ),
     )
     surgical_edit_threshold: float = Field(

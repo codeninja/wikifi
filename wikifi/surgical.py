@@ -133,8 +133,14 @@ class SectionChange:
 
     @property
     def churn_ratio(self) -> float:
+        # Mirror :func:`classify_section_change`'s guard: when the live
+        # finding set is empty but the cache had findings (i.e.
+        # ``removed_ids`` is non-empty), every cached finding is gone —
+        # the maximum possible churn. Returning 0.0 there would be
+        # misleading and could let downstream callers treat a
+        # remove-everything diff as "no change."
         if self.total_live == 0:
-            return 0.0
+            return 1.0 if self.removed_ids else 0.0
         return (len(self.added_indices) + len(self.removed_ids)) / self.total_live
 
 
@@ -159,6 +165,20 @@ def classify_section_change(
             decision="rewrite",
             added_indices=list(range(1, len(live_finding_ids) + 1)),
             removed_ids=[],
+            unchanged_count=0,
+            total_live=len(live_finding_ids),
+        )
+
+    # Empty-string ids surface from malformed or legacy notes (see
+    # :func:`wikifi.cache.note_finding_ids`). They have no meaningful
+    # identity, so any section that contains one — cached or live —
+    # forces a full rewrite rather than risking a "two empties look
+    # unchanged" set collision in the comparisons below.
+    if "" in cached.finding_ids or "" in live_finding_ids:
+        return SectionChange(
+            decision="rewrite",
+            added_indices=list(range(1, len(live_finding_ids) + 1)),
+            removed_ids=list(cached.finding_ids),
             unchanged_count=0,
             total_live=len(live_finding_ids),
         )
@@ -212,7 +232,7 @@ def surgical_aggregate(
     - Contradictions are fully replaced from the model output.
     """
     added_notes = [live_notes[i - 1] for i in change.added_indices if 1 <= i <= len(live_notes)]
-    removed_notes = _resolve_removed_claim_texts(cached, change.removed_ids)
+    removed_notes = _removed_finding_descriptors(change.removed_ids)
     user_prompt = _render_surgical_user_prompt(
         section=section,
         cached_body=cached.body,
@@ -308,20 +328,21 @@ def _resolve_added_indices(indices: list[int], added_refs: list[list[SourceRef]]
     return coalesce_refs(refs)
 
 
-def _resolve_removed_claim_texts(cached: CachedSection, removed_ids: list[str]) -> list[dict]:
-    """Reconstruct (file, finding_text) pairs for every removed cached finding.
+def _removed_finding_descriptors(removed_ids: list[str]) -> list[dict]:
+    """Build the ``removed_notes`` payload the surgical prompt expects.
 
-    The cache stores ``finding_ids`` aligned with the prior walk's notes
-    order, but it doesn't store the original note bodies. The best we
-    can show the model for a removed finding is its file path — that's
-    enough context for the model to find the affected sentence in the
-    cached body and revise around it. When the cache only knows the id,
-    we surface the id itself so the prompt is at least debuggable.
+    The cache stores stable ``finding_ids`` aligned with the prior
+    walk's notes order, but it does *not* persist the original note
+    bodies (file path or finding text). All we can give the model for
+    a removed finding is the opaque id; the prompt then asks the model
+    to find any sentence in the cached body that cites this id-shaped
+    handle and revise around it.
+
+    Restoring richer context (file path, finding text) would require
+    persisting the underlying notes alongside ``finding_ids`` in the
+    cache schema — a separate change, not addressed here.
     """
-    out: list[dict] = []
-    for fid in removed_ids:
-        out.append({"finding_id": fid})
-    return out
+    return [{"finding_id": fid} for fid in removed_ids]
 
 
 def _render_surgical_user_prompt(

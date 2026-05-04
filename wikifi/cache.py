@@ -110,11 +110,14 @@ class CachedSection:
     """Per-section aggregator output recovered from cache.
 
     ``finding_ids`` is the ordered list of stable per-note ids (see
-    :func:`compute_finding_id`) that fed into the cached body, aligned
-    with the notes' position so a 1-based ``claim.source_indices``
-    entry maps to ``finding_ids[idx - 1]``. Surgical aggregation uses
-    this to detect which findings were added or removed between walks
-    and route an edit instead of a full rewrite.
+    :func:`compute_finding_id`) that fed into the cached body. Its sole
+    consumer is :func:`wikifi.surgical.classify_section_change`, which
+    diffs cached vs live ids to decide between cache-hit / unchanged /
+    surgical / rewrite. Cached ``claims`` and ``contradictions`` already
+    carry resolved :class:`~wikifi.evidence.SourceRef` objects, so this
+    list is *not* used to re-resolve sources — note positional alignment
+    is preserved for the classifier's set comparison, not for source
+    reconstruction.
     """
 
     notes_hash: str
@@ -556,9 +559,12 @@ def compute_finding_id(*, file: str, section_id: str, finding: str) -> str:
     """Stable identity for one note across walks.
 
     Composition: ``sha256(file + "::" + section_id + "::" + finding)``,
-    truncated to 16 hex chars. Two walks that emit the same finding
-    text from the same file targeting the same section produce the
-    same id; any change in any of the three components is a fresh id.
+    truncated via :func:`wikifi.fingerprint.hash_text` to
+    ``FINGERPRINT_LENGTH`` (12) hex chars — the same digest length the
+    rest of wikifi uses for content fingerprints. Two walks that emit
+    the same finding text from the same file targeting the same section
+    produce the same id; any change in any of the three components is
+    a fresh id.
 
     A reword of ``finding`` (even one character) gets a new id, which
     semantically counts as "removed-and-added" from the surgical
@@ -575,21 +581,25 @@ def compute_finding_id(*, file: str, section_id: str, finding: str) -> str:
 def note_finding_ids(notes: list[dict[str, Any]], *, section_id: str) -> list[str]:
     """Compute the ordered ``finding_id`` list for a section's notes.
 
-    Aligned with note position so a 1-based ``claim.source_indices``
-    entry maps to ``finding_ids[idx - 1]``. Notes missing ``file`` or
-    ``finding`` get an empty-string id, which still preserves
-    positional alignment but won't compare equal to any real id —
-    surgical aggregation will treat them as always-changed and route
+    Aligned with note position so the surgical classifier and the
+    aggregator's Path 2 fast path can reason about which findings
+    appear at which index. Notes missing ``file`` or ``finding`` (or
+    carrying empty values for either) get an empty-string id —
+    `compute_finding_id` would still produce a stable hash for empty
+    inputs, which would let two malformed notes from different walks
+    look "unchanged" to the classifier. Returning ``""`` here forces
+    them to compare unequal to any real id and routes the section
     around them.
     """
-    return [
-        compute_finding_id(
-            file=str(n.get("file", "")),
-            section_id=section_id,
-            finding=str(n.get("finding", "")),
-        )
-        for n in notes
-    ]
+    out: list[str] = []
+    for note in notes:
+        file = str(note.get("file") or "")
+        finding = str(note.get("finding") or "")
+        if not file or not finding:
+            out.append("")
+            continue
+        out.append(compute_finding_id(file=file, section_id=section_id, finding=finding))
+    return out
 
 
 def hash_introspection_scope(*, include: list[str], exclude: list[str]) -> str:

@@ -21,7 +21,7 @@ The content chunking window is fixed at **150,000 bytes** with an **8,000-byte o
 
 ## Identity and Cache Rules
 
-**Finding identity** is defined as the SHA-256 digest of the concatenation `file::section_id::finding`, truncated to 16 hexadecimal characters. A single-character change to any of the three components produces a different identity, treated as a delete-plus-insert rather than an edit, invalidating any cached prose referencing the prior wording.
+**Finding identity** is defined as the SHA-256 digest of the concatenation `file::section_id::finding`, truncated to 12 hexadecimal characters (the same FINGERPRINT_LENGTH that governs content fingerprints elsewhere). A single-character change to any of the three components produces a different identity, treated as a delete-plus-insert rather than an edit, invalidating any cached prose referencing the prior wording.
 
 **Content fingerprints** must be exactly 12 hexadecimal characters derived from the leading 12 characters of a SHA-256 digest computed over raw bytes (not decoded text), ensuring encoding-independence across all subsystems.
 
@@ -117,7 +117,7 @@ A fixed set of directory and file patterns is unconditionally excluded from the 
 - Files whose stripped text content is shorter than 64 bytes are unconditionally skipped to prevent speculative AI reasoning on stubs. [5][7]
 - The content chunking window is fixed at 150,000 bytes with an 8,000-byte overlap between adjacent chunks. [8][9]
 - The invariant 0 ≤ overlap < chunk_size is enforced as a hard error on any change to chunking logic. [9]
-- Finding identity is SHA-256(file::section_id::finding) truncated to 16 hex characters; a single-character change to any component is treated as a delete-plus-insert invalidating cached prose. [10]
+- Finding identity is SHA-256(file::section_id::finding) truncated to 12 hex characters; a single-character change to any component is treated as a delete-plus-insert invalidating cached prose. [10]
 - Content fingerprints must be exactly 12 hexadecimal characters derived from the leading 12 characters of a SHA-256 digest computed over raw bytes. [11]
 - Aggregation cache keys must include the full sources list (file reference, line range, and content fingerprint per citation), not merely the finding text. [12]
 - A cache entry produced under critic-review mode must not be silently served to a non-review walk; the reverse is permitted. [13]

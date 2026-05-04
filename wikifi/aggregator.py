@@ -127,8 +127,14 @@ def aggregate_all(
        Re-render the cached bundle, no LLM call. (Plan A behavior.)
     2. **Unchanged finding set** — ``notes_hash`` differs but the
        finding ids are identical (a source line shifted, summary
-       changed, etc.). Refresh the cache key, re-render the cached
-       body, no LLM call.
+       changed, etc.). Re-render the cached body, no LLM call. The
+       cached ``notes_hash`` is *not* refreshed: the citations in the
+       cached claims still reference the prior walk's line ranges /
+       fingerprints, so a later walk needs another aggregation pass to
+       refresh them. Leaving the cache key stale keeps
+       :func:`aggregation_fully_cached` honest — the orchestrator's
+       short-circuit will not skip stage 3 for a section whose
+       citations could be drifting.
     3. **Surgical edit** — finding-set churn ratio is at or below
        ``surgical_threshold``. Send the cached body plus the added /
        removed delta to the LLM and merge the edit into the cached
@@ -136,9 +142,12 @@ def aggregate_all(
     4. **Full rewrite** — too much churn (or no prior cached body to
        edit). Re-aggregate from scratch. (Plan A behavior.)
 
-    Path 3 is gated by ``use_surgical_edits``; setting it to ``False``
-    collapses the decision tree back to the Plan A two-path version
-    (cache-hit or full rewrite).
+    Only Path 3 is gated by ``use_surgical_edits``; setting it to
+    ``False`` disables the LLM-side surgical edit, leaving the three
+    no-LLM paths (full cache hit, unchanged-finding-set re-render,
+    and full rewrite) intact. Path 2 in particular still fires when
+    only line ranges or summaries drift — that's a generic cache-reuse
+    optimization not specific to surgical editing.
 
     When ``persist_cache`` is supplied, it is invoked after each successful
     section's cache update — that turns a Ctrl-C / OOM mid-stage-3 into a
@@ -196,9 +205,22 @@ def aggregate_all(
             surgical_threshold=surgical_threshold if use_surgical_edits else -1.0,
         )
 
-        # Path 2: finding ids unchanged but notes_hash differs (e.g. line
-        # ranges shifted). The cached body is still grounded; just
-        # refresh the cache key and re-render.
+        # Path 2: finding ids unchanged but notes_hash differs (e.g.
+        # line ranges shifted, summary changed). The cached body's
+        # narrative still holds because every finding_id is still
+        # present, so we re-render rather than calling the LLM.
+        #
+        # Deliberately *don't* refresh the cache entry here. The cached
+        # ``claims`` carry resolved SourceRefs (file/lines/fingerprint)
+        # captured at prior-walk extraction time; if line ranges or
+        # fingerprints drifted, those refs are stale. Re-rendering with
+        # them is a tolerable per-walk shortcut, but updating
+        # ``notes_hash`` to match live notes would let
+        # :func:`aggregation_fully_cached` flag the section as fresh
+        # and the orchestrator would then skip stage 3 entirely on the
+        # next no-source-change walk — locking the stale citations in
+        # place. Leaving the cache key alone keeps the predicate honest
+        # and lets a future Path 4 rewrite refresh citations cleanly.
         if change.decision == "unchanged" and cached_entry is not None:
             bundle = EvidenceBundle(
                 body=cached_entry.body,
@@ -208,17 +230,6 @@ def aggregate_all(
             write_section(layout, section, render_section_body(bundle))
             stats.sections_cached += 1
             stats.sections_written += 1
-            if cache is not None:
-                cache.record_aggregation(
-                    section.id,
-                    notes_hash=notes_hash,
-                    body=cached_entry.body,
-                    claims=cached_entry.claims,
-                    contradictions=cached_entry.contradictions,
-                    finding_ids=live_finding_ids,
-                )
-                if persist_cache is not None:
-                    persist_cache()
             continue
 
         bundle: EvidenceBundle | None = None
