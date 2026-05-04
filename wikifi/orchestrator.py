@@ -205,6 +205,8 @@ def run_walk(
         provider=provider,
         cache=cache,
         persist_cache=_persist_aggregation if cache is not None else None,
+        surgical_threshold=settings.surgical_edit_threshold,
+        use_surgical_edits=settings.use_surgical_edits,
     )
 
     def _persist_derivation() -> None:

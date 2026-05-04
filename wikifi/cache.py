@@ -49,11 +49,16 @@ EXTRACTION_CACHE_FILENAME = "extraction.json"
 AGGREGATION_CACHE_FILENAME = "aggregation.json"
 DERIVATION_CACHE_FILENAME = "derivation.json"
 INTROSPECTION_CACHE_FILENAME = "introspection.json"
-# Bumped from 1 → 2 when stages 3 & 4 gained incremental persistence and
-# the derivation/introspection caches were added. v1 entries load to
-# empty so an upgraded wiki re-extracts on the first walk; subsequent
-# walks pick up the new short-circuit behavior.
-CACHE_VERSION = 2
+# Cache schema version, bumped to invalidate every entry across upgrades:
+# v1 → v2: stages 3 & 4 gained incremental persistence; derivation +
+#          introspection caches added.
+# v2 → v3: ``CachedSection.finding_ids`` added so the aggregator can
+#          classify per-section deltas (added / removed findings) and
+#          choose between cache-hit, surgical-edit, and full-rewrite
+#          paths instead of always rewriting on any note change.
+# Older entries load to empty so an upgraded wiki re-extracts on the
+# first walk; subsequent walks pick up the new behavior.
+CACHE_VERSION = 3
 
 # Re-exposed for callers that already import ``CACHE_DIRNAME`` from this
 # module; the constant itself lives in :mod:`wikifi.wiki` next to the
@@ -72,6 +77,7 @@ __all__ = [
     "WalkCache",
     "aggregation_cache_path",
     "cache_dir",
+    "compute_finding_id",
     "derivation_cache_path",
     "extraction_cache_path",
     "hash_introspection_scope",
@@ -79,6 +85,7 @@ __all__ = [
     "hash_upstream_bodies",
     "introspection_cache_path",
     "load",
+    "note_finding_ids",
     "reset",
     "save",
     "save_aggregation",
@@ -100,12 +107,21 @@ class CachedFindings:
 
 @dataclass
 class CachedSection:
-    """Per-section aggregator output recovered from cache."""
+    """Per-section aggregator output recovered from cache.
+
+    ``finding_ids`` is the ordered list of stable per-note ids (see
+    :func:`compute_finding_id`) that fed into the cached body, aligned
+    with the notes' position so a 1-based ``claim.source_indices``
+    entry maps to ``finding_ids[idx - 1]``. Surgical aggregation uses
+    this to detect which findings were added or removed between walks
+    and route an edit instead of a full rewrite.
+    """
 
     notes_hash: str
     body: str
     claims: list[dict[str, Any]] = field(default_factory=list)
     contradictions: list[dict[str, Any]] = field(default_factory=list)
+    finding_ids: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -213,12 +229,14 @@ class WalkCache:
         body: str,
         claims: list[dict[str, Any]] | None = None,
         contradictions: list[dict[str, Any]] | None = None,
+        finding_ids: list[str] | None = None,
     ) -> None:
         self.aggregation[section_id] = CachedSection(
             notes_hash=notes_hash,
             body=body,
             claims=list(claims or []),
             contradictions=list(contradictions or []),
+            finding_ids=list(finding_ids or []),
         )
 
     # ----- derivation scope -----
@@ -350,6 +368,7 @@ def save_aggregation(layout: WikiLayout, cache: WalkCache) -> None:
                     "body": entry.body,
                     "claims": entry.claims,
                     "contradictions": entry.contradictions,
+                    "finding_ids": entry.finding_ids,
                 }
                 for sid, entry in cache.aggregation.items()
             },
@@ -441,6 +460,7 @@ def _load_aggregation(path: Path) -> dict[str, CachedSection]:
                 body=entry.get("body", ""),
                 claims=list(entry.get("claims", [])),
                 contradictions=list(entry.get("contradictions", [])),
+                finding_ids=[str(fid) for fid in entry.get("finding_ids", [])],
             )
         except (KeyError, TypeError, ValueError) as exc:
             log.warning("dropping malformed aggregation cache entry %s: %s", sid, exc)
@@ -530,6 +550,46 @@ def hash_upstream_bodies(upstream_bodies: dict[str, str]) -> str:
 
     payload = [{"section_id": sid, "body": upstream_bodies[sid]} for sid in sorted(upstream_bodies)]
     return hash_text(json.dumps(payload, ensure_ascii=False, sort_keys=True))
+
+
+def compute_finding_id(*, file: str, section_id: str, finding: str) -> str:
+    """Stable identity for one note across walks.
+
+    Composition: ``sha256(file + "::" + section_id + "::" + finding)``,
+    truncated to 16 hex chars. Two walks that emit the same finding
+    text from the same file targeting the same section produce the
+    same id; any change in any of the three components is a fresh id.
+
+    A reword of ``finding`` (even one character) gets a new id, which
+    semantically counts as "removed-and-added" from the surgical
+    aggregator's point of view — the same as a delete-plus-insert in a
+    text diff. That's intentional: a paragraph the cached body wrote
+    around the old wording can no longer be assumed to still be
+    grounded by the new wording.
+    """
+    from wikifi.fingerprint import hash_text
+
+    return hash_text(f"{file}::{section_id}::{finding}")
+
+
+def note_finding_ids(notes: list[dict[str, Any]], *, section_id: str) -> list[str]:
+    """Compute the ordered ``finding_id`` list for a section's notes.
+
+    Aligned with note position so a 1-based ``claim.source_indices``
+    entry maps to ``finding_ids[idx - 1]``. Notes missing ``file`` or
+    ``finding`` get an empty-string id, which still preserves
+    positional alignment but won't compare equal to any real id —
+    surgical aggregation will treat them as always-changed and route
+    around them.
+    """
+    return [
+        compute_finding_id(
+            file=str(n.get("file", "")),
+            section_id=section_id,
+            finding=str(n.get("finding", "")),
+        )
+        for n in notes
+    ]
 
 
 def hash_introspection_scope(*, include: list[str], exclude: list[str]) -> str:

@@ -28,7 +28,7 @@ from dataclasses import dataclass
 
 from pydantic import BaseModel, Field
 
-from wikifi.cache import WalkCache, hash_section_notes
+from wikifi.cache import WalkCache, hash_section_notes, note_finding_ids
 from wikifi.evidence import (
     Claim,
     Contradiction,
@@ -39,6 +39,7 @@ from wikifi.evidence import (
 )
 from wikifi.providers.base import LLMProvider
 from wikifi.sections import PRIMARY_SECTIONS, Section
+from wikifi.surgical import classify_section_change, surgical_aggregate
 from wikifi.wiki import WikiLayout, read_notes, write_section
 
 log = logging.getLogger("wikifi.aggregator")
@@ -101,6 +102,8 @@ class AggregationStats:
     sections_written: int = 0
     sections_empty: int = 0
     sections_cached: int = 0
+    sections_edited: int = 0
+    sections_rewritten: int = 0
 
 
 def aggregate_all(
@@ -109,6 +112,8 @@ def aggregate_all(
     provider: LLMProvider,
     cache: WalkCache | None = None,
     persist_cache: Callable[[], None] | None = None,
+    surgical_threshold: float = 0.3,
+    use_surgical_edits: bool = True,
 ) -> AggregationStats:
     """Aggregate every primary section from its accumulated notes.
 
@@ -116,9 +121,24 @@ def aggregate_all(
     `wikifi.deriver.derive_all` after this stage — they have no per-file
     notes to aggregate from.
 
-    When ``cache`` is supplied and the section's note digest is unchanged
-    from the prior walk, the cached body and evidence are reused without
-    invoking the LLM.
+    Each section follows one of four paths, in priority order:
+
+    1. **Cache hit** — ``notes_hash`` matches the cached entry exactly.
+       Re-render the cached bundle, no LLM call. (Plan A behavior.)
+    2. **Unchanged finding set** — ``notes_hash`` differs but the
+       finding ids are identical (a source line shifted, summary
+       changed, etc.). Refresh the cache key, re-render the cached
+       body, no LLM call.
+    3. **Surgical edit** — finding-set churn ratio is at or below
+       ``surgical_threshold``. Send the cached body plus the added /
+       removed delta to the LLM and merge the edit into the cached
+       claims. Preserves prose for unchanged paragraphs.
+    4. **Full rewrite** — too much churn (or no prior cached body to
+       edit). Re-aggregate from scratch. (Plan A behavior.)
+
+    Path 3 is gated by ``use_surgical_edits``; setting it to ``False``
+    collapses the decision tree back to the Plan A two-path version
+    (cache-hit or full rewrite).
 
     When ``persist_cache`` is supplied, it is invoked after each successful
     section's cache update — that turns a Ctrl-C / OOM mid-stage-3 into a
@@ -152,42 +172,112 @@ def aggregate_all(
             continue
 
         notes_hash = hash_section_notes(notes)
+        live_finding_ids = note_finding_ids(notes, section_id=section.id)
+
+        # Path 1: full cache hit. Identical notes payload, identical
+        # citations, identical body — re-render and move on.
         if cache is not None:
-            cached = cache.lookup_aggregation(section.id, notes_hash)
-            if cached is not None:
+            cached_hit = cache.lookup_aggregation(section.id, notes_hash)
+            if cached_hit is not None:
                 bundle = EvidenceBundle(
-                    body=cached.body,
-                    claims=[Claim.model_validate(c) for c in cached.claims],
-                    contradictions=[Contradiction.model_validate(c) for c in cached.contradictions],
+                    body=cached_hit.body,
+                    claims=[Claim.model_validate(c) for c in cached_hit.claims],
+                    contradictions=[Contradiction.model_validate(c) for c in cached_hit.contradictions],
                 )
                 write_section(layout, section, render_section_body(bundle))
                 stats.sections_cached += 1
                 stats.sections_written += 1
                 continue
 
-        try:
-            structured = provider.complete_json(
-                system=AGGREGATION_SYSTEM_PROMPT,
-                user=_render_user_prompt(section, notes),
-                schema=SectionBody,
+        cached_entry = cache.aggregation.get(section.id) if cache is not None else None
+        change = classify_section_change(
+            cached=cached_entry,
+            live_finding_ids=live_finding_ids,
+            surgical_threshold=surgical_threshold if use_surgical_edits else -1.0,
+        )
+
+        # Path 2: finding ids unchanged but notes_hash differs (e.g. line
+        # ranges shifted). The cached body is still grounded; just
+        # refresh the cache key and re-render.
+        if change.decision == "unchanged" and cached_entry is not None:
+            bundle = EvidenceBundle(
+                body=cached_entry.body,
+                claims=[Claim.model_validate(c) for c in cached_entry.claims],
+                contradictions=[Contradiction.model_validate(c) for c in cached_entry.contradictions],
             )
-            bundle = _bundle_from(structured, notes)
-            rendered = render_section_body(bundle)
-        except Exception as exc:
-            log.warning("aggregation failed for %s: %s", section.id, exc)
-            rendered = _fallback_body(section, notes, error=str(exc))
-            bundle = None
+            write_section(layout, section, render_section_body(bundle))
+            stats.sections_cached += 1
+            stats.sections_written += 1
+            if cache is not None:
+                cache.record_aggregation(
+                    section.id,
+                    notes_hash=notes_hash,
+                    body=cached_entry.body,
+                    claims=cached_entry.claims,
+                    contradictions=cached_entry.contradictions,
+                    finding_ids=live_finding_ids,
+                )
+                if persist_cache is not None:
+                    persist_cache()
+            continue
 
-        write_section(layout, section, rendered)
+        bundle: EvidenceBundle | None = None
+        path_taken: str = "rewrite"
+
+        # Path 3: surgical edit. Hand the cached body + delta to the LLM.
+        # On any failure we fall through to the rewrite path so the user
+        # never gets a missing section.
+        if change.decision == "surgical" and cached_entry is not None:
+            try:
+                bundle = surgical_aggregate(
+                    section=section,
+                    cached=cached_entry,
+                    live_notes=notes,
+                    change=change,
+                    provider=provider,
+                )
+                path_taken = "edited"
+            except Exception as exc:
+                log.warning(
+                    "surgical edit failed for %s (%s); falling back to full rewrite",
+                    section.id,
+                    exc,
+                )
+                bundle = None
+
+        # Path 4: full rewrite. Either the classifier said so, or the
+        # surgical attempt above raised.
+        if bundle is None:
+            try:
+                structured = provider.complete_json(
+                    system=AGGREGATION_SYSTEM_PROMPT,
+                    user=_render_user_prompt(section, notes),
+                    schema=SectionBody,
+                )
+                bundle = _bundle_from(structured, notes)
+                path_taken = "rewrite"
+            except Exception as exc:
+                log.warning("aggregation failed for %s: %s", section.id, exc)
+                rendered = _fallback_body(section, notes, error=str(exc))
+                write_section(layout, section, rendered)
+                stats.sections_written += 1
+                continue
+
+        write_section(layout, section, render_section_body(bundle))
         stats.sections_written += 1
+        if path_taken == "edited":
+            stats.sections_edited += 1
+        else:
+            stats.sections_rewritten += 1
 
-        if cache is not None and bundle is not None:
+        if cache is not None:
             cache.record_aggregation(
                 section.id,
                 notes_hash=notes_hash,
                 body=bundle.body,
                 claims=[c.model_dump() for c in bundle.claims],
                 contradictions=[c.model_dump() for c in bundle.contradictions],
+                finding_ids=live_finding_ids,
             )
             if persist_cache is not None:
                 persist_cache()
