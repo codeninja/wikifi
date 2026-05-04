@@ -36,14 +36,14 @@ from typing import TypeVar
 from ollama import Client
 from pydantic import BaseModel
 
-from wikifi.providers.base import ChatMessage
+from wikifi.providers.base import ChatMessage, LLMProvider
 
 T = TypeVar("T", bound=BaseModel)
 
 ThinkLevel = bool | str | None
 
 
-class OllamaProvider:
+class OllamaProvider(LLMProvider):
     name = "ollama"
 
     def __init__(

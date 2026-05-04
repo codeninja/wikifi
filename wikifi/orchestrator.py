@@ -1,13 +1,19 @@
 """End-to-end pipeline that wires Stage 1 → Stage 2 → Stage 3 → Stage 4.
 
-The CLI calls into ``init_wiki`` and ``run_walk``. Both accept a target root
-and a configured provider so tests can substitute a mock provider trivially.
+The CLI calls into ``init_wiki``, ``run_walk``, and ``run_report``. Each
+accepts a target root and a configured provider so tests can substitute
+a mock provider trivially.
 
 - Stage 1: LLM introspection of repo structure (`introspection.introspect`)
-- Stage 2: deterministic per-file extraction → JSONL notes (`extractor.extract_repo`)
-- Stage 3: per-section aggregation of primary sections (`aggregator.aggregate_all`)
-- Stage 4: derivation of personas/user_stories/diagrams from primary section
-  bodies (`deriver.derive_all`)
+- Stage 1.5: lightweight static analysis (`repograph.build_graph`) when
+  ``settings.use_graph`` is set
+- Stage 2: deterministic per-file extraction → JSONL notes
+  (`extractor.extract_repo`), with caching, specialized routing, and
+  cross-file context if available
+- Stage 3: per-section aggregation of primary sections
+  (`aggregator.aggregate_all`), with section-level cache
+- Stage 4: derivation of personas/user_stories/diagrams from primary
+  section bodies (`deriver.derive_all`), with optional critic loop
 """
 
 from __future__ import annotations
@@ -17,12 +23,17 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from wikifi.aggregator import AggregationStats, aggregate_all
+from wikifi.cache import WalkCache
+from wikifi.cache import load as load_cache
+from wikifi.cache import reset as reset_cache
+from wikifi.cache import save as save_cache
 from wikifi.config import Settings
 from wikifi.deriver import DerivationStats, derive_all
 from wikifi.extractor import ExtractionStats, extract_repo
 from wikifi.introspection import IntrospectionResult, introspect
 from wikifi.providers.base import LLMProvider
 from wikifi.providers.ollama_provider import OllamaProvider
+from wikifi.repograph import RepoGraph, build_graph
 from wikifi.walker import WalkConfig, iter_files
 from wikifi.wiki import WikiLayout, initialize, reset_notes
 
@@ -46,6 +57,8 @@ class WalkReport:
     extraction: ExtractionStats
     aggregation: AggregationStats
     derivation: DerivationStats
+    cache: WalkCache | None = None
+    graph: RepoGraph | None = None
 
 
 def run_walk(
@@ -83,9 +96,30 @@ def run_walk(
         min_content_bytes=settings.min_content_bytes,
     )
 
+    files = list(iter_files(walk_config))
+
+    cache: WalkCache | None = None
+    if settings.use_cache:
+        cache = load_cache(layout)
+        # Drop cache entries for files that fell out of scope so the
+        # cache size tracks the live in-scope set.
+        in_scope = {p.as_posix() for p in files}
+        cache.prune_extraction(keep=in_scope)
+    else:
+        reset_cache(layout)
+
+    graph: RepoGraph | None = None
+    if settings.use_graph:
+        log.info("stage 1.5: building repo import graph")
+        graph = build_graph(repo_root=root, files=files)
+
     log.info("stage 2: extracting per-file findings")
     reset_notes(layout)
-    files = list(iter_files(walk_config))
+
+    def _persist() -> None:
+        if cache is not None:
+            save_cache(layout, cache)
+
     extraction = extract_repo(
         layout=layout,
         provider=provider,
@@ -93,29 +127,93 @@ def run_walk(
         repo_root=root,
         chunk_size_bytes=settings.chunk_size_bytes,
         chunk_overlap_bytes=settings.chunk_overlap_bytes,
+        cache=cache,
+        graph=graph,
+        persist_cache=_persist if cache is not None else None,
+        use_specialized_extractors=settings.use_specialized_extractors,
     )
 
     log.info("stage 3: aggregating primary sections")
-    aggregation = aggregate_all(layout=layout, provider=provider)
+    aggregation = aggregate_all(layout=layout, provider=provider, cache=cache)
 
     log.info("stage 4: deriving personas, user stories, and diagrams")
-    derivation = derive_all(layout=layout, provider=provider)
+    derivation = derive_all(
+        layout=layout,
+        provider=provider,
+        review=settings.review_derivatives,
+        review_min_score=settings.review_min_score,
+    )
+
+    if cache is not None:
+        save_cache(layout, cache)
 
     return WalkReport(
         introspection=introspection,
         extraction=extraction,
         aggregation=aggregation,
         derivation=derivation,
+        cache=cache,
+        graph=graph,
     )
 
 
 def build_provider(settings: Settings) -> LLMProvider:
-    """Construct the configured provider. Currently Ollama is the only backend."""
-    if settings.provider != "ollama":
-        raise ValueError(f"unknown provider {settings.provider!r}; only 'ollama' is supported in v1")
-    return OllamaProvider(
-        model=settings.model,
-        host=settings.ollama_host,
-        timeout=settings.request_timeout,
-        think=settings.think,
-    )
+    """Construct the configured provider.
+
+    Local Ollama is the default. Hosted backends are opt-in via
+    ``WIKIFI_PROVIDER=anthropic`` (plus ``ANTHROPIC_API_KEY``) or
+    ``WIKIFI_PROVIDER=openai`` (plus ``OPENAI_API_KEY``).
+    """
+    if settings.provider == "ollama":
+        return OllamaProvider(
+            model=settings.model,
+            host=settings.ollama_host,
+            timeout=settings.request_timeout,
+            think=settings.think,
+        )
+    if settings.provider == "anthropic":
+        from wikifi.providers.anthropic_provider import AnthropicProvider
+
+        # When users opt in to Anthropic but leave the Ollama default
+        # model id in place, swap to a sensible Claude default rather
+        # than 404 on the model name.
+        model = settings.model if settings.model.startswith("claude-") else "claude-opus-4-7"
+        return AnthropicProvider(
+            model=model,
+            api_key=settings.anthropic_api_key,
+            timeout=settings.request_timeout,
+            max_tokens=settings.anthropic_max_tokens,
+            think=settings.think,
+        )
+    if settings.provider == "openai":
+        from wikifi.providers.openai_provider import OpenAIProvider
+
+        # Same default-swap guard as the Anthropic path, but inverted:
+        # only swap when the model id is *obviously* an Ollama
+        # identifier (the user opted into openai but forgot to update
+        # WIKIFI_MODEL). Anything else passes through unchanged so
+        # Azure-OpenAI / proxy deployments — which use arbitrary
+        # deployment IDs like ``prod-gpt4o`` or ``eastus-chat`` that
+        # don't match the upstream OpenAI naming convention — keep
+        # working.
+        model = "gpt-4o" if _looks_like_ollama_model(settings.model) else settings.model
+        return OpenAIProvider(
+            model=model,
+            api_key=settings.openai_api_key,
+            base_url=settings.openai_base_url,
+            timeout=settings.request_timeout,
+            max_tokens=settings.openai_max_tokens,
+            think=settings.think,
+        )
+    raise ValueError(f"unknown provider {settings.provider!r}; expected 'ollama', 'anthropic', or 'openai'")
+
+
+def _looks_like_ollama_model(model: str) -> bool:
+    """Heuristic — Ollama uses ``family:tag`` (e.g. ``qwen3.6:27b``).
+
+    Fine-tuned OpenAI models also contain ``:`` (``ft:gpt-4o:...``)
+    so we exclude that prefix. Anything else without a ``:`` —
+    upstream OpenAI ids, Azure deployment names, plain proxy aliases —
+    is left alone.
+    """
+    return ":" in model and not model.lower().startswith("ft:")

@@ -89,3 +89,133 @@ def test_build_provider_returns_ollama_for_ollama_settings():
 def test_build_provider_rejects_unknown():
     with pytest.raises(ValueError):
         build_provider(_settings(provider="other"))
+
+
+def test_build_provider_returns_anthropic_when_selected(monkeypatch):
+    """``provider='anthropic'`` dispatches to AnthropicProvider with a Claude model default."""
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+    settings = _settings(provider="anthropic", model="m")  # non-claude model id
+    provider = build_provider(settings)
+    from wikifi.providers.anthropic_provider import AnthropicProvider
+
+    assert isinstance(provider, AnthropicProvider)
+    # Falls back to a sane Claude default rather than 404'ing on "m".
+    assert provider.model.startswith("claude-")
+
+
+def test_build_provider_returns_openai_when_selected(monkeypatch):
+    """``provider='openai'`` dispatches to OpenAIProvider with a GPT default.
+
+    The default-swap fires when the configured model id is obviously
+    an Ollama identifier (``family:tag``) — the common "user opted
+    into openai but forgot to update WIKIFI_MODEL" case.
+    """
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    settings = _settings(provider="openai", model="qwen3.6:27b")
+    provider = build_provider(settings)
+    from wikifi.providers.openai_provider import OpenAIProvider
+
+    assert isinstance(provider, OpenAIProvider)
+    # Falls back to gpt-4o rather than 404'ing on the Ollama default.
+    assert provider.model.startswith("gpt-")
+
+
+def test_build_provider_preserves_explicit_openai_model(monkeypatch):
+    """A user-supplied gpt/o-series model id is passed through unchanged."""
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    for model in ("gpt-4o", "o3-mini", "gpt-5"):
+        settings = _settings(provider="openai", model=model)
+        provider = build_provider(settings)
+        assert provider.model == model
+
+
+def test_build_provider_preserves_azure_openai_deployment_id(monkeypatch):
+    """Arbitrary Azure / proxy deployment IDs survive the swap.
+
+    Azure-OpenAI (and OpenAI-compatible proxies) commonly use
+    deployment names that don't match the upstream OpenAI prefixes —
+    e.g. ``prod-gpt4o``, ``eastus-chat``, ``my-team-deployment``.
+    Replacing them with ``gpt-4o`` would silently route the user to
+    the wrong model on a perfectly valid configuration.
+    """
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    for deployment in ("prod-gpt4o", "eastus-chat", "my-team-deployment", "fine-tuned-v3"):
+        settings = _settings(
+            provider="openai",
+            model=deployment,
+            openai_base_url="https://my-azure-endpoint.openai.azure.com/",
+        )
+        provider = build_provider(settings)
+        assert provider.model == deployment, f"{deployment} should pass through unchanged"
+
+
+def test_build_provider_preserves_fine_tuned_openai_model(monkeypatch):
+    """``ft:gpt-4o:org::id`` contains a colon but stays on the OpenAI path."""
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    settings = _settings(provider="openai", model="ft:gpt-4o:my-org::abc123")
+    provider = build_provider(settings)
+    assert provider.model == "ft:gpt-4o:my-org::abc123"
+
+
+def test_run_walk_persists_cache_for_resumability(mini_target, mock_provider_factory):
+    """A second walk reuses the cache and skips the LLM call for unchanged files."""
+    settings = _settings()
+    introspection = IntrospectionResult(
+        include=["src/"], exclude=[], primary_languages=["python"], likely_purpose="demo", rationale="ok"
+    )
+
+    extraction_calls = {"n": 0}
+
+    def factory(schema, system, user):
+        if schema is IntrospectionResult:
+            return introspection
+        if schema is FileFindings:
+            extraction_calls["n"] += 1
+            return FileFindings(
+                summary="role",
+                findings=[SectionFinding(section_id="entities", finding="Order entity inferred.")],
+            )
+        if schema is SectionBody:
+            return SectionBody(body="Synthesized.")
+        if schema is DerivedSection:
+            return DerivedSection(body="Derived.")
+        raise AssertionError(f"unexpected {schema}")
+
+    provider = mock_provider_factory(json_factory=factory)
+    run_walk(root=mini_target, settings=settings, provider=provider)
+    first = extraction_calls["n"]
+    assert first >= 2
+
+    # Second walk against the same target with the same content: cache reuses
+    # the per-file findings, so extraction calls do not increase.
+    run_walk(root=mini_target, settings=settings, provider=provider)
+    assert extraction_calls["n"] == first
+
+
+def test_run_walk_review_flag_invokes_critic(mini_target, mock_provider_factory):
+    """With ``review_derivatives=True`` the deriver runs the critic loop."""
+    from wikifi.critic import Critique
+
+    settings = _settings(review_derivatives=True)
+    introspection = IntrospectionResult(
+        include=["src/"], exclude=[], primary_languages=["python"], likely_purpose="demo", rationale="ok"
+    )
+    critic_called = {"n": 0}
+
+    def factory(schema, system, user):
+        if schema is IntrospectionResult:
+            return introspection
+        if schema is FileFindings:
+            return FileFindings(findings=[SectionFinding(section_id="entities", finding="Order.")])
+        if schema is SectionBody:
+            return SectionBody(body="Synthesized.")
+        if schema is DerivedSection:
+            return DerivedSection(body="Derived.")
+        if schema is Critique:
+            critic_called["n"] += 1
+            return Critique(score=9, summary="ok")
+        raise AssertionError(f"unexpected {schema}")
+
+    provider = mock_provider_factory(json_factory=factory)
+    run_walk(root=mini_target, settings=settings, provider=provider)
+    assert critic_called["n"] >= 1

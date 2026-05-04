@@ -2,25 +2,42 @@
 
 Given the include/exclude decision from Stage 1, walk each file deterministically
 and ask the LLM what intent-bearing content it contributes to each capture
-section. Results are appended to per-section JSONL note files for the aggregator.
+section. Results are appended to per-section JSONL note files for the
+aggregator.
 
-The contract: one LLM call per file *or* one call per overlapping chunk for
-files that exceed the per-call window. Output is validated against a strict
-Pydantic schema. Files that can't be read or validated are recorded as skipped
-findings rather than crashing the walk.
+Three orthogonal mechanisms make this stage premium-grade:
+
+1. **Content-addressed cache.** Each file is fingerprinted; if its fingerprint
+   matches a cached entry, the LLM call is skipped entirely and cached
+   findings are replayed into the notes store. This is what makes a re-walk
+   of a 50k-file legacy monorepo finish in minutes.
+2. **Cross-file context.** A repo-wide import graph (built once, before
+   extraction starts) supplies each file's neighborhood to the prompt so
+   findings can describe inter-file flows.
+3. **Type-aware specialization.** Files classified as SQL, OpenAPI,
+   Protobuf, GraphQL, or migrations bypass the LLM entirely and run
+   through deterministic extractors that read the structure directly.
+
+Every emitted finding carries a structured :class:`SourceRef` so the
+aggregator can stitch citations back into the rendered wiki.
 """
 
 from __future__ import annotations
 
 import logging
-from collections.abc import Iterable
-from dataclasses import dataclass
+from collections.abc import Callable, Iterable
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from pydantic import BaseModel, Field
 
+from wikifi.cache import WalkCache
+from wikifi.evidence import SourceRef
+from wikifi.fingerprint import hash_file
 from wikifi.providers.base import LLMProvider
+from wikifi.repograph import FileKind, RepoGraph, classify
 from wikifi.sections import PRIMARY_SECTION_IDS, PRIMARY_SECTIONS
+from wikifi.specialized.dispatch import select as select_specialized
 from wikifi.wiki import WikiLayout, append_note
 
 log = logging.getLogger("wikifi.extractor")
@@ -52,6 +69,14 @@ you actually see. Adjacent chunks share an overlap region, so it is normal for \
 the same finding to appear twice — that's deliberate context, not duplication \
 to invent around.
 
+When the user prompt names neighbor files (files this one imports from or is \
+imported by), you may reference those relationships when describing flows that \
+cross file boundaries. Do not fabricate flows that aren't visible in the chunk.
+
+Each finding can carry an optional list of supporting line ranges within \
+this file. Provide them when you can; omit them when the contribution is \
+diffuse across the chunk.
+
 Only emit findings for these section ids: {_SECTION_LIST}
 
 Section briefs:
@@ -73,6 +98,10 @@ class SectionFinding(BaseModel):
 
     section_id: str = Field(description=f"Must be one of: {_SECTION_LIST}")
     finding: str = Field(description="Tech-agnostic markdown describing the contribution. 1-5 sentences.")
+    line_range: tuple[int, int] | None = Field(
+        default=None,
+        description="Optional inclusive (start, end) line range within the chunk supporting this finding.",
+    )
 
 
 class FileFindings(BaseModel):
@@ -89,6 +118,9 @@ class ExtractionStats:
     findings_total: int = 0
     files_skipped: int = 0
     chunks_processed: int = 0
+    cache_hits: int = 0
+    specialized_files: int = 0
+    files_kinds: dict[str, int] = field(default_factory=dict)
 
 
 def extract_repo(
@@ -99,6 +131,10 @@ def extract_repo(
     repo_root: Path,
     chunk_size_bytes: int = 150_000,
     chunk_overlap_bytes: int = 8_000,
+    cache: WalkCache | None = None,
+    graph: RepoGraph | None = None,
+    persist_cache: Callable[[], None] | None = None,
+    use_specialized_extractors: bool = True,
 ) -> ExtractionStats:
     """Walk the supplied files and append per-section findings to the notes store.
 
@@ -108,12 +144,19 @@ def extract_repo(
     chunk produces one LLM call; identical findings emerging from the
     overlap region are deduplicated per file so a single declaration isn't
     double-counted.
+
+    When a ``cache`` is supplied, files whose content fingerprint matches a
+    cached entry skip the LLM call entirely and replay the cached findings.
+    When ``persist_cache`` is supplied, it is invoked after each file
+    finishes — that turns crash-resumability into a free property of the
+    cache layer.
     """
     stats = ExtractionStats()
     valid_ids = set(PRIMARY_SECTION_IDS)
 
     for rel in files:
         stats.files_seen += 1
+        log.info("- extracting: ./%s", rel.as_posix())
         full = repo_root / rel
         try:
             data = full.read_text(encoding="utf-8", errors="replace")
@@ -122,12 +165,89 @@ def extract_repo(
             stats.files_skipped += 1
             continue
 
+        try:
+            fingerprint = hash_file(full)
+        except OSError:
+            fingerprint = ""
+
+        kind = classify(rel, sample=data[:4096])
+        kind_label = kind.value
+        stats.files_kinds[kind_label] = stats.files_kinds.get(kind_label, 0) + 1
+
+        # ---- cache hit ----
+        if cache is not None and fingerprint:
+            cached = cache.lookup_extraction(rel.as_posix(), fingerprint)
+            if cached is not None:
+                file_had_findings = _replay_cached(layout, rel, cached, valid_ids, stats)
+                if file_had_findings:
+                    stats.files_with_findings += 1
+                stats.cache_hits += 1
+                if persist_cache is not None:
+                    persist_cache()
+                continue
+
+        # ---- specialized routing ----
+        specialized_fn = select_specialized(kind, rel_path=rel.as_posix()) if use_specialized_extractors else None
+        if specialized_fn is not None:
+            stats.specialized_files += 1
+            try:
+                result = specialized_fn(rel.as_posix(), data)
+            except Exception as exc:  # specialized failures don't kill the walk
+                log.warning("specialized extraction failed for %s: %s", rel, exc)
+                stats.files_skipped += 1
+                continue
+
+            cached_findings = []
+            file_had_findings = False
+            for finding in result.findings:
+                if finding.section_id not in valid_ids:
+                    continue
+                note = _build_note(
+                    rel=rel,
+                    summary=result.summary,
+                    finding_text=finding.finding,
+                    sources=finding.sources,
+                    extractor=f"specialized:{kind_label}",
+                )
+                append_note(layout, finding.section_id, note)
+                cached_findings.append(
+                    {
+                        "section_id": finding.section_id,
+                        "finding": finding.finding,
+                        "sources": [s.model_dump() for s in finding.sources],
+                    }
+                )
+                stats.findings_total += 1
+                file_had_findings = True
+            if file_had_findings:
+                stats.files_with_findings += 1
+            if cache is not None and fingerprint:
+                cache.record_extraction(
+                    rel.as_posix(),
+                    fingerprint=fingerprint,
+                    findings=cached_findings,
+                    summary=result.summary,
+                    chunks_processed=0,
+                )
+            if persist_cache is not None:
+                persist_cache()
+            continue
+
+        # ---- LLM extraction path ----
         chunks = _chunk_text(data, chunk_size=chunk_size_bytes, overlap=chunk_overlap_bytes)
         total_chunks = len(chunks)
         file_had_findings = False
         any_chunk_failed = False
         seen_findings: set[tuple[str, str]] = set()
         latest_summary = ""
+        cached_findings: list[dict] = []
+        chunks_done = 0
+
+        neighbors = graph.neighbor_paths(rel.as_posix()) if graph is not None else []
+
+        # Track each chunk's starting line so finding line_ranges can be
+        # mapped back to absolute file lines for the citation.
+        chunk_offsets = _chunk_line_offsets(data, chunks)
 
         for chunk_index, chunk_body in enumerate(chunks):
             try:
@@ -138,6 +258,7 @@ def extract_repo(
                         body=chunk_body,
                         chunk_index=chunk_index,
                         total_chunks=total_chunks,
+                        neighbors=neighbors,
                     ),
                     schema=FileFindings,
                 )
@@ -153,9 +274,11 @@ def extract_repo(
                 continue
 
             stats.chunks_processed += 1
+            chunks_done += 1
             if chunk_findings.summary:
                 latest_summary = chunk_findings.summary
 
+            chunk_line_offset = chunk_offsets[chunk_index]
             for finding in chunk_findings.findings:
                 if finding.section_id not in valid_ids:
                     continue
@@ -164,15 +287,29 @@ def extract_repo(
                     continue
                 seen_findings.add(key)
 
-                note: dict[str, object] = {
-                    "file": rel.as_posix(),
-                    "summary": latest_summary,
-                    "finding": finding.finding,
-                }
-                if total_chunks > 1:
-                    note["chunk"] = chunk_index
-                    note["chunks"] = total_chunks
+                line_range: tuple[int, int] | None = None
+                if finding.line_range is not None:
+                    start, end = finding.line_range
+                    line_range = (start + chunk_line_offset, end + chunk_line_offset)
+
+                sources = [SourceRef(file=rel.as_posix(), lines=line_range, fingerprint=fingerprint)]
+                note = _build_note(
+                    rel=rel,
+                    summary=latest_summary,
+                    finding_text=finding.finding,
+                    sources=sources,
+                    extractor=f"llm:{kind_label}",
+                    chunk_index=chunk_index,
+                    total_chunks=total_chunks,
+                )
                 append_note(layout, finding.section_id, note)
+                cached_findings.append(
+                    {
+                        "section_id": finding.section_id,
+                        "finding": finding.finding,
+                        "sources": [s.model_dump() for s in sources],
+                    }
+                )
                 stats.findings_total += 1
                 file_had_findings = True
 
@@ -184,10 +321,78 @@ def extract_repo(
             # chunked files lose some chunks we still keep what we got.
             stats.files_skipped += 1
 
+        if cache is not None and fingerprint and chunks_done > 0:
+            cache.record_extraction(
+                rel.as_posix(),
+                fingerprint=fingerprint,
+                findings=cached_findings,
+                summary=latest_summary,
+                chunks_processed=chunks_done,
+            )
+        if persist_cache is not None:
+            persist_cache()
+
     return stats
 
 
-def _render_user_prompt(*, rel: Path, body: str, chunk_index: int = 0, total_chunks: int = 1) -> str:
+def _replay_cached(
+    layout: WikiLayout,
+    rel: Path,
+    cached,
+    valid_ids: set[str],
+    stats: ExtractionStats,
+) -> bool:
+    """Re-emit cached findings into the notes store. Returns True if any landed."""
+    file_had_findings = False
+    for entry in cached.findings:
+        section_id = entry.get("section_id", "")
+        if section_id not in valid_ids:
+            continue
+        sources = [SourceRef(**s) for s in entry.get("sources", [])]
+        note = _build_note(
+            rel=rel,
+            summary=cached.summary,
+            finding_text=entry.get("finding", ""),
+            sources=sources,
+            extractor="cache",
+        )
+        append_note(layout, section_id, note)
+        stats.findings_total += 1
+        file_had_findings = True
+    return file_had_findings
+
+
+def _build_note(
+    *,
+    rel: Path,
+    summary: str,
+    finding_text: str,
+    sources: list[SourceRef],
+    extractor: str,
+    chunk_index: int | None = None,
+    total_chunks: int | None = None,
+) -> dict[str, object]:
+    note: dict[str, object] = {
+        "file": rel.as_posix(),
+        "summary": summary,
+        "finding": finding_text,
+        "sources": [s.model_dump() for s in sources],
+        "extractor": extractor,
+    }
+    if total_chunks is not None and total_chunks > 1:
+        note["chunk"] = chunk_index
+        note["chunks"] = total_chunks
+    return note
+
+
+def _render_user_prompt(
+    *,
+    rel: Path,
+    body: str,
+    chunk_index: int = 0,
+    total_chunks: int = 1,
+    neighbors: list[str] | None = None,
+) -> str:
     if total_chunks > 1:
         chunk_header = (
             f"Chunk: {chunk_index + 1} of {total_chunks} "
@@ -196,15 +401,26 @@ def _render_user_prompt(*, rel: Path, body: str, chunk_index: int = 0, total_chu
         )
     else:
         chunk_header = ""
+    neighbor_block = ""
+    if neighbors:
+        neighbor_lines = "\n".join(f"  - {n}" for n in neighbors[:8])
+        neighbor_block = (
+            "Neighbor files (this file imports from or is imported by these — "
+            "feel free to mention cross-file relationships when supported by the chunk):\n"
+            f"{neighbor_lines}\n\n"
+        )
     return (
         f"File path: {rel.as_posix()}\n\n"
+        f"{neighbor_block}"
         f"{chunk_header}"
         "File contents:\n"
         "```\n"
         f"{body}\n"
         "```\n\n"
         "Return findings strictly in the FileFindings schema. Use section ids "
-        f"only from: {_SECTION_LIST}."
+        f"only from: {_SECTION_LIST}. Provide ``line_range`` as an inclusive "
+        "(start, end) pair *within this chunk* whenever the contribution is "
+        "tied to a specific span; omit it for diffuse contributions."
     )
 
 
@@ -240,6 +456,28 @@ def _chunk_text(text: str, *, chunk_size: int, overlap: int) -> list[str]:
         tail = prev[-overlap:] if len(prev) > overlap else prev
         overlapped.append(tail + curr)
     return overlapped
+
+
+def _chunk_line_offsets(text: str, chunks: list[str]) -> list[int]:
+    """Return the starting line number (0-indexed offset) of each chunk
+    within ``text``. Used to translate per-chunk line ranges into absolute
+    file line ranges for citations.
+    """
+    offsets: list[int] = []
+    cursor = 0
+    for chunk in chunks:
+        idx = text.find(chunk, cursor)
+        if idx < 0:
+            # Overlap or aggressive splitting can shift the search window;
+            # fall back to a global find. Worst case: line offsets are
+            # approximate, which is acceptable for citation purposes.
+            idx = text.find(chunk)
+            if idx < 0:
+                offsets.append(0)
+                continue
+        offsets.append(text.count("\n", 0, idx))
+        cursor = idx + max(1, len(chunk) // 2)  # advance past most of this chunk
+    return offsets
 
 
 def _recursive_split(text: str, *, chunk_size: int, separators: list[str]) -> list[str]:
@@ -284,3 +522,8 @@ def _recursive_split(text: str, *, chunk_size: int, separators: list[str]) -> li
     if current:
         chunks.append(current)
     return chunks
+
+
+def classify_file(rel_path: Path, sample: str) -> FileKind:
+    """Public re-export so callers don't need to import :mod:`repograph`."""
+    return classify(rel_path, sample=sample)

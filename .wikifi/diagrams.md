@@ -1,137 +1,146 @@
 # Diagrams
 
-### Domain Map
-The following graph visualizes the bounded contexts within the core domain of Automated Knowledge Translation. It reflects the strict, stage-gated dependency chain and the cross-cutting nature of external intelligence integration.
+Three diagrams follow: a domain map, an entity–relationship view, and an integration flow. All representations are technology-agnostic and derived solely from the documented system model.
+
+## Domain Map
+
+Subdomains, their responsibilities, and the directed dependency chain that governs pipeline ordering. No subdomain reaches backwards; the arrows below are the authoritative expression of inter-subdomain dependency.
 
 ```mermaid
 graph TD
-  Core[Core Domain: Automated Knowledge Translation]
-  Introspection[Repository Introspection & Curation\nSupporting]
-  Extraction[Semantic Extraction & Analysis\nCore]
-  Aggregation[Information Aggregation & Synthesis\nCore]
-  Orchestration[Pipeline Orchestration & Lifecycle Management\nSupporting]
-  External[External Intelligence Integration\nGeneralized]
+    subgraph CORE["Core Domain — Automated Documentation Synthesis"]
+        RI[Repository Introspection]
+        KE[Knowledge Extraction]
+        SS[Section Synthesis]
+        APW[Artefact Persistence — working state]
+        APC[Artefact Persistence — committed wiki]
+    end
 
-  Core --> Introspection
-  Introspection -->|Curated artifacts & structural metadata| Extraction
-  Extraction -->|Structured knowledge units & analysis results| Aggregation
-  Aggregation -->|Synthesized content & workspace population| Orchestration
-
-  External -.->|On-demand pattern resolution & narrative generation| Extraction
+    RI -->|include and exclude scope| KE
+    KE -->|extraction notes| APW
+    KE -->|evidential record| SS
+    SS -->|rendered section markdown| APC
 ```
 
-**Key Observations:**
-- Data flows unidirectionally through the pipeline, with intermediate states explicitly persisted between stages to support incremental processing, auditability, and fault tolerance.
-- External Intelligence Integration operates as a generalized, cross-cutting capability invoked on-demand within the extraction context rather than dictating pipeline progression.
-- Orchestration and workspace lifecycle management responsibilities currently overlap; future modeling may require separating execution coordination from directory/configuration governance.
+## Entity Relationship View
 
-### Entity Relationship View
-This entity-relationship diagram maps the core domain entities, their primary fields, and the structural boundaries that govern data transformation from raw repository scanning to final documentation assembly.
+Core entities across all concern areas. Cardinality follows the documented information model.
 
 ```mermaid
 erDiagram
-    CONFIGURATION ||--o{ SCAN_TRAVERSAL_CONFIG : "defines"
-    SCAN_TRAVERSAL_CONFIG ||--o{ DIRECTORY_SUMMARY : "scopes"
-    DIRECTORY_SUMMARY ||--|| INTROSPECTION_ASSESSMENT : "generates"
-    INTROSPECTION_ASSESSMENT ||--o{ EXTRACTION_NOTE : "guides"
-    EXTRACTION_NOTE }o--|| DOCUMENTATION_SECTION : "aggregates_to"
-    DOCUMENTATION_SECTION ||--o{ AGGREGATION_STATS : "updates"
-    DOCUMENTATION_SECTION ||--o{ WORKSPACE_LAYOUT : "populates"
-    EXECUTION_SUMMARY }o--|| PIPELINE_EXECUTION : "observes"
+    SECTION {
+        string id PK
+        string title
+        string brief
+        string tier
+    }
+    SECTION ||--o{ SECTION : "upstream-of"
+    WIKI_LAYOUT ||--o{ SECTION : "resolves paths for"
+    SECTION_REPORT }o--|| SECTION : "describes"
+    WIKI_REPORT ||--|{ SECTION_REPORT : "aggregates"
+    LOADED_SECTION ||--|| SECTION : "pairs body with"
 
-    CONFIGURATION {
-        string default_settings
-        string local_overrides
+    SECTION ||--o{ SECTION_FINDING : "collects"
+    FILE_FINDINGS ||--|{ SECTION_FINDING : "groups"
+
+    SOURCE_REF {
+        string file_path
+        string line_range
+        string fingerprint
     }
-    SCAN_TRAVERSAL_CONFIG {
-        string root_path
-        string inclusion_exclusion_patterns
-        number size_thresholds
-    }
-    DIRECTORY_SUMMARY {
-        number file_count
-        number total_size
-        string extension_distribution
-        boolean manifest_presence
-    }
-    INTROSPECTION_ASSESSMENT {
-        string primary_languages
-        string inferred_purpose
-        string classification_rationale
-    }
-    EXTRACTION_NOTE {
-        datetime timestamp
-        string file_reference
-        string role_summary
-        string extracted_finding
-    }
-    DOCUMENTATION_SECTION {
-        string category
-        string aggregated_content
-        string final_markdown_body
-    }
-    AGGREGATION_STATS {
-        number successful_writes
-        number empty_section_count
-    }
-    WORKSPACE_LAYOUT {
-        string config_paths
-        string notes_paths
-        string sections_paths
-    }
-    EXECUTION_SUMMARY {
-        string stage_metrics
-        string completion_status
-        string consolidated_findings
-    }
+    CLAIM }o--|{ SOURCE_REF : "backed by"
+    CONTRADICTION }|--|{ CLAIM : "groups conflicting"
+    EVIDENCE_BUNDLE ||--|{ CLAIM : "contains"
+    EVIDENCE_BUNDLE ||--o{ CONTRADICTION : "contains"
+
+    WALK_REPORT ||--|| INTROSPECTION_RESULT : "carries"
+    WALK_REPORT ||--|| EXTRACTION_STATS : "carries"
+    WALK_REPORT ||--|| AGGREGATION_STATS : "carries"
+    WALK_REPORT ||--|| DERIVATION_STATS : "carries"
+    WALK_REPORT ||--|| WALK_CACHE : "carries"
+    WALK_REPORT ||--|| REPO_GRAPH : "carries"
+    WALK_CACHE ||--o{ CACHED_FINDINGS : "holds"
+    WALK_CACHE ||--o{ CACHED_SECTION : "holds"
+    REPO_GRAPH ||--|{ GRAPH_NODE : "indexes"
+
+    DERIVATION_STATS ||--o{ REVIEW_OUTCOME : "audit trail"
+    REVIEW_OUTCOME ||--|| CRITIQUE : "initial"
+    REVIEW_OUTCOME ||--o| CRITIQUE : "follow-up"
+
+    CHAT_SESSION ||--|| LLM_PROVIDER : "uses"
+    CHAT_SESSION ||--|{ CHAT_MESSAGE : "history"
 ```
 
-**Key Observations:**
-- Configuration entities establish hard boundaries for traversal and analysis, ensuring processing never exceeds defined size constraints or excluded paths.
-- Extraction notes are immutable, timestamped records tied to single source files, serving as the raw material for downstream aggregation.
-- Aggregation statistics and the execution summary function as cross-cutting observers, tracking pipeline health and output readiness without interfering with the primary data flow.
-- **Known Gap:** The exact mapping rules between intermediate extraction notes and final documentation sections are implied but not explicitly detailed. Further specification is required to define how notes are grouped, prioritized, or filtered during section assembly, and how empty sections are resolved or reported upstream.
+## Integration Flow
 
-### Integration Flow
-The sequence diagram below illustrates the internal pipeline handoffs and external interface interactions. It captures the staged execution model, centralized orchestration, and abstracted external dependencies.
+End-to-end pipeline sequence from CLI invocation through all four stages, showing each stage's interactions with the LLM provider abstraction, the cache layer, the import graph, and the filesystem layout.
 
 ```mermaid
 sequenceDiagram
-  participant CLI as CLI Interface
-  participant Orch as Orchestrator
-  participant Traversal as Traversal & Introspection
-  participant Extractor as Source Analysis & Extraction
-  participant Aggregator as Content Aggregation
-  participant Deriver as Derivative Generation
-  participant AI as Generative AI Services
-  participant Telemetry as Observability & Telemetry
-  participant Storage as Wiki Storage
+    autonumber
+    participant CLI
+    participant Orchestrator
+    participant Config
+    participant LLMProvider
+    participant ImportGraph
+    participant SpecDispatch
+    participant Cache
+    participant FilesystemLayout
 
-  CLI->>Orch: Trigger execution / provision workspace
-  Orch->>Traversal: Delegate scanning & structural analysis
-  Traversal->>Traversal: Apply path filters & size constraints
-  Traversal-->>Orch: Return filtered paths & metadata
-  Orch->>Extractor: Delegate artifact analysis
-  Extractor->>AI: Request pattern resolution / narrative generation (on-demand)
-  AI-->>Extractor: Return processed findings
-  Extractor->>Telemetry: Log processing metrics & outcomes
-  Extractor-->>Orch: Return structured analysis notes
-  Orch->>Aggregator: Delegate content synthesis
-  Aggregator->>AI: Request section-level synthesis
-  AI-->>Aggregator: Return synthesized markdown
-  Aggregator->>Storage: Write documentation sections
-  Aggregator-->>Orch: Return aggregation statistics
-  Orch->>Deriver: Delegate supplementary content generation
-  Deriver->>AI: Request derivative synthesis
-  AI-->>Deriver: Return derivative documentation
-  Deriver->>Storage: Write derivative artifacts
-  Deriver-->>Orch: Confirm completion
-  Orch->>Orch: Consolidate metrics & generate execution summary
-  Orch-->>CLI: Report pipeline health & output readiness
+    CLI->>Config: load settings and feature flags
+    CLI->>Orchestrator: walk command
+    Orchestrator->>LLMProvider: Stage 1 — scope classification
+    LLMProvider-->>Orchestrator: IntrospectionResult
+    Orchestrator->>FilesystemLayout: initialise layout
+
+    loop per in-scope file
+        Orchestrator->>ImportGraph: fetch file neighbours
+        ImportGraph-->>Orchestrator: neighbour paths
+        Orchestrator->>Cache: lookup by content fingerprint
+        alt cache hit
+            Cache-->>Orchestrator: FileFindings cached
+        else cache miss
+            Orchestrator->>SpecDispatch: route by FileKind
+            alt recognised kind
+                SpecDispatch-->>Orchestrator: SpecializedFindings
+            else general path
+                SpecDispatch->>LLMProvider: Stage 2 — extraction
+                LLMProvider-->>SpecDispatch: SectionFindings
+                SpecDispatch-->>Orchestrator: FileFindings
+            end
+            Orchestrator->>Cache: store findings
+        end
+        Orchestrator->>FilesystemLayout: append notes per section
+    end
+
+    loop per primary section
+        Orchestrator->>Cache: lookup by notes-payload hash
+        alt cache hit
+            Cache-->>Orchestrator: rendered section body
+        else cache miss
+            Orchestrator->>LLMProvider: Stage 3 — aggregation
+            LLMProvider-->>Orchestrator: EvidenceBundle
+            Orchestrator->>FilesystemLayout: write section markdown
+            Orchestrator->>Cache: store aggregated section
+        end
+    end
+
+    loop per derivative section in topological order
+        Orchestrator->>FilesystemLayout: read upstream section bodies
+        Orchestrator->>LLMProvider: Stage 4 — derivation
+        LLMProvider-->>Orchestrator: section body
+        Orchestrator->>FilesystemLayout: write section markdown
+        opt quality review enabled
+            Orchestrator->>LLMProvider: critique
+            LLMProvider-->>Orchestrator: Critique with score
+            alt score below revision threshold
+                Orchestrator->>LLMProvider: revise
+                LLMProvider-->>Orchestrator: revised body
+                Orchestrator->>FilesystemLayout: overwrite section markdown
+            end
+        end
+    end
+
+    Orchestrator-->>CLI: WalkReport
+    Note over CLI,FilesystemLayout: chat and report subcommands read finished wiki via FilesystemLayout
 ```
-
-**Key Observations:**
-- The orchestrator acts as the central coordinator, delegating execution to specialized components in a strict sequence while maintaining a single source of truth for pipeline health.
-- All external dependencies are routed through standardized contracts, isolating core business logic from provider-specific implementations and enabling swappable analytical backends.
-- Observability and telemetry are integrated directly into the extraction stage to monitor processing metrics and record analysis outcomes in real time.
-- **Known Gaps:** The integration contracts do not specify exact data schemas or serialization formats for inter-module handoffs. Error handling, retry policies, fallback mechanisms for external service degradation, authentication/rate-limiting constraints, and versioning guarantees between pipeline stages remain undefined and require clarification in implementation documentation.

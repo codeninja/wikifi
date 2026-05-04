@@ -1,2 +1,3 @@
-# wikifi local working state — section markdown is committed, notes are not.
+# wikifi local working state — section markdown is committed, notes and cache are not.
 .notes/
+.cache/

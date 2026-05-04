@@ -15,6 +15,8 @@ from typing import TypeVar
 import pytest
 from pydantic import BaseModel
 
+from wikifi.providers.base import LLMProvider
+
 T = TypeVar("T", bound=BaseModel)
 
 # ---------------------------------------------------------------------------
@@ -22,7 +24,7 @@ T = TypeVar("T", bound=BaseModel)
 # ---------------------------------------------------------------------------
 
 
-class MockProvider:
+class MockProvider(LLMProvider):
     """Test double for ``LLMProvider`` driven by per-schema response queues."""
 
     name = "mock"

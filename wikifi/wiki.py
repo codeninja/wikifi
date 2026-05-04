@@ -6,9 +6,10 @@ stable so existing wikis remain readable when wikifi is upgraded.
 ```
 <target>/.wikifi/
   config.toml          # provider/model overrides; created by `wikifi init`
-  .gitignore           # excludes per-file extraction notes by default
+  .gitignore           # excludes per-file extraction notes + cache by default
   <section>.md         # one per entry in wikifi.sections.SECTIONS
   .notes/              # per-file/per-section extraction state (jsonl)
+  .cache/              # content-addressed extraction + aggregation cache
 ```
 """
 
@@ -24,12 +25,26 @@ from wikifi.sections import SECTIONS, Section
 
 WIKI_DIRNAME = ".wikifi"
 NOTES_DIRNAME = ".notes"
+# Cache dir constant lives here (not in ``cache.py``) so the layout has
+# one source of truth and ``cache.py`` can import it without inverting
+# the existing ``cache → wiki`` dependency direction.
+CACHE_DIRNAME = ".cache"
 CONFIG_FILENAME = "config.toml"
 GITIGNORE_FILENAME = ".gitignore"
 
-DEFAULT_GITIGNORE = """# wikifi local working state — section markdown is committed, notes are not.
-.notes/
-"""
+# Lines we guarantee in ``.wikifi/.gitignore``. Both ``.notes/`` and
+# ``.cache/`` are local working state — section markdown is what gets
+# committed. New entries appended here are also backfilled into older
+# wikis on the next ``wikifi init`` (see :func:`initialize`) so users
+# upgrading wikifi don't accumulate noisy untracked files.
+_GITIGNORE_REQUIRED_ENTRIES: tuple[str, ...] = (
+    f"{NOTES_DIRNAME}/",
+    f"{CACHE_DIRNAME}/",
+)
+DEFAULT_GITIGNORE = (
+    "# wikifi local working state — section markdown is committed, "
+    "notes and cache are not.\n" + "\n".join(_GITIGNORE_REQUIRED_ENTRIES) + "\n"
+)
 
 
 @dataclass(frozen=True)
@@ -51,6 +66,10 @@ class WikiLayout:
     @property
     def notes_dir(self) -> Path:
         return self.wiki_dir / NOTES_DIRNAME
+
+    @property
+    def cache_dir(self) -> Path:
+        return self.wiki_dir / CACHE_DIRNAME
 
     def section_path(self, section: Section | str) -> Path:
         sid = section.id if isinstance(section, Section) else section
@@ -79,8 +98,7 @@ def initialize(layout: WikiLayout, *, model: str, provider: str, ollama_host: st
         layout.config_path.write_text(_render_config(model=model, provider=provider, ollama_host=ollama_host))
     created.append(layout.config_path)
 
-    if not layout.gitignore_path.exists():
-        layout.gitignore_path.write_text(DEFAULT_GITIGNORE)
+    _ensure_gitignore(layout)
     created.append(layout.gitignore_path)
 
     for section in SECTIONS:
@@ -90,6 +108,28 @@ def initialize(layout: WikiLayout, *, model: str, provider: str, ollama_host: st
         created.append(path)
 
     return created
+
+
+def _ensure_gitignore(layout: WikiLayout) -> None:
+    """Ensure the wiki's .gitignore exists and covers every required entry.
+
+    Older wikis predate the cache layer and have a ``.gitignore`` that
+    only ignores ``.notes/``. Backfill any missing line-by-line entries
+    from :data:`_GITIGNORE_REQUIRED_ENTRIES` so users upgrading wikifi
+    don't end up with stray ``.cache/`` (or future-added) directories
+    showing as untracked changes in the target repo.
+    """
+    path = layout.gitignore_path
+    if not path.exists():
+        path.write_text(DEFAULT_GITIGNORE)
+        return
+    existing = path.read_text(encoding="utf-8")
+    existing_lines = {line.strip() for line in existing.splitlines() if line.strip()}
+    missing = [entry for entry in _GITIGNORE_REQUIRED_ENTRIES if entry not in existing_lines]
+    if not missing:
+        return
+    suffix_nl = "" if existing.endswith("\n") else "\n"
+    path.write_text(existing + suffix_nl + "\n".join(missing) + "\n")
 
 
 def write_section(layout: WikiLayout, section: Section, body: str) -> Path:

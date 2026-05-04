@@ -1,35 +1,56 @@
 # Domains and Subdomains
 
-### Core Domain: Automated Knowledge Translation
-The system operates within a single core domain focused on transforming raw technical artifacts into structured, business-readable documentation. This domain treats source repositories as unstructured knowledge sources that require systematic discovery, semantic translation, and narrative synthesis. All processing is deliberately decoupled from implementation specifics, ensuring that technical constructs are consistently mapped to domain-agnostic business concepts.
+## Core Domain
 
-### Bounded Contexts & Subdomains
-The core domain is partitioned into five bounded contexts, each with distinct responsibilities and clear boundaries:
+The system's core domain is **automated documentation synthesis**: ingesting an arbitrary source repository and producing a structured, intent-bearing wiki that describes the codebase in technology-agnostic terms. The central concern is not the mechanics of reading files, but the act of surfacing *business intent* — distinguishing what a system does from the accidental details of how it is implemented.
 
-| Subdomain | Primary Responsibility | DDD Classification |
+## Subdomains
+
+### Repository Introspection
+Before any analysis begins, the system must decide which parts of a repository carry production intent and which represent infrastructure, tooling, or generated artefacts. This subdomain owns that classification decision. A defining constraint is **tech-agnosticism**: the introspection logic must not rely on recognising specific languages, frameworks, or conventions, so that it generalises across any codebase.
+
+### Knowledge Extraction
+Once relevant files are identified, this subdomain is responsible for extracting structured, intent-bearing findings from each one. It encompasses file classification, content chunking, querying an inference backend for structured observations, and persisting those observations with precise citations for downstream use. The output of this subdomain is the raw evidential record.
+
+### Section Synthesis
+The documentation produced by the system is split along a clear dependency boundary:
+
+| Subdomain tier | Description | Pipeline position |
 |---|---|---|
-| **Repository Introspection & Curation** | Discovers project structure, classifies artifacts, filters irrelevant content, and establishes workspace boundaries. | Supporting |
-| **Semantic Extraction & Analysis** | Processes individual artifacts to translate technical patterns into structured knowledge units. Leverages external analytical services for complex pattern recognition. | Core |
-| **Information Aggregation & Synthesis** | Consumes extracted knowledge units, resolves redundancies, aligns terminology, and composes coherent section-level documentation. | Core |
-| **Pipeline Orchestration & Lifecycle Management** | Governs sequential stage execution, manages reporting, coordinates output derivation, and controls the documentation workspace lifecycle. | Supporting |
-| **External Intelligence Integration** | Abstracts communication with generative analysis services. Standardizes request formulation and response consumption, decoupling core logic from provider implementations. | Generalized |
+| **Primary sections** | Built from per-file evidence produced by the extraction subdomain | Stages 2–3 |
+| **Derivative sections** | Synthesised by aggregating across all primary-section findings | Stage 4 |
 
-### Context Relationships & Data Flow
-The subdomains form a strict, stage-gated dependency chain. Data flows unidirectionally through the pipeline:
+This ordering is a first-class design constraint: derivative sections cannot be produced until all primary evidence is available. The boundary between the two tiers is enforced structurally, not merely by convention.
 
-1. **Introspection → Extraction**: Curated artifact lists and structural metadata are passed to the extraction context.
-2. **Extraction → Aggregation**: Structured knowledge units and intermediate analysis results are consumed for section-level synthesis.
-3. **Aggregation → Orchestration**: Synthesized content is handed off for final artifact derivation, workspace population, and lifecycle closure.
+### Artefact Persistence
+Two distinct storage concerns are separated within the system. *Committed wiki content* — the section markdown files that are versioned alongside the target project — is kept apart from *local working state*, which includes per-file extraction notes and a content-addressed cache. The persistence subdomain owns this boundary and ensures that working state is never accidentally treated as part of the published record.
 
-External Intelligence Integration operates as a cross-cutting capability within the Extraction context. It is invoked on-demand to resolve ambiguous technical patterns or generate analytical narratives, but does not dictate pipeline progression.
+## Subdomain Relationships
 
-### State Management & Persistence
-Intermediate analysis results are explicitly persisted between pipeline stages. This design supports:
-- **Incremental Processing**: Only modified or newly discovered artifacts trigger re-analysis.
-- **Auditability**: Each transformation step is traceable, preserving the lineage from raw artifact to final documentation.
-- **Fault Tolerance**: Pipeline stages can resume from the last persisted state without requiring full re-execution.
+The subdomains form a directed dependency chain:
 
-### Modeling Gaps & Observations
-- **Error & Conflict Resolution**: The notes emphasize a linear, deterministic flow but provide limited detail on how conflicting domain interpretations are resolved during synthesis, or how pipeline failures trigger rollback or recovery.
-- **Orchestration vs. Workspace Boundaries**: Responsibilities for pipeline execution and workspace lifecycle management appear overlapping. Future modeling may benefit from separating execution coordination from directory/configuration governance.
-- **Provider Abstraction Depth**: While external intelligence is abstracted, the notes do not specify how fallback mechanisms or service degradation are handled when analytical responses are incomplete or malformed.
+```
+Repository Introspection
+        ↓
+  Knowledge Extraction  →  Artefact Persistence (working state)
+        ↓
+  Section Synthesis
+        ↓
+  Artefact Persistence (committed wiki content)
+```
+
+No subdomain reaches backwards in this chain; the pipeline ordering is the authoritative expression of inter-subdomain dependency.
+
+## Supporting claims
+- The core domain is automated documentation synthesis: extracting business intent from a source repository and producing a technology-agnostic wiki. [1][2]
+- The repository introspection subdomain decides which parts of a codebase encode business intent versus infrastructure or tooling. [2]
+- A defining constraint of repository introspection is tech-agnosticism — the analysis must not depend on recognising any specific language or framework. [2]
+- The knowledge extraction subdomain covers file classification, content chunking, inference-backend querying, and persisting findings with citations. [1]
+- Documentation sections are divided into primary sections (built from per-file evidence) and derivative sections (synthesised from aggregates of primary sections), with the ordering enforced as a structural constraint. [3]
+- Two distinct storage concerns exist: committed wiki content and local working state (extraction notes and cache); the persistence subdomain enforces this boundary. [4]
+
+## Sources
+1. `wikifi/extractor.py`
+2. `wikifi/introspection.py:19-44`
+3. `wikifi/sections.py:1-19`
+4. `wikifi/wiki.py:1-50`

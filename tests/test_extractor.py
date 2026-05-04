@@ -2,12 +2,14 @@ from pathlib import Path
 
 import pytest
 
+from wikifi.cache import WalkCache
 from wikifi.extractor import (
     FileFindings,
     SectionFinding,
     _chunk_text,
     extract_repo,
 )
+from wikifi.repograph import build_graph
 from wikifi.wiki import WikiLayout, initialize, read_notes
 
 
@@ -327,6 +329,150 @@ def test_section_ids_documented_in_system_prompt():
         assert sid not in EXTRACTION_SYSTEM_PROMPT.split("Only emit findings for these section ids:")[1].split("\n")[0]
 
 
+def test_extract_repo_uses_cache_to_skip_unchanged_files(tmp_path, mock_provider_factory):
+    """A file whose fingerprint matches a cache entry skips the LLM call entirely."""
+    layout = _layout(tmp_path)
+    (tmp_path / "a.py").write_text("class Order: pass\n# meaningful body content here for the walker\n")
+
+    cache = WalkCache()
+    seen: list[str] = []
+
+    def factory(schema, system, user):
+        seen.append(user)
+        return FileFindings(
+            summary="domain class",
+            findings=[SectionFinding(section_id="entities", finding="Order entity.")],
+        )
+
+    provider = mock_provider_factory(json_factory=factory)
+    extract_repo(
+        layout=layout,
+        provider=provider,
+        files=[Path("a.py")],
+        repo_root=tmp_path,
+        cache=cache,
+    )
+    assert len(seen) == 1
+    assert "a.py" in cache.extraction
+    # Second walk against the same file: cache hit, no new LLM call.
+    seen.clear()
+    stats2 = extract_repo(
+        layout=layout,
+        provider=provider,
+        files=[Path("a.py")],
+        repo_root=tmp_path,
+        cache=cache,
+    )
+    assert seen == []
+    assert stats2.cache_hits == 1
+    notes = read_notes(layout, "entities")
+    # Findings are replayed into the notes store on cache hit.
+    assert any("Order" in n["finding"] for n in notes)
+
+
+def test_extract_repo_invalidates_cache_when_file_changes(tmp_path, mock_provider_factory):
+    layout = _layout(tmp_path)
+    target = tmp_path / "a.py"
+    target.write_text("class Order: pass\n# body content for the walker minimum threshold\n")
+
+    cache = WalkCache()
+    call_count = {"n": 0}
+
+    def factory(schema, system, user):
+        call_count["n"] += 1
+        return FileFindings(findings=[SectionFinding(section_id="entities", finding="Order.")])
+
+    provider = mock_provider_factory(json_factory=factory)
+    extract_repo(layout=layout, provider=provider, files=[Path("a.py")], repo_root=tmp_path, cache=cache)
+    assert call_count["n"] == 1
+
+    # Mutate the file → fingerprint changes → cache miss → new call.
+    target.write_text("class Customer: pass\n# different content for the walker minimum threshold\n")
+    extract_repo(layout=layout, provider=provider, files=[Path("a.py")], repo_root=tmp_path, cache=cache)
+    assert call_count["n"] == 2
+
+
+def test_extract_repo_routes_sql_through_specialized_extractor(tmp_path, mock_provider_factory):
+    """SQL files bypass the LLM and go through the deterministic SQL extractor."""
+    layout = _layout(tmp_path)
+    (tmp_path / "schema.sql").write_text("CREATE TABLE customer (id INTEGER PRIMARY KEY, email VARCHAR(255) NOT NULL);")
+
+    seen: list[str] = []
+
+    def factory(schema, system, user):
+        seen.append(user)
+        return FileFindings()
+
+    provider = mock_provider_factory(json_factory=factory)
+    stats = extract_repo(
+        layout=layout,
+        provider=provider,
+        files=[Path("schema.sql")],
+        repo_root=tmp_path,
+    )
+    # No LLM calls — specialized extractor handled the file directly.
+    assert seen == []
+    assert stats.specialized_files == 1
+    notes = read_notes(layout, "entities")
+    assert any("customer" in n["finding"] for n in notes)
+
+
+def test_extract_repo_emits_source_refs_in_notes(tmp_path, mock_provider_factory):
+    """Every note carries a structured ``sources`` list for downstream citations."""
+    layout = _layout(tmp_path)
+    (tmp_path / "a.py").write_text("class Order:\n    pass\n# more body content for walker minimum\n")
+
+    findings = FileFindings(
+        summary="domain class",
+        findings=[
+            SectionFinding(section_id="entities", finding="Order entity.", line_range=(1, 2)),
+        ],
+    )
+    provider = mock_provider_factory(json_responses={FileFindings: [findings]})
+    extract_repo(
+        layout=layout,
+        provider=provider,
+        files=[Path("a.py")],
+        repo_root=tmp_path,
+    )
+    note = read_notes(layout, "entities")[0]
+    sources = note["sources"]
+    assert sources and sources[0]["file"] == "a.py"
+    assert sources[0]["lines"] == [1, 2]
+    assert sources[0]["fingerprint"]
+
+
+def test_extract_repo_injects_neighbor_context_when_graph_supplied(tmp_path, mock_provider_factory):
+    layout = _layout(tmp_path)
+    (tmp_path / "pkg").mkdir()
+    (tmp_path / "pkg" / "__init__.py").write_text("# package marker for tests; long enough to pass min_content\n")
+    (tmp_path / "pkg" / "main.py").write_text("from pkg.helper import compute\n\ndef run():\n    return compute()\n")
+    (tmp_path / "pkg" / "helper.py").write_text(
+        "def compute():\n    return 42\n# extra padding to satisfy the minimum content threshold for the walker\n"
+    )
+
+    files = [Path("pkg/__init__.py"), Path("pkg/main.py"), Path("pkg/helper.py")]
+    graph = build_graph(repo_root=tmp_path, files=files)
+
+    captured: list[str] = []
+
+    def factory(schema, system, user):
+        captured.append(user)
+        return FileFindings()
+
+    provider = mock_provider_factory(json_factory=factory)
+    extract_repo(
+        layout=layout,
+        provider=provider,
+        files=files,
+        repo_root=tmp_path,
+        graph=graph,
+    )
+    main_prompt = next(p for p in captured if "pkg/main.py" in p)
+    assert "Neighbor files" in main_prompt
+    assert "pkg/helper.py" in main_prompt
+
+
 def test_extract_repo_drops_derivative_section_findings(tmp_path, mock_provider_factory):
     """Even if the model emits a derivative section id, the extractor filters it out."""
     from wikifi.sections import DERIVATIVE_SECTION_IDS
@@ -355,3 +501,35 @@ def test_extract_repo_drops_derivative_section_findings(tmp_path, mock_provider_
 
     assert len(read_notes(layout, "entities")) == 1
     assert read_notes(layout, derivative_id) == []
+
+
+def test_extract_repo_use_specialized_extractors_false_falls_back_to_llm(tmp_path, mock_provider_factory):
+    """`use_specialized_extractors=False` keeps schema files on the LLM path.
+
+    Lock in the `use_specialized_extractors` setting wired through from
+    config — without this the knob would be silently ignored and SQL/
+    GraphQL/Protobuf/OpenAPI files would always bypass the LLM regardless
+    of the user's explicit opt-out.
+    """
+    layout = _layout(tmp_path)
+    (tmp_path / "schema.sql").write_text("CREATE TABLE customer (id INTEGER PRIMARY KEY);")
+
+    seen: list[str] = []
+
+    def factory(schema, system, user):
+        seen.append(user)
+        return FileFindings(findings=[SectionFinding(section_id="entities", finding="Routed to LLM.")])
+
+    provider = mock_provider_factory(json_factory=factory)
+    stats = extract_repo(
+        layout=layout,
+        provider=provider,
+        files=[Path("schema.sql")],
+        repo_root=tmp_path,
+        use_specialized_extractors=False,
+    )
+
+    assert seen, "LLM should have been called when specialized extractors are disabled"
+    assert stats.specialized_files == 0
+    notes = read_notes(layout, "entities")
+    assert any("Routed to LLM." in n["finding"] for n in notes)
