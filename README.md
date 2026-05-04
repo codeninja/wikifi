@@ -2,10 +2,9 @@
 
 > A Python library that walks a codebase and produces a **technology-agnostic** feature and domain extraction from the source suitable for reflection into a new modern implementaiton which retains it's previous functionality and delivered value to users.
 
-For the *why* behind wikifi and the design questions still to resolve, see [`VISION.md`](./VISION.md). For the development process, see [`CLAUDE.md`](./CLAUDE.md).
+For the *why* behind wikifi and the design questions still to resolve, see [`VISION.md`](./VISION.md). For the development process, see [`CLAUDE.md`](./CLAUDE.md). 
 
-## Status
-Pre-implementation. Architecture and CLI surface are sketched below; binding decisions live in `VISION.md`.
+To see the results, view the [.wikifi](./.wikifi/) directory in this repo, which contains the output of running `wikifi walk` on the wikifi codebase itself.
 
 ## Install & use
 Add wikifi to a target project, then run `init` to bootstrap wikification of that project's source.
