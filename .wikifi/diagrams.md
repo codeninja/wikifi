@@ -1,146 +1,117 @@
 # Diagrams
 
-Three diagrams follow: a domain map, an entity–relationship view, and an integration flow. All representations are technology-agnostic and derived solely from the documented system model.
+The three diagrams below cover the subdomain structure of the core domain, the structural relationships between the principal entities, and the end-to-end pipeline integration flow.
+
+---
 
 ## Domain Map
 
-Subdomains, their responsibilities, and the directed dependency chain that governs pipeline ordering. No subdomain reaches backwards; the arrows below are the authoritative expression of inter-subdomain dependency.
+The four subdomains that compose the core domain of automated documentation synthesis form a strict directed dependency chain. No subdomain reaches backward; the ordering is a first-class design constraint.
 
 ```mermaid
-graph TD
-    subgraph CORE["Core Domain — Automated Documentation Synthesis"]
-        RI[Repository Introspection]
-        KE[Knowledge Extraction]
-        SS[Section Synthesis]
-        APW[Artefact Persistence — working state]
-        APC[Artefact Persistence — committed wiki]
-    end
+graph LR
+    RI["Repository Introspection"]
+    KE["Knowledge Extraction"]
+    SS_P["Section Synthesis - Primary"]
+    SS_D["Section Synthesis - Derivative"]
+    AP_W[("Working-State Persistence")]
+    AP_C[("Committed Wiki Persistence")]
 
-    RI -->|include and exclude scope| KE
-    KE -->|extraction notes| APW
-    KE -->|evidential record| SS
-    SS -->|rendered section markdown| APC
+    RI --> KE
+    KE --> AP_W
+    KE --> SS_P
+    SS_P --> SS_D
+    SS_P --> AP_C
+    SS_D --> AP_C
 ```
+
+---
 
 ## Entity Relationship View
 
-Core entities across all concern areas. Cardinality follows the documented information model.
+The diagram spans six concern areas: wiki structure, evidence tracing, extraction, pipeline orchestration, caching, and quality review. The self-referential edge on **Section** represents the directed acyclic graph of upstream declarations enforced by topological ordering at startup.
 
 ```mermaid
 erDiagram
-    SECTION {
-        string id PK
-        string title
-        string brief
-        string tier
-    }
     SECTION ||--o{ SECTION : "upstream-of"
-    WIKI_LAYOUT ||--o{ SECTION : "resolves paths for"
-    SECTION_REPORT }o--|| SECTION : "describes"
-    WIKI_REPORT ||--|{ SECTION_REPORT : "aggregates"
-    LOADED_SECTION ||--|| SECTION : "pairs body with"
-
-    SECTION ||--o{ SECTION_FINDING : "collects"
-    FILE_FINDINGS ||--|{ SECTION_FINDING : "groups"
-
-    SOURCE_REF {
-        string file_path
-        string line_range
-        string fingerprint
-    }
-    CLAIM }o--|{ SOURCE_REF : "backed by"
-    CONTRADICTION }|--|{ CLAIM : "groups conflicting"
-    EVIDENCE_BUNDLE ||--|{ CLAIM : "contains"
-    EVIDENCE_BUNDLE ||--o{ CONTRADICTION : "contains"
-
-    WALK_REPORT ||--|| INTROSPECTION_RESULT : "carries"
-    WALK_REPORT ||--|| EXTRACTION_STATS : "carries"
-    WALK_REPORT ||--|| AGGREGATION_STATS : "carries"
-    WALK_REPORT ||--|| DERIVATION_STATS : "carries"
-    WALK_REPORT ||--|| WALK_CACHE : "carries"
-    WALK_REPORT ||--|| REPO_GRAPH : "carries"
-    WALK_CACHE ||--o{ CACHED_FINDINGS : "holds"
-    WALK_CACHE ||--o{ CACHED_SECTION : "holds"
-    REPO_GRAPH ||--|{ GRAPH_NODE : "indexes"
-
-    DERIVATION_STATS ||--o{ REVIEW_OUTCOME : "audit trail"
-    REVIEW_OUTCOME ||--|| CRITIQUE : "initial"
-    REVIEW_OUTCOME ||--o| CRITIQUE : "follow-up"
-
-    CHAT_SESSION ||--|| LLM_PROVIDER : "uses"
-    CHAT_SESSION ||--|{ CHAT_MESSAGE : "history"
+    SECTION ||--o{ LOADED_SECTION : "has loaded form"
+    SECTION ||--o{ SECTION_REPORT : "reported by"
+    WIKI_REPORT ||--o{ SECTION_REPORT : aggregates
+    EVIDENCE_BUNDLE ||--o{ CLAIM : contains
+    EVIDENCE_BUNDLE ||--o{ CONTRADICTION : contains
+    CLAIM ||--o{ SOURCE_REF : "backed by"
+    CONTRADICTION ||--|{ CLAIM : groups
+    FILE_FINDINGS ||--|{ SECTION_FINDING : groups
+    WALK_REPORT ||--|| INTROSPECTION_RESULT : carries
+    WALK_REPORT ||--|| WALK_CACHE : carries
+    WALK_REPORT ||--|| REPO_GRAPH : carries
+    REPO_GRAPH ||--o{ GRAPH_NODE : contains
+    WALK_CACHE ||--o{ CACHED_FINDINGS : stores
+    WALK_CACHE ||--o{ CACHED_SECTION : stores
+    WIKI_QUALITY_REPORT ||--o{ CRITIQUE : maps
+    REVIEW_OUTCOME ||--|{ CRITIQUE : tracks
+    CHAT_SESSION ||--o{ CHAT_MESSAGE : history
+    CHAT_SESSION ||--|| LLM_PROVIDER : uses
 ```
 
-## Integration Flow
+---
 
-End-to-end pipeline sequence from CLI invocation through all four stages, showing each stage's interactions with the LLM provider abstraction, the cache layer, the import graph, and the filesystem layout.
+## Pipeline Integration Flow
+
+The sequence below traces a complete pipeline run triggered by the `walk` command. The provider abstraction is the sole contact point for all inference calls; the filesystem layout abstraction mediates all reads and writes; the cache layer short-circuits calls when prior results remain valid. Derivative sections are excluded from the aggregation stage and are handled exclusively in the derivation stage.
 
 ```mermaid
 sequenceDiagram
-    autonumber
+    actor Operator
     participant CLI
     participant Orchestrator
-    participant Config
-    participant LLMProvider
-    participant ImportGraph
-    participant SpecDispatch
+    participant LLMProvider as LLM Provider
+    participant ImportGraph as Import Graph
     participant Cache
-    participant FilesystemLayout
+    participant Layout as Filesystem Layout
 
-    CLI->>Config: load settings and feature flags
-    CLI->>Orchestrator: walk command
-    Orchestrator->>LLMProvider: Stage 1 — scope classification
+    Operator->>CLI: walk command
+    CLI->>Orchestrator: initialise pipeline
+
+    Note over Orchestrator,LLMProvider: Stage 1 - Repository Introspection
+    Orchestrator->>LLMProvider: structured completion (classify repository paths)
     LLMProvider-->>Orchestrator: IntrospectionResult
-    Orchestrator->>FilesystemLayout: initialise layout
 
-    loop per in-scope file
-        Orchestrator->>ImportGraph: fetch file neighbours
-        ImportGraph-->>Orchestrator: neighbour paths
-        Orchestrator->>Cache: lookup by content fingerprint
-        alt cache hit
-            Cache-->>Orchestrator: FileFindings cached
-        else cache miss
-            Orchestrator->>SpecDispatch: route by FileKind
-            alt recognised kind
-                SpecDispatch-->>Orchestrator: SpecializedFindings
-            else general path
-                SpecDispatch->>LLMProvider: Stage 2 — extraction
-                LLMProvider-->>SpecDispatch: SectionFindings
-                SpecDispatch-->>Orchestrator: FileFindings
-            end
-            Orchestrator->>Cache: store findings
-        end
-        Orchestrator->>FilesystemLayout: append notes per section
+    Note over Orchestrator,ImportGraph: Build Cross-File Import Graph
+    Orchestrator->>ImportGraph: traverse in-scope files
+    ImportGraph-->>Orchestrator: RepoGraph ready
+
+    Note over Orchestrator,Layout: Stage 2 - Knowledge Extraction (per file)
+    loop each in-scope file
+        Orchestrator->>Cache: check content fingerprint
+        Cache-->>Orchestrator: hit or miss
+        Orchestrator->>ImportGraph: fetch neighbour paths
+        Orchestrator->>LLMProvider: structured completion (findings schema)
+        LLMProvider-->>Orchestrator: FileFindings
+        Orchestrator->>Layout: append notes
     end
 
-    loop per primary section
-        Orchestrator->>Cache: lookup by notes-payload hash
-        alt cache hit
-            Cache-->>Orchestrator: rendered section body
-        else cache miss
-            Orchestrator->>LLMProvider: Stage 3 — aggregation
-            LLMProvider-->>Orchestrator: EvidenceBundle
-            Orchestrator->>FilesystemLayout: write section markdown
-            Orchestrator->>Cache: store aggregated section
-        end
+    Note over Orchestrator,Layout: Stage 3 - Section Aggregation (primary sections only)
+    loop each primary section
+        Orchestrator->>Cache: check notes-payload hash
+        Cache-->>Orchestrator: hit or miss
+        Orchestrator->>LLMProvider: structured completion (section-body schema)
+        LLMProvider-->>Orchestrator: EvidenceBundle
+        Orchestrator->>Layout: write section markdown
     end
 
-    loop per derivative section in topological order
-        Orchestrator->>FilesystemLayout: read upstream section bodies
-        Orchestrator->>LLMProvider: Stage 4 — derivation
+    Note over Orchestrator,Layout: Stage 4 - Section Derivation (topological order)
+    loop each derivative section
+        Orchestrator->>Layout: read upstream section bodies
+        Orchestrator->>LLMProvider: structured completion (synthesis)
         LLMProvider-->>Orchestrator: section body
-        Orchestrator->>FilesystemLayout: write section markdown
-        opt quality review enabled
-            Orchestrator->>LLMProvider: critique
-            LLMProvider-->>Orchestrator: Critique with score
-            alt score below revision threshold
-                Orchestrator->>LLMProvider: revise
-                LLMProvider-->>Orchestrator: revised body
-                Orchestrator->>FilesystemLayout: overwrite section markdown
-            end
-        end
+        Orchestrator->>LLMProvider: structured completion (quality critique)
+        LLMProvider-->>Orchestrator: Critique
+        Orchestrator->>Layout: write section markdown
     end
 
     Orchestrator-->>CLI: WalkReport
-    Note over CLI,FilesystemLayout: chat and report subcommands read finished wiki via FilesystemLayout
+    CLI-->>Operator: run summary
 ```
+
+> **External capability providers**: The system is additionally configured as a client that fans out to multiple external capability providers via a tool-server protocol — a local AI utility, a local web crawler, a remote documentation context service, and a remote stitching/search service. The upstream sections do not specify at which pipeline call sites these providers are invoked.

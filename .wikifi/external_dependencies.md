@@ -1,61 +1,51 @@
 # External-System Dependencies
 
-The system depends on external services in two areas: the **language-model inference layer** that drives all AI analysis, and a set of **tooling integrations** used for development support and runtime enrichment.
+The system draws on external services in three areas: language-model inference, development-time tooling integrations, and an optional document-parsing aid.
 
-### Language-Model Inference
+## Language-Model Inference Services
 
-Three mutually exclusive inference backends are supported; exactly one is active per deployment.
+All AI inference is routed through exactly one of three backends, selected at configuration time.
 
-| Backend | Role | Authentication | Key Configuration |
+| Backend | Hosting model | Authentication | Notes |
 |---|---|---|---|
-| Self-hosted local inference service | Default LLM backend; serves models over HTTP on the local network | None required | Configurable host address and request timeout |
-| Anthropic's hosted inference API | Opt-in cloud backend for high-capability extraction | API key (environment variable) | Configurable output-token cap and HTTP timeout to manage long-running calls; supports adaptive reasoning depth |
-| OpenAI-compatible hosted inference API | Opt-in cloud backend for structured decoding, completion, and chat | API key | Configurable base URL, enabling compatible proxy or alternate deployment targets |
+| Self-hosted model server | Local process, user-managed | None required | Default path; connects via a configurable HTTP endpoint |
+| Anthropic hosted API | Cloud, vendor-managed | API key (environment variable) | Opt-in; supports adaptive reasoning depth; configurable per-call token cap (default 32 000) and HTTP timeout (default 900 s) to handle long inference runs |
+| OpenAI-compatible hosted API | Cloud, vendor-managed (or proxy) | API key | Opt-in; base URL is overridable, enabling compatible third-party or private deployments |
 
-The self-hosted local service is the default and the zero-friction starting point for new users — it requires no credentials and no cloud account. The two hosted cloud services are opt-in alternatives that require API keys and expose additional parameters for latency and cost control.
+The self-hosted model server is the zero-configuration default: new users can run it locally without obtaining any credentials. The two cloud options are opt-in and require API keys supplied via environment variables. Both cloud providers support configurable timeouts, token limits, and extended reasoning modes; the cloud inference path also performs structured-output decoding (schema-constrained responses returning validated domain objects), free-text completion, and multi-turn conversational exchange.
 
-The local backend supports reasoning-capable model variants that trade increased latency for greater analytical depth; this extended-reasoning mode is also available on the hosted cloud backends.
+## Development-Time Tool Integrations
 
-The Anthropic-backed path operates in a single structured-extraction mode. The OpenAI-compatible path supports three distinct usage modes: schema-constrained structured decoding (returning validated domain objects), free-text completion, and multi-turn conversational chat.
+A separate layer of integrations, declared in the project's tool-server configuration, augments the system during development or at runtime with auxiliary capabilities:
 
-### Development and Runtime Tooling Integrations
+- **Google's generative AI service** — consumed via a shared API key; powers at least two registered tool integrations, including one described as an orchestration or data-assembly capability.
+- **External documentation and context lookup** — an HTTP-based service queried with its own API key to retrieve up-to-date reference material, likely used to enrich prompts with current library or API documentation.
+- **Self-hosted web-crawling service** — a locally-running crawler reachable at a fixed port, requiring no API key, used to fetch and process web content on demand.
 
-Several additional services are configured in the tooling layer:
+## Optional Parsing Support
 
-- **Self-hosted web-crawling service** — runs locally on a fixed port with no external credentials required. Provides on-demand web-crawling capability, used to gather source material.
-- **Google's hosted AI/generative API** — authenticated via a dedicated API key; consumed by at least two registered tool integrations.
-- **External documentation context service** — called over HTTP using a dedicated API key; enriches prompts or retrieves up-to-date reference documentation at runtime.
-- **Google-hosted orchestration service** — an HTTP service authenticated via the same Google API key; its exact role is not fully specified in available sources but is likely related to data composition or workflow orchestration.
-
-### Soft Dependency: Structured-Data Parsing
-
-When processing structured API contract files, the system can optionally leverage an external YAML parsing library for full format support. If that library is absent, an internal minimal parser serves as a fallback, covering the specific fields the system requires. This is a soft rather than hard dependency — the system remains functional without it.
+When processing contract specification files in YAML format, the system can delegate parsing to a third-party YAML library if one is present in the environment. If the library is absent the system falls back to a built-in minimal parser that covers the subset of YAML constructs it needs. This makes the external library a soft, non-blocking dependency rather than a hard requirement.
 
 ## Supporting claims
-- Three mutually exclusive LLM inference backends are supported: a self-hosted local service, Anthropic's hosted API, and an OpenAI-compatible hosted API. [1][2][3][4][5]
-- The self-hosted local inference service is the default backend, requires no API key, and connects over a configurable HTTP endpoint. [1][2][5][6]
-- The self-hosted local service supports reasoning-capable model variants that trade latency for greater analytical depth. [1][6]
-- Anthropic's hosted inference API is an opt-in backend authenticated via an environment-variable API key, with a configurable output-token cap and HTTP timeout to manage long-running inference calls. [3][5][7]
-- Anthropic's hosted backend supports an adaptive reasoning depth mode. [3][7]
-- The OpenAI-compatible hosted API is an opt-in backend authenticated via API key, with a configurable base URL enabling use of compatible proxy deployments. [4][5][8]
-- The OpenAI-compatible backend supports three usage modes: schema-constrained structured decoding, free-text completion, and multi-turn conversational chat. [8]
-- A self-hosted web-crawling service runs locally on a fixed port and requires no external credentials. [9]
-- Google's hosted AI/generative API is consumed by at least two tool integrations, authenticated via a dedicated API key. [10][11]
-- An external documentation context service is called over HTTP with a dedicated API key, used to enrich prompts or retrieve reference documentation at runtime. [12]
-- A Google-hosted orchestration service is consumed over HTTP, authenticated via the same Google API key; its exact role is not fully specified in available sources. [11]
-- An external YAML parsing library is a soft dependency for structured API contract processing; the system falls back to an internal minimal parser when the library is absent. [13]
+- The self-hosted model server is the default inference backend, requires no API key, and is reachable at a configurable HTTP endpoint. [1][2][3]
+- Anthropic's hosted inference API is an opt-in backend authenticated via an environment-variable API key, supporting adaptive reasoning modes, a configurable per-call token cap (default 32 000), and an HTTP timeout defaulting to 900 seconds. [4][2][5]
+- The OpenAI-compatible hosted API is an opt-in backend authenticated via API key with a configurable base URL, enabling use of compatible third-party or private proxy deployments. [6][2][7]
+- The cloud inference path supports structured-output (schema-constrained) decoding, free-text completion, and multi-turn conversational chat. [7]
+- Google's generative AI service is consumed via a shared API key and powers at least two registered tool integrations, including one orchestration or data-assembly capability. [8][9]
+- An HTTP-based external documentation and context lookup service is queried with its own dedicated API key, likely to enrich prompts with up-to-date reference material. [10]
+- A self-hosted web-crawling service runs locally at a fixed port, requires no API key, and is used to fetch and process web content. [11]
+- A third-party YAML parsing library is a soft dependency for processing YAML-format specification files; the system falls back to a built-in minimal parser when the library is absent. [12]
 
 ## Sources
-1. `.env.example:7-14`
-2. `wikifi/config.py:53-55`
-3. `wikifi/config.py:116-134`
-4. `wikifi/config.py:136-151`
-5. `wikifi/orchestrator.py:148-200`
-6. `wikifi/providers/ollama_provider.py:52`
-7. `wikifi/providers/anthropic_provider.py:83-100`
-8. `wikifi/providers/openai_provider.py:113-175`
-9. `.mcp.json:14-20`
-10. `.mcp.json:4-8`
-11. `.mcp.json:29-35`
-12. `.mcp.json:22-28`
-13. `wikifi/specialized/openapi.py:154-162`
+1. `wikifi/config.py:53-55`
+2. `wikifi/orchestrator.py:148-200`
+3. `wikifi/providers/ollama_provider.py:52`
+4. `wikifi/config.py:116-134`
+5. `wikifi/providers/anthropic_provider.py:83-100`
+6. `wikifi/config.py:136-151`
+7. `wikifi/providers/openai_provider.py:113-175`
+8. `.mcp.json:4-8`
+9. `.mcp.json:29-35`
+10. `.mcp.json:22-28`
+11. `.mcp.json:14-20`
+12. `wikifi/specialized/openapi.py:154-162`
