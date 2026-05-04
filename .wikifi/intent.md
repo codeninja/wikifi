@@ -1,57 +1,64 @@
 # Intent and Problem Space
 
-wikifi exists because the intent embedded in a legacy system is typically invisible — locked inside years of implementation choices, technology-specific conventions, and accumulated structure that makes it difficult to separate *what the system does and why* from *how it currently does it*. Migration teams tasked with replacing or re-implementing such a system need the former without the latter.
+wikifi exists to produce a structured, technology-agnostic wiki from an arbitrary source code repository — explaining **what a system does and why**, independent of the languages, frameworks, or infrastructure used to build it. Its primary audience is the team inheriting or migrating an existing codebase: architects and engineers who need a trustworthy, actionable picture of domain entities, capabilities, and integrations without spending days reading raw source files.
 
-### The Core Problem
+### The core problem
 
-When a team inherits a large legacy codebase and must produce a new implementation, they face a knowledge-extraction problem. The source describes a particular way of solving a set of problems, but rarely describes the problems themselves at a level that is portable to a new context. Reading the source directly tends to reproduce the same structure and constraints in the new system — recreating legacy decisions rather than the underlying intent.
+Large and legacy codebases resist quick comprehension. Source files encode intent implicitly, mixed with scaffolding, build artifacts, tests, and dependency code that carry no domain signal. At the same time, certain structured artifacts — database schemas, API contracts, protocol definitions — express intent with machine-readable precision that general-purpose analysis handles poorly. Any naive, uniform approach to understanding a codebase either drowns in noise or misses the highest-fidelity evidence.
 
-wikifi addresses this by walking a repository and producing a structured, technology-agnostic wiki that surfaces:
+Beyond individual files, some concepts — user personas, end-to-end user stories, system-level diagrams — only emerge from the *aggregate* of capabilities, entities, and integrations, and simply cannot be read from any single file in isolation.
 
-- **Domain entities and capabilities** — what the system models and what it can do
-- **API contracts and integration touchpoints** — what it exposes and to whom
-- **Cross-cutting concerns** — considerations that span the system as a whole
-- **Personas, user stories, and diagrams** — who uses the system, what they need, and how flows connect
+wikifi addresses all of this by treating repository understanding as a structured, multi-stage extraction problem rather than a documentation-writing task.
 
-The goal is to make legacy intent explicit, complete, and portable so a fresh implementation can retain full functional value without inheriting structural decisions.
+### For whom
 
-### Primary Audience
+The system is designed explicitly around the needs of **migration teams and technical architects** who must understand a live system well enough to redesign or replatform it. Every design choice — traceability of claims to source locations, surfacing of contradictions rather than silently merging them, quality scoring before handoff — is oriented toward answering the question: *can we trust this wiki enough to act on it?*
 
-The immediate audience is migration teams — architects and developers who need to understand a system's domain well enough to re-implement it rather than maintain it. A secondary audience includes anyone who must understand what a system does without reading its source directly, including those who need to interrogate the resulting wiki conversationally.
+### Constraints that shape the design
 
-### What the System Is Not
+**Trust and traceability over convenience.** The system refuses to silently resolve disagreements between source files. Every synthesized claim must trace back to the specific files that justified it, and a dedicated quality-assurance pass flags unsupported claims and coverage gaps before output is delivered.
 
-wikifi is explicitly a feature-extraction tool, not a transposition tool. It surfaces what a legacy system does and leaves all decisions about target architecture, structure, and approach entirely to the migration team. The output prescribes nothing about how the new system should be built.
+**Technology neutrality.** All output is expressed in domain terms — entities, capabilities, integrations, personas — never in terms of the implementation technology. This ensures the wiki remains useful even when the migration replaces the entire stack.
 
-### Shaping Constraints
+**Local-first operation.** The default configuration routes all inference through a locally-hosted model to avoid cloud API dependencies. Hosted providers are explicit opt-ins, reflecting a philosophy of keeping sensitive source code within the operator's own infrastructure unless otherwise chosen.
 
-Several constraints are built into the design from the outset:
+**Quality over speed.** The system prioritises documentation quality over processing throughput. Guards prevent runaway behaviour on near-empty or oversized files, and higher-order sections are synthesized only after all primary evidence has been assembled.
 
-| Constraint | Rationale |
-|---|---|
-| **Technology agnosticism** | Output must be expressed in domain terms, never in terms of the implementation technology found in the source, so the wiki does not embed the very assumptions it is meant to dissolve. |
-| **Quality over speed** | Accuracy and completeness of the generated wiki are prioritised over processing throughput. |
-| **Arbitrary scale** | The system must handle repositories of any size — including legacy monorepos with tens of thousands of files — through caching and chunking strategies that make repeated and interrupted runs cheap. |
-| **Full traceability** | Every assertion in the generated wiki must trace back to specific source files and locations so architects can verify any claim against the original codebase. |
-| **Honest disagreement** | Where source files contain conflicting signals, the system surfaces those contradictions explicitly rather than silently resolving them, preserving the full picture for the migration team. |
+**Scalability on large codebases.** Re-processing a large legacy codebase on every run is impractical. Content-addressed caching ensures only changed files require new analysis, making repeated full-repository walks economical and enabling recovery after mid-run failures. Structured contract files bypass general-model processing entirely when deterministic parsing is more accurate and less costly.
+
+**Stable output contract.** The on-disk layout produced by wikifi is treated as a contract with the target project: it must remain stable across tool upgrades so that existing wikis stay readable and can be updated incrementally without full regeneration.
+
+## Supporting claims
+- wikifi exists to produce a technology-agnostic wiki explaining what a system does and why, independent of the technologies used to build it. [1][2][3][4][5]
+- Its primary audience is migration teams and architects who need a trustworthy picture of a codebase without manual source-reading. [6][7][8][9][10][11]
+- Some concepts — personas, user stories, diagrams — only emerge from the aggregate of capabilities and entities and cannot be extracted from individual files. [12][5]
+- The system refuses to silently resolve contradictions; every claim must trace back to the specific source files that justified it. [13][7]
+- A quality-assurance pass flags unsupported claims and coverage gaps before output is delivered, so migration teams can trust the result without manually verifying every claim. [6][8]
+- The default configuration routes inference through a locally-hosted model; hosted providers are explicit opt-ins reflecting a local-first philosophy. [14]
+- The system prioritises documentation quality over processing throughput, with guards against runaway behaviour on near-empty or oversized files. [1]
+- Content-addressed caching makes repeated full-repository walks economical and enables recovery after mid-run failures; only changed files require new analysis. [15][16]
+- Structured contract files bypass general-model processing when deterministic parsing is more accurate and less costly. [17][18][19][20]
+- The on-disk layout is treated as a stable contract with the target project, kept consistent across tool upgrades so existing wikis remain readable. [21]
 
 ## Sources
-1. `VISION.md:3-9`
-2. `CLAUDE.md:73-75`
-3. `README.md:3`
-4. `wikifi/cli.py:1-8`
-5. `.env.example:1-2`
-6. `TESTING-AND-DEMO.md:1-6`
-7. `wikifi/config.py:1-8`
-8. `wikifi/specialized/__init__.py:1-13`
+1. `.env.example:1-2`
+2. `wikifi/cli.py:1-10`
+3. `wikifi/introspection.py:1-9`
+4. `wikifi/orchestrator.py:1-17`
+5. `wikifi/sections.py:1-19`
+6. `wikifi/critic.py:1-15`
+7. `wikifi/evidence.py:1-18`
+8. `wikifi/report.py:1-16`
 9. `wikifi/specialized/openapi.py:1-11`
 10. `wikifi/specialized/protobuf.py:1-8`
-11. `wikifi/deriver.py:1-18`
-12. `wikifi/sections.py:1-19`
-13. `VISION.md:86-89`
-14. `wikifi/critic.py:1-15`
-15. `wikifi/chat.py:1-32`
-16. `wikifi/cache.py:1-21`
-17. `wikifi/extractor.py:1-37`
-18. `wikifi/aggregator.py:1-15`
-19. `wikifi/evidence.py:1-18`
+11. `wikifi/specialized/sql.py:1-13`
+12. `wikifi/deriver.py:1-18`
+13. `wikifi/aggregator.py:1-15`
+14. `wikifi/config.py:1-26`
+15. `wikifi/cache.py:1-20`
+16. `wikifi/extractor.py:1-30`
+17. `wikifi/repograph.py:1-30`
+18. `wikifi/specialized/__init__.py:1-12`
+19. `wikifi/specialized/dispatch.py:1-13`
+20. `wikifi/specialized/models.py:1-8`
+21. `wikifi/wiki.py:1-8`

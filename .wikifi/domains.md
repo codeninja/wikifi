@@ -2,48 +2,55 @@
 
 ## Core Domain
 
-The system's core domain is **codebase knowledge extraction**: reasoning about an arbitrary repository's structure, intent, and behaviour, then representing that understanding as a technology-agnostic, human-readable wiki. The domain is explicitly decoupled from any recognition of specific languages, frameworks, or runtimes — tech-agnosticism is a first-class constraint enforced at the analysis level, not merely a presentation concern.
+The system's core domain is **automated documentation synthesis**: ingesting an arbitrary source repository and producing a structured, intent-bearing wiki that describes the codebase in technology-agnostic terms. The central concern is not the mechanics of reading files, but the act of surfacing *business intent* — distinguishing what a system does from the accidental details of how it is implemented.
 
-## Primary Subdomains
+## Subdomains
 
 ### Repository Introspection
-This subdomain covers the initial act of understanding a repository: discovering which paths exist, classifying files by kind, resolving import relationships, and deciding which parts of the codebase encode genuine business intent versus infrastructure or tooling noise. The output is a curated inclusion set that drives all downstream work.
+Before any analysis begins, the system must decide which parts of a repository carry production intent and which represent infrastructure, tooling, or generated artefacts. This subdomain owns that classification decision. A defining constraint is **tech-agnosticism**: the introspection logic must not rely on recognising specific languages, frameworks, or conventions, so that it generalises across any codebase.
 
-### Per-File Knowledge Extraction
-Operating over the inclusion set produced by introspection, this subdomain extracts intent-bearing findings from individual source files, organised by wiki section. It encompasses caching and memoisation of extraction results, cross-file context derived from the import graph, and chunk-level deduplication to prevent redundant evidence.
+### Knowledge Extraction
+Once relevant files are identified, this subdomain is responsible for extracting structured, intent-bearing findings from each one. It encompasses file classification, content chunking, querying an inference backend for structured observations, and persisting those observations with precise citations for downstream use. The output of this subdomain is the raw evidential record.
 
-### Documentation Synthesis
-This subdomain aggregates per-file findings into coherent wiki sections and then derives higher-level artifacts (narrative summaries, personas, diagrams) from those aggregates. A critical design constraint enforced structurally is the **dependency ordering** between primary evidence extraction and derivative synthesis: derivative sections may only consume content that primary sections have already produced.
+### Section Synthesis
+The documentation produced by the system is split along a clear dependency boundary:
 
-## Secondary Subdomains
+| Subdomain tier | Description | Pipeline position |
+|---|---|---|
+| **Primary sections** | Built from per-file evidence produced by the extraction subdomain | Stages 2–3 |
+| **Derivative sections** | Synthesised by aggregating across all primary-section findings | Stage 4 |
 
-| Subdomain | Responsibility |
-|---|---|
-| **Provider Abstraction** | Decouples extraction and synthesis intelligence from any specific inference backend, allowing local and hosted providers to be swapped without altering the pipeline. |
-| **Wiki Authoring & Organisation** | Governs how extracted knowledge is structured, stored on the filesystem, and made navigable for consumers such as migration teams. |
-| **Interactive Knowledge Retrieval** | Supports on-demand querying of the generated wiki, enabling a conversational interface over the accumulated knowledge base. |
+This ordering is a first-class design constraint: derivative sections cannot be produced until all primary evidence is available. The boundary between the two tiers is enforced structurally, not merely by convention.
 
-## Domain Relationships
+### Artefact Persistence
+Two distinct storage concerns are separated within the system. *Committed wiki content* — the section markdown files that are versioned alongside the target project — is kept apart from *local working state*, which includes per-file extraction notes and a content-addressed cache. The persistence subdomain owns this boundary and ensures that working state is never accidentally treated as part of the published record.
 
-Repository Introspection feeds Per-File Extraction, which in turn feeds Documentation Synthesis — forming a directed, stage-ordered pipeline. Provider Abstraction is a horizontal supporting concern that all three primary subdomains depend on. Wiki Authoring & Organisation governs the output representation consumed by Interactive Knowledge Retrieval. Quality assurance of generated content is an ancillary concern cross-cutting the extraction and synthesis stages.
+## Subdomain Relationships
+
+The subdomains form a directed dependency chain:
+
+```
+Repository Introspection
+        ↓
+  Knowledge Extraction  →  Artefact Persistence (working state)
+        ↓
+  Section Synthesis
+        ↓
+  Artefact Persistence (committed wiki content)
+```
+
+No subdomain reaches backwards in this chain; the pipeline ordering is the authoritative expression of inter-subdomain dependency.
 
 ## Supporting claims
-- The core domain is codebase knowledge extraction: reasoning about an arbitrary repository's structure, intent, and behaviour and representing that understanding as a technology-agnostic wiki. [1][2][3][4]
-- Tech-agnosticism is a first-class constraint at the analysis level, not merely a presentation concern. [5]
-- The repository introspection subdomain covers discovering and classifying files, resolving import relationships, and deciding which parts of a codebase encode business intent versus infrastructure or tooling. [1][6][5]
-- The per-file knowledge extraction subdomain extracts intent-bearing findings per wiki section, and encompasses caching/memoisation, import-graph-based cross-file context, and chunk-level deduplication. [1][3]
-- The documentation synthesis subdomain aggregates per-file findings into wiki sections and derives higher-level artifacts such as narrative summaries, personas, and diagrams. [1][4][7]
-- The dependency ordering between primary evidence extraction and derivative synthesis is a first-class design constraint enforced structurally. [7]
-- Provider abstraction is a secondary domain that decouples extraction intelligence from any specific inference backend. [8]
-- Wiki authoring and organisation is a secondary domain governing how extracted knowledge is structured and stored for consumption by a migration team. [2]
-- Interactive knowledge retrieval against the generated wiki is a supporting subdomain. [6]
+- The core domain is automated documentation synthesis: extracting business intent from a source repository and producing a technology-agnostic wiki. [1][2]
+- The repository introspection subdomain decides which parts of a codebase encode business intent versus infrastructure or tooling. [2]
+- A defining constraint of repository introspection is tech-agnosticism — the analysis must not depend on recognising any specific language or framework. [2]
+- The knowledge extraction subdomain covers file classification, content chunking, inference-backend querying, and persisting findings with citations. [1]
+- Documentation sections are divided into primary sections (built from per-file evidence) and derivative sections (synthesised from aggregates of primary sections), with the ordering enforced as a structural constraint. [3]
+- Two distinct storage concerns exist: committed wiki content and local working state (extraction notes and cache); the persistence subdomain enforces this boundary. [4]
 
 ## Sources
-1. `README.md:32-55`
-2. `VISION.md:3-20`
-3. `wikifi/extractor.py`
-4. `wikifi/orchestrator.py:1-16`
-5. `wikifi/introspection.py:19-44`
-6. `wikifi/cli.py:1-8`
-7. `wikifi/sections.py:1-19`
-8. `README.md:57-63`
+1. `wikifi/extractor.py`
+2. `wikifi/introspection.py:19-44`
+3. `wikifi/sections.py:1-19`
+4. `wikifi/wiki.py:1-50`

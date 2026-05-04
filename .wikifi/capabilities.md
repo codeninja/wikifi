@@ -1,107 +1,115 @@
 # Capabilities
 
-wikifi analyzes any target codebase and produces a structured, technology-agnostic wiki that captures domain knowledge, system intent, capabilities, external dependencies, integrations, cross-cutting concerns, core entities, and hard specifications — expressed entirely in domain terms rather than in the language of a specific technology stack.
+wikifi turns any codebase into a structured, technology-agnostic wiki by walking source files, extracting structured knowledge, and synthesizing readable documentation with a full evidence trail that links every assertion back to specific source locations.
 
-## Workspace Initialization
+## Documentation Pipeline
 
-Before analysis begins, the system bootstraps a wiki workspace inside the target project in an idempotent manner, creating the required directory structure, a configuration file, version-control ignore rules, and one placeholder document per defined section. Repeat invocations leave already-existing artifacts untouched.
+Documentation is produced through four ordered stages:
 
-## Codebase Analysis Pipeline
+**1. Repository Triage**
+The system examines the directory layout and manifest files to determine which paths contain production source worth deeper analysis and which should be skipped (vendored dependencies, build artifacts, generated files, CI configuration). Files outside configurable size bounds are excluded before any analysis begins.[7][8]
 
-The core pipeline runs in four ordered stages:
+**2. Per-file Extraction**
+Each in-scope file is analyzed to produce structured findings describing its contribution to each wiki section.[9] Files whose format is well-structured — relational schemas, API contracts, interface definitions, and migration scripts — are routed to dedicated deterministic extractors that bypass AI inference entirely, improving accuracy and reducing cost for these artifact types. General-purpose source files are analyzed via AI inference, with large files split into overlapping chunks so no content is lost at boundaries. Findings are deduplicated across chunk boundaries to avoid double-counting, and each finding carries a citation (path and line range) for downstream traceability.
 
-1. **Repository introspection** — The system compresses the repository's directory layout and reads key manifest files, then uses this compact view to classify every path as either worth walking (production source, business logic, integrations, domain models) or worth skipping (vendored dependencies, build output, tests, CI/CD). The classification is returned as a structured, diffable result.
+Optionally, the system builds a cross-file import and reference graph before extraction begins. Each file's extraction is then enriched with its neighborhood in that graph — which files it depends on and which depend on it — enabling findings to describe cross-file flows rather than treating files in isolation.
 
-2. **Per-file extraction** — Every in-scope file is routed through one of three extraction paths:
-   - *Cache replay* — if a file's content is unchanged since the last run, previously stored findings are reused without any further processing.
-   - *Deterministic schema parsing* — files recognised as structured schema artifacts (SQL DDL, database migrations, API contract specs, interface definition files, and graph schema files) are processed by purpose-built parsers that produce findings about entities, relationships, operations, and constraints without invoking an AI model.
-   - *AI-assisted extraction* — all remaining files pass through an AI extraction pass; large files are recursively split into overlapping chunks so no content is missed regardless of size.
+**3. Section Synthesis**
+Per-file findings are aggregated into coherent, readable markdown bodies for each primary wiki section. Every assertion in the output is backed by numbered citations traceable to the specific source files and line ranges from which it was inferred.
 
-   Every finding carries a source citation — the originating file path, an inclusive line range, and a content fingerprint — enabling full traceability back to the codebase.
-
-3. **Cross-file context enrichment** — In parallel with extraction, the system builds an import and reference graph across the entire in-scope file set. Each file's neighborhood (the files it depends on and the files that depend on it) is injected into its extraction prompt, enabling findings to describe inter-file flows rather than treating each file in isolation.
-
-4. **Section aggregation** — Per-file findings are grouped by their target wiki section and synthesised into readable markdown bodies. Every asserted claim is backed by numbered citations pointing to the originating files and line ranges. Where two or more files make incompatible assertions about the same topic, the system surfaces the conflict explicitly in a dedicated *Conflicts in source* block rather than silently resolving it — a deliberate feature for legacy codebases where disagreements encode high-priority migration signals.
+**4. Derivative Section Generation**
+Higher-level artifacts — user personas, scenario-based user stories, and architectural diagrams — are synthesized from the finalized primary sections. If upstream content is absent, the system writes a placeholder declaring the gap rather than fabricating content.
 
 ## Wiki Structure
 
-The generated wiki is organised into **eleven sections**: eight primary sections populated directly from per-file evidence, and three derivative sections synthesised from the completed primaries:
+The generated wiki covers **eight primary sections**: business domains, system intent, capabilities, external dependencies, integrations, cross-cutting concerns, core entities, and hard specifications. Three derivative sections (personas, user stories, architectural diagrams) are generated only after all relevant primary sections are finalized.
 
-| Section type | Sections |
-|---|---|
-| Primary (8) | Business domains, system intent, capabilities, external dependencies, integrations, cross-cutting concerns, core entities, hard specifications |
-| Derivative (3) | User personas, Gherkin-style user stories, Mermaid architectural diagrams |
+The system can scaffold a complete wiki directory structure in a target project in an idempotent manner — re-running initialization leaves existing content untouched while creating any missing pieces.
 
-Derivative sections are only generated after the primaries they depend on are finalised. If upstream primary sections are empty or missing, the system writes a placeholder that declares the gap rather than fabricating content.
+## Conflict Detection and Evidence Traceability
+
+When source files make incompatible assertions about the same domain topic, the conflict is surfaced explicitly under a dedicated heading rather than silently resolved. This is a deliberate design choice for legacy codebases, where tribal knowledge often hides in inconsistencies; teams are directed to resolve conflicts before re-implementation. Claims that appear in the supporting evidence but cannot be matched to the synthesized narrative body are collected into a separate supporting-claims list, ensuring nothing is silently dropped.
 
 ## Quality Assurance
 
-An optional critic-and-reviser pass evaluates any synthesised section against its brief and the upstream evidence it drew from, producing a structured quality score (0–10) with itemised unsupported claims, gaps, and suggested edits. When a section scores below a configurable threshold, a revision is automatically invoked; the revision is accepted only if it matches or improves the original score, preventing regressions. This loop is particularly valuable for derivative sections — personas and user stories — where single-shot synthesis is most prone to introducing unsupported assertions.
+An optional critic-and-reviser loop evaluates each synthesized section against a structured rubric (scored 0–10), identifies unsupported claims and coverage gaps, and triggers a revision pass when the score falls below a configurable threshold. A revised body is accepted only if it improves or matches the prior score, preventing regressions. The loop is off by default to keep generation time predictable, but is most beneficial for derivative sections where single-shot synthesis is most likely to stray from evidence. If synthesis fails entirely for a section, the system falls back to emitting the raw notes directly, preserving information at the cost of polish.
 
-## Incremental and Resumable Walks
+## Coverage and Readiness Reporting
 
-The pipeline uses a two-scope content-addressed cache: per-file extraction results are keyed to a combination of file path and content fingerprint, and per-section aggregation results are keyed to a digest of the contributing notes payload. Only changed files and affected sections are reprocessed on incremental runs. Because results are persisted after every completed file, an interrupted walk resumes from the last unprocessed file rather than restarting from scratch. The cache can also be fully invalidated to force a clean re-walk.
+A dedicated report command produces a markdown table listing each section with its file count, finding count, body size, quality score, and the most prominent gap or unsupported claim — giving teams a one-page readiness summary. The coverage portion requires no AI provider and is safe for automated pipelines.
 
-## Coverage and Quality Reporting
+## Incremental and Crash-Resumable Operation
 
-A report command produces a human-readable markdown table summarising every wiki section by contributing file count, finding count, body size, optional critic-derived quality score, and the highest-priority content gap identified by the critic. Coverage statistics also surface *dead zones* — files that were processed but produced no findings — so teams can identify blind spots in the analysis.
+Two independently keyed caches — one per file (keyed by content fingerprint) and one per section (keyed by a hash of its full notes payload) — allow re-walks to skip unchanged material entirely. The cache is written after each file completes, making the pipeline crash-resumable.[34] Stale entries for files removed from the repository can be pruned. A monotonically incremented version number embedded in every cache file causes a clean rebuild on version mismatch, preventing stale data from surviving format upgrades. Cache files are written atomically so a crash during persistence never corrupts the stored state. A force-reanalysis mode is also available to drop the cache entirely and perform a clean walk.
 
-## Interactive Knowledge Querying
+## Interactive Query Interface
 
-Once a wiki has been generated, users can open an interactive conversational session grounded in all populated sections. The session supports multi-turn exchanges, conversation history reset, and introspection of which sections are currently loaded as context. Only meaningfully populated sections are included, ensuring the assistant is not grounded in placeholder content.
+Once a wiki is generated, users can open a conversational session grounded in the populated wiki sections. Only sections with meaningful content are loaded as context. The session supports multi-turn questioning, conversation history reset while retaining the wiki context, and inspection of which sections are currently loaded.
 
-## Graceful Degradation
-
-When AI synthesis fails for a section, the system falls back to emitting the raw collected notes directly in the section body, preserving information at the cost of polish and surfacing the error inline. Similarly, unparseable schema files produce an advisory finding directing reviewers to inspect the file manually rather than silently failing.
+## Supporting claims
+- wikifi produces a technology-agnostic wiki from any codebase, linking every assertion back to specific source locations. [1][2][3]
+- Stage 1 examines the directory layout and manifest files to classify paths as worth walking or skippable (vendored dependencies, build output, generated files, CI configuration). [4][5][6]
+- Files with well-structured formats (relational schemas, API contracts, interface definitions, migration scripts) are routed to dedicated deterministic extractors that bypass AI inference entirely. [10][11][12][13][14][15]
+- Large files are split into overlapping chunks so no content is lost at boundaries, with separators tried from coarsest to finest. [16]
+- Findings are deduplicated across chunk boundaries to avoid double-counting, and each finding carries a citation (path and line range). [9]
+- The system optionally builds a cross-file import and reference graph, injecting each file's neighborhood into its extraction pass to enable cross-file flow descriptions. [17][18][19]
+- Per-file findings are aggregated into coherent, readable markdown bodies for each primary wiki section, with every assertion backed by numbered citations. [1][3]
+- Derivative sections — user personas, scenario-based user stories, and architectural diagrams — are synthesized from finalized primary sections; absent upstream content produces a placeholder rather than fabricated content. [20][21]
+- The wiki covers eight primary sections and three derivative sections; derivative sections are generated only after their upstream primaries are finalized. [21]
+- The system scaffolds a complete wiki directory structure idempotently, leaving existing content untouched while creating missing pieces. [22]
+- Incompatible assertions across source files are surfaced explicitly under a dedicated heading rather than silently resolved — a deliberate feature for legacy codebases where tribal knowledge hides in inconsistencies. [23][24]
+- Claims that appear in the supporting evidence but cannot be matched to the narrative body are collected into a separate supporting-claims list rather than silently dropped. [3]
+- An optional critic-and-reviser loop evaluates each synthesized section on a 0–10 rubric, identifies unsupported claims and gaps, and triggers revision when the score falls below a configurable threshold, accepting the revision only if it improves or matches the prior score. [25][26]
+- The critic-reviser loop is off by default to keep generation time predictable, and is most beneficial for derivative sections where single-shot synthesis is most likely to fabricate. [25][27]
+- If synthesis fails entirely, the system falls back to emitting raw notes directly in the section body, preserving information at the cost of polish. [28]
+- A report command produces a per-section markdown table with file counts, finding counts, body size, quality score, and the most prominent gap or unsupported claim. [29][30][31]
+- The coverage portion of the report requires no AI provider and is safe for automated pipelines. [29]
+- Two independently keyed caches — per-file (content fingerprint) and per-section (notes-payload hash) — allow re-walks to skip unchanged material entirely. [32][33][34]
+- Stale cache entries for removed files can be pruned in bulk. [35][18]
+- A monotonically incremented version number in every cache file triggers a clean rebuild on version mismatch, preventing stale data from surviving upgrades. [36]
+- Cache files are written atomically so a crash during persistence never leaves a corrupted cache. [37]
+- A force-reanalysis mode drops the on-disk cache entirely to perform a clean walk. [38]
+- Users can open a conversational session grounded in populated wiki sections, supporting multi-turn questioning, history reset, and inspection of loaded sections. [39][2]
+- Only sections with meaningful content are loaded as context for the conversational session; placeholder sections are filtered out. [40]
 
 ## Sources
-1. `VISION.md:6-8`
-2. `wikifi/sections.py:44-142`
-3. `README.md:14-24`
-4. `wikifi/orchestrator.py:62-76`
-5. `wikifi/wiki.py:64-86`
-6. `wikifi/introspection.py:28-44`
-7. `wikifi/introspection.py:61-70`
-8. `wikifi/walker.py:92-186`
-9. `wikifi/extractor.py:140-200`
-10. `wikifi/cache.py:5-8`
-11. `README.md:34-36`
-12. `TESTING-AND-DEMO.md:116-149`
-13. `wikifi/config.py:75-81`
-14. `wikifi/repograph.py:41-52`
-15. `wikifi/specialized/__init__.py:46-57`
-16. `wikifi/specialized/sql.py:56-62`
-17. `wikifi/extractor.py:251-270`
-18. `TESTING-AND-DEMO.md:40-66`
-19. `wikifi/aggregator.py:1-15`
-20. `TESTING-AND-DEMO.md:90-114`
-21. `wikifi/config.py:69-74`
-22. `wikifi/extractor.py:241-246`
-23. `wikifi/repograph.py:155-210`
-24. `wikifi/evidence.py:88-121`
-25. `wikifi/aggregator.py:9-14`
-26. `wikifi/evidence.py:13-17`
-27. `VISION.md:53-63`
-28. `wikifi/deriver.py:73-107`
-29. `TESTING-AND-DEMO.md:151-164`
-30. `wikifi/config.py:83-94`
-31. `wikifi/critic.py:100-153`
-32. `wikifi/deriver.py:90-103`
-33. `TESTING-AND-DEMO.md:67-88`
-34. `wikifi/cache.py:9-12`
-35. `wikifi/config.py:63-68`
-36. `wikifi/cache.py:14-18`
-37. `wikifi/cache.py:105-113`
-38. `README.md:16-20`
-39. `wikifi/cli.py:88-112`
-40. `README.md:21-23`
-41. `TESTING-AND-DEMO.md:166-186`
-42. `wikifi/critic.py:155-180`
-43. `wikifi/report.py:44-77`
-44. `wikifi/report.py:103-107`
-45. `README.md:24-25`
-46. `wikifi/chat.py:88-130`
-47. `wikifi/chat.py:63-82`
-48. `wikifi/cli.py:60-220`
-49. `wikifi/aggregator.py:272-285`
-50. `wikifi/specialized/openapi.py:23-50`
+1. `wikifi/aggregator.py:1-15`
+2. `wikifi/cli.py:63-210`
+3. `wikifi/evidence.py:85-120`
+4. `wikifi/introspection.py:28-44`
+5. `wikifi/introspection.py:61-70`
+6. `wikifi/walker.py:92-186`
+7. `.env.example:20-29`
+8. `wikifi/walker.py:100-130`
+9. `wikifi/extractor.py`
+10. `wikifi/config.py:97-102`
+11. `wikifi/extractor.py:183-218`
+12. `wikifi/repograph.py:1-15`
+13. `wikifi/specialized/__init__.py:8-11`
+14. `wikifi/specialized/dispatch.py:44-62`
+15. `wikifi/specialized/models.py:4-6`
+16. `wikifi/extractor.py:298-360`
+17. `wikifi/config.py:60-93`
+18. `wikifi/orchestrator.py:55-145`
+19. `wikifi/repograph.py:162-215`
+20. `wikifi/deriver.py:73-107`
+21. `wikifi/sections.py:44-142`
+22. `wikifi/wiki.py:72-101`
+23. `wikifi/aggregator.py:9-14`
+24. `wikifi/evidence.py:121-133`
+25. `wikifi/config.py:103-113`
+26. `wikifi/critic.py:100-153`
+27. `wikifi/deriver.py:90-103`
+28. `wikifi/aggregator.py:272-285`
+29. `wikifi/report.py:82-85`
+30. `wikifi/report.py:106-114`
+31. `wikifi/report.py:46-74`
+32. `wikifi/cache.py:5-15`
+33. `wikifi/config.py:88-96`
+34. `wikifi/extractor.py:166-182`
+35. `wikifi/cache.py:113-118`
+36. `wikifi/cache.py:37`
+37. `wikifi/cache.py:205-209`
+38. `wikifi/cli.py:90-122`
+39. `wikifi/chat.py:88-130`
+40. `wikifi/chat.py:63-82`

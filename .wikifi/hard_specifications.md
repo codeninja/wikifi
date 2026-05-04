@@ -1,69 +1,188 @@
 # Hard Specifications
 
-_Aggregation failed for **Hard Specifications** (anthropic provider: empty parsed_output and parse fallback failed: 1 validation error for SectionBody
-  Invalid JSON: EOF while parsing a value at line 1 column 0 [type=json_invalid, input_value='', input_type=str]
-    For further information visit https://errors.pydantic.dev/2.13/v/json_invalid). Raw notes preserved below._
+## Output Integrity
 
-> Brief: Critical requirements that must be carried forward verbatim: compliance rules, SLAs, contractual obligations, immutable formats.
+These rules govern what the system is permitted to emit and are enforced at multiple stages of the pipeline.
 
+- **Tech-agnostic language.** All synthesised wiki content — both primary sections and derivative sections such as personas, user stories, and diagrams — must be free of specific language, framework, or library names. Every such observation must be translated into domain terms. This constraint applies equally to the aggregator, the reviser, and the deriver.
+- **No silent contradiction resolution.** Whenever two source notes make incompatible claims about the same topic, the output must include a `contradictions[]` entry naming each position and the note indices that support it. Suppressing or merging conflicting claims is forbidden.
+- **No invented facts.** When evidence is absent, the system must declare the gap explicitly rather than speculating.[2][6] This applies to both primary aggregation and derivative synthesis.
+- **Derivative sections grounded in upstream content only.** Derivative sections must draw exclusively on the aggregated bodies of the primary sections that precede them in the canonical section ordering; they may not introduce claims not present in those upstream bodies.
 
-## Raw findings
+## Evidence and Citation Format
 
-- **.env.example** — Only the 'ollama' provider is supported in v1. The default request timeout is 900 seconds (15 minutes). Fully disabling thinking mode ('false') is documented as unsafe with Qwen3 models because those models ignore the JSON-schema output constraint and emit free text instead.
-- **CLAUDE.md** — The system must run against a local LLM out of the box with no cloud dependency required; hosted backends (Anthropic, OpenAI, custom) are valid additional options but never the default.
-- **CLAUDE.md** — Provider abstraction is mandatory: swapping the LLM backend must not require changes outside the provider boundary.
-- **CLAUDE.md** — When the chosen model exposes a reasoning or thinking level, the system must run at the highest available setting; lower reasoning levels are opt-in only.
-- **CLAUDE.md** — Test coverage target is ≥ 85%; every feature must ship with tests.
-- **CLAUDE.md** — wikifi is strictly a feature-extraction tool: it describes what the legacy system does and must never transform source into any target architecture, language, or framework shape.
-- **CLAUDE.md** — Derivative wiki sections (personas, user stories, diagrams) must be produced only after primary content sections are complete and must never be inferred from a single file.
-- **README.md** — The critic-reviser loop must only accept a revised section if its quality score is at least as high as the score of the original; downgrades are rejected.
-- **README.md** — Empty or near-empty input files must never stall the walk; the walker is required to filter them out before any LLM call is made.
-- **README.md** — Every per-file finding must carry a structured SourceRef (file, line range, content fingerprint) to support citation in the rendered wiki.
-- **TESTING-AND-DEMO.md** — The test suite must include exactly 156 passing tests with total line coverage at or above 93%. Every new module must individually reach at least 86% coverage, and each premium-pipeline module (fingerprint, cache, evidence, critic, report, repograph, specialized parsers, and the Anthropic provider) must carry a dedicated test file.
-- **TESTING-AND-DEMO.md** — The Anthropic provider must place cache_control of type 'ephemeral' on the system-prompt block, use the messages.parse structured-output contract, translate the 'think' intensity setting to an effort level, and map API errors to a RuntimeError. These behaviors are locked in by the provider's dedicated test file.
-- **TESTING-AND-DEMO.md** — The OpenAI provider must use the chat.completions.parse structured-output contract, route reasoning_effort only to o-series and gpt-5 models (not standard models), swap max_tokens for max_completion_tokens on reasoning models, and map API errors to RuntimeError. OpenAI's automatic prefix caching applies to prefixes of at least 1024 tokens and lasts approximately 5–10 minutes.
-- **TESTING-AND-DEMO.md** — The critic-reviser loop must only accept a revised derivative section if the revision scores at least as well as the original; a revision that scores lower must be discarded.
-- **VISION.md** — The generated wiki must at minimum contain: DDD domains and subdomains, system intent, domain-level capabilities, external-system dependencies, internal and external integrations, cross-cutting concerns, core entities and their structures, and hard specifications — regardless of the on-disk layout chosen by the implementor.
-- **VISION.md** — Derivative wiki sections (user personas, user stories, aggregate diagrams) must be produced in a step that runs *after* primary capture and must never be inferred from a single source file.
-- **VISION.md** — Wiki content is stored in the target project's `.wikifi/` directory; the contract is the content the wiki conveys, not its on-disk shape or file structure within that directory.
-- **VISION.md** — Success is defined as: a migration team working from the wiki alone — without reference to the original codebase — can deliver a microservice re-implementation that preserves the original system's personas, problem space, integrations, cross-cutting concerns, entities, data patterns, and user value.
-- **wikifi/aggregator.py** — Contradictions between source notes must never be silently resolved: any incompatible claims must produce a `contradictions[]` entry naming each position and the note indices that support it. This is stated as a hard rule in the LLM system prompt and enforced structurally via the `AggregatedContradiction` schema.
-- **wikifi/aggregator.py** — Wiki section bodies must be tech-agnostic: no mention of specific languages, frameworks, or libraries is permitted in synthesised output; every observation must be translated into domain terms.
-- **wikifi/aggregator.py** — Note indices presented to the LLM are 1-based, and the resolution logic subtracts 1 before indexing into the notes list — an off-by-one invariant that must be preserved if the prompting scheme changes.
-- **wikifi/cache.py** — The aggregation cache key is computed only over content-bearing fields (file reference, summary, finding text) and explicitly excludes timestamps and per-walk debug fields, ensuring that regenerating identical notes on a fresh walk always produces a cache hit.
-- **wikifi/cache.py** — Cache files must reside at `.wikifi/.cache/extraction.json` and `.wikifi/.cache/aggregation.json` relative to the wiki directory root.
-- **wikifi/cli.py** — The tool's entry point must be declared as `wikifi` in the project's script configuration and must delegate directly to the Typer application; this contract ties the installed command name to the main() function in this module.
-- **wikifi/config.py** — Files exceeding 2,000,000 bytes are unconditionally dropped and never read; this threshold is explicitly documented as targeting vendored or generated noise rather than real source files.
-- **wikifi/config.py** — Each language model call is limited to a 150,000-byte content window, sized to fit within a 32K-context model after prompt overhead; larger files must be split into overlapping chunks rather than truncated.
-- **wikifi/config.py** — Adjacent file chunks share an 8,000-byte overlap region to preserve cross-boundary context; this overlap guarantee must be maintained when the chunking logic is modified.
-- **wikifi/critic.py** — The scoring rubric is fixed: 9–10 indicates fully grounded, tech-agnostic, narratively coherent content with no unsupported claims; 6–8 allows minor issues; 3–5 signals substantial gaps or partial coverage; 0–2 marks incoherent or off-brief content. The default minimum acceptable score for shipping a section without revision is 7.
-- **wikifi/critic.py** — A revised body is only accepted if its follow-up critique score is greater than or equal to the initial score; any revision that causes a score regression is discarded and the original body is retained. This invariant must be preserved in any reimplementation.
-- **wikifi/critic.py** — All section bodies must be tech-agnostic: the reviser is explicitly instructed not to invent claims unsupported by upstream evidence and to declare gaps explicitly when evidence is missing rather than speculating.
-- **wikifi/deriver.py** — Derivative sections must be grounded solely in upstream section content. The model is instructed to declare gaps explicitly rather than filling them with invented facts — this is a hard constraint on output integrity.
-- **wikifi/deriver.py** — All wiki content, including derivative sections, must remain technology-agnostic: language names, framework names, and library names are forbidden and must be translated into domain terms.
-- **wikifi/deriver.py** — Gherkin-style outputs must use proper Given/When/Then syntax inside fenced ```gherkin code blocks. Mermaid diagrams must be valid and inside fenced ```mermaid code blocks, preferring graph, classDiagram, erDiagram, and sequenceDiagram diagram types.
-- **wikifi/evidence.py** — Source references must be rendered in the format 'path/to/file:start-end' (or 'path/to/file:line' for a single line, or just 'path/to/file' when lines are unknown). The 'Sources' footer uses 1-based sequential numeric indices in the form '1. `path`'.
-- **wikifi/evidence.py** — Contradictions must never be silently merged into a unified narrative; they must be explicitly surfaced in a dedicated 'Conflicts in source' sub-section, with a warning that migration teams must resolve them before re-implementation.
-- **wikifi/extractor.py** — Per-file extraction is restricted to primary wiki sections only. Derivative sections (personas, user stories, diagrams) are explicitly excluded from per-file extraction and are instead produced in a later aggregation stage; requesting them at the per-file level is documented as producing sparse, speculative findings.
-- **wikifi/extractor.py** — The recursive text splitter must guarantee termination on any input, including minified single-line files with no whitespace, by falling back through separator priority (blank lines → single newlines → spaces → character boundaries). The character-boundary split is the terminal step that ensures every byte is eventually consumed.
-- **wikifi/extractor.py** — Chunk overlap must satisfy `0 <= overlap < chunk_size`; violating this constraint raises an error. The effective base chunk size is `chunk_size - overlap` so that prepending an overlap tail never causes a chunk to exceed `chunk_size` bytes.
-- **wikifi/fingerprint.py** — Fingerprints are defined as the first 12 hexadecimal characters of a SHA-256 digest (48 bits of entropy). This length is explicitly chosen to be sufficient to distinguish every file in any realistic repository (estimated 50% collision threshold at ~10 trillion files) while remaining short enough to embed inline in human-readable citations. This format must be preserved across any migration because it is recorded in cached artefacts and emitted into wiki evidence references.
-- **wikifi/introspection.py** — Stage 1 must operate without reading any source files; it sees only directory-level summaries and manifest contents. This constraint is architectural and must be preserved: source reading is exclusively Stage 2's responsibility.
-- **wikifi/introspection.py** — Include and exclude patterns produced by Stage 1 must be in gitignore-style format relative to the repository root.
-- **wikifi/orchestrator.py** — When a user selects the Anthropic provider but the configured model name does not begin with 'claude-', the system silently substitutes the model identifier 'claude-opus-4-7' rather than forwarding an invalid name. Similarly, for OpenAI, non-OpenAI-pattern model names are replaced with 'gpt-4o'. This model-name substitution logic must be preserved so that users migrating from the default local provider do not receive opaque remote API errors.
-- **wikifi/orchestrator.py** — The only accepted provider identifiers are 'ollama', 'anthropic', and 'openai'; any other value raises an error. This contract is enforced at provider construction time and must be maintained by any future provider registration mechanism.
-- **wikifi/repograph.py** — The implementation must remain dependency-free beyond regex and path resolution — tree-sitter or similar binary dependencies are explicitly prohibited so that the tool can be installed without native compilation.
-- **wikifi/report.py** — Quality scoring is only performed when explicitly requested (`score=True`) and a provider is supplied; without both conditions the report remains purely structural. This ensures the tool can run in provider-free environments such as CI pipelines without failure.
-- **wikifi/sections.py** — Derivative sections must always reference only known section IDs, and every upstream a derivative depends on must appear earlier in the canonical SECTIONS ordering. This ordering invariant is validated at module load time and any violation raises an error, making it a hard structural requirement for the section taxonomy.
-- **wikifi/walker.py** — The maximum file size threshold is 2,000,000 bytes (2 MB); files at or above this limit are unconditionally skipped and never sent for analysis. The minimum content threshold is 64 bytes of stripped text. Manifest files are truncated to 20,000 bytes maximum before being included in any prompt.
-- **wikifi/wiki.py** — The directory layout is explicitly declared as a stable contract between the tool and any target project: upgrading the tool must not break existing wikis. This constraint is called out in the module docstring and governs all future changes to path conventions.
-- **wikifi/wiki.py** — The `.wikifi/` directory layout follows a fixed, documented schema: `config.toml` for provider/model overrides, `.gitignore` for excluding notes, one `<section>.md` per defined section, and a `.notes/<section>.jsonl` per section for extraction state. This schema must remain stable across upgrades.
-- **wikifi/specialized/protobuf.py** — The module explicitly designates proto file findings as direct inputs to interface design during migration, implying that message names, enum value sets, service names, RPC signatures, and streaming contracts must be preserved verbatim when porting to a new stack.
-- **wikifi/specialized/sql.py** — Indexes are explicitly annotated as performance invariants that 'the new system must preserve,' establishing a carry-forward requirement for any target platform.
-- **wikifi/specialized/sql.py** — UNIQUE and NOT NULL constraints are treated as storage-level invariants that must survive migration, not merely advisory metadata.
-- **wikifi/providers/anthropic_provider.py** — Sampling parameters (temperature, top_p, top_k) must not be sent to the claude-opus-4-7 model variant — doing so causes a 400 error. The provider explicitly omits these parameters for this model generation, making their absence a hard constraint carried forward with the provider implementation.
-- **wikifi/providers/anthropic_provider.py** — The maximum output token budget per call is set at 16,000 tokens. This is documented as comfortable headroom for any section schema response while staying within the SDK's non-streaming HTTP timeout guard, making it an operationally important default that should not be reduced without re-validating pipeline completions.
-- **wikifi/providers/ollama_provider.py** — Qwen3-family models must not be invoked with think=False on the structured-output path: doing so causes the model to bypass the schema constraint and emit free text, which fails downstream validation. The thinking level must be 'low' or higher to preserve schema compliance. For the derivative-section synthesis pass, 'high' thinking is the preferred setting for output quality, but callers must budget 1–3 minutes per file and configure the timeout to at least 900 seconds to absorb that latency.
-- **wikifi/providers/openai_provider.py** — Reasoning-capable model families (identified by name prefix) must receive output-token limits via a distinct parameter name from standard chat models; sending the wrong parameter to either family causes a request failure. The provider routes the correct parameter unconditionally based on model identity.
-- **wikifi/providers/openai_provider.py** — The `think` (reasoning-effort) knob must only be forwarded to reasoning-capable models; forwarding it to a plain chat model risks a validation error from the hosted service. The mapping from wikifi's internal knob values (`low`, `medium`, `high`) to the API's accepted values is fixed and must be preserved.
-- **wikifi/providers/openai_provider.py** — When the hosted service returns a response that cannot be parsed into the expected structured schema (e.g. due to refusal or truncation), the system falls back to direct JSON validation of the raw text rather than returning a null result, preserving the protocol contract that callers always receive a validated object or an explicit error.
+The citation scheme is a contractual output format.
+
+- Claims must be rendered with compact footnote-style markers (`[1]`, `[2]`, …) and a **Sources** footer at the bottom of each section.
+- Line ranges are formatted as `path/to/file:start-end`; a single-line reference as `path/to/file:line`; an unknown range as `path/to/file` alone.
+- Detected contradictions must appear verbatim under a **Conflicts in source** heading with an explicit instruction that migration teams must resolve them before re-implementation. They must not be suppressed.
+- Note indices presented to the synthesis stage are 1-based; the internal resolution step subtracts 1 before indexing into the underlying list. This off-by-one invariant must be preserved if the prompting scheme is ever changed.
+
+## File Processing Thresholds
+
+| Parameter | Value | Rule |
+|---|---|---|
+| Maximum file size | 2,000,000 bytes | Files at or above this limit are unconditionally skipped and never read |
+| Minimum content size | 64 bytes (stripped) | Files below this threshold are skipped entirely |
+| Chunk window | 150,000 bytes | Fixed sliding-window size for splitting large files |
+| Chunk overlap | 8,000 bytes | Overlap between adjacent chunks to preserve cross-boundary context |
+| Manifest truncation | 20,000 bytes | Manifest files are truncated to this length before inclusion in any prompt |
+
+Additionally, chunk overlap must satisfy `0 ≤ overlap < chunk_size`, and chunk size must be positive. These inequalities are hard invariants; violating them causes the recursive splitter to fail on edge-case inputs such as whitespace-free monolithic files.
+
+## Caching Constraints
+
+- **Aggregation cache key completeness.** The hash used to key an aggregation result must span the file reference, summary, finding text, and the full structured sources list (file path, line range, and fingerprint per source). Omitting any field allows stale citation metadata to be replayed without re-aggregation.
+- **Atomic write pattern.** Cache persistence must write to a sibling `.tmp` file and then rename it atomically. A crash during saving must never produce a corrupt cache file.
+- **Fingerprint format.** Content fingerprints are defined as the first 12 hexadecimal characters of a SHA-256 digest. This format must be preserved across any migration because it is recorded in cached artefacts and emitted into wiki evidence references.
+
+## Quality Assurance Rules
+
+The scoring rubric is fixed and non-negotiable:
+
+| Score range | Meaning |
+|---|---|
+| 9–10 | Fully grounded, tech-agnostic, narratively coherent; no unsupported claims |
+| 6–8 | Minor issues only |
+| 3–5 | Substantial gaps or partial coverage |
+| 0–2 | Incoherent or off-brief |
+
+- The **minimum acceptable score** for publishing a section without revision is **7**.
+- A revised body is accepted only if its follow-up critique score is **greater than or equal to** the initial score. Any revision that produces a score regression is discarded and the original body is retained. This invariant must be preserved in any reimplementation.
+
+## Provider and API Constraints
+
+### Shared
+- The default per-call request timeout is **900 seconds**, chosen to absorb the observed latency of high-effort reasoning on large local models. Reducing this value risks aborting in-progress reasoning traces.
+- Three abstract interaction modes — structured completion, text completion, and chat — constitute the **complete and exclusive** contract between the pipeline and any backend. No other methods are ever invoked; any conforming implementation must satisfy all three signatures exactly.
+
+### Hosted-Claude Backend
+- Default maximum output is **32,000 tokens** per call. Callers using the highest reasoning effort levels are expected to raise this limit and enable streaming; too low a value causes the model to exhaust the budget on reasoning before producing structured output.
+- Sampling parameters (temperature, top-p, top-k) **must not** be sent to the `claude-opus-4-7` model variant; doing so causes a validation error. The provider omits them unconditionally.
+- Structured output is obtained via schema-constrained decoding; if the primary parsed result is absent, the implementation falls back to parsing the raw text block as JSON before raising an error.
+
+### Local-Model Backend
+- Disabling the reasoning trace on Qwen3-family models causes them to ignore the JSON schema constraint and emit free text, breaking validation. Reasoning must never be disabled for Qwen3-style models on the structured-output path. The configuration documentation explicitly marks fully-disabled thinking as unsafe for this reason.
+- Default per-call timeout is 900 seconds (same rationale as above).
+
+### OpenAI-Compatible Backend
+- Default output cap is **16,000 tokens** per call; default per-call timeout is 900 seconds.
+- Reasoning-capable model families (identified by the prefixes `o<digit>` or `gpt-5`) must receive `max_completion_tokens` instead of `max_tokens`, and may receive a `reasoning_effort` value of `low`, `medium`, or `high`. Non-reasoning models must **not** receive `reasoning_effort` to avoid API validation errors.
+- When the structured-output parse path returns no parsed object (due to a refusal or truncation), the implementation must fall back to validating raw JSON text against the schema, not return a null silently.
+
+### Model Identifier Routing
+- **Ollama heuristic:** a model identifier is classified as an Ollama-style identifier if it contains `:` and does not begin with the prefix `ft:` (case-insensitive). This rule must be carried forward exactly to avoid misclassifying fine-tuned models or Azure deployment IDs.
+- When the hosted-Claude backend is selected but no Claude-prefixed model identifier is configured, the system falls back to a specific default model rather than forwarding the potentially invalid identifier.
+- Azure/proxy deployments with non-standard deployment IDs are preserved unchanged.
+
+## Pipeline Stage Boundaries
+
+- **Stage 1** must operate without reading any source files; it sees only directory-level summaries and manifest contents. Source reading is exclusively Stage 2's responsibility.
+- **Stage 1** must produce include and exclude path patterns in gitignore-style format relative to the repository root.
+- **Stage 2 (extraction)** targets only primary wiki sections. Derivative sections are explicitly excluded and are produced in Stage 4 from the aggregate of primary findings. This boundary must be preserved through any migration.
+- **Derivative section ordering.** Every derivative section must reference only known section IDs, and every upstream dependency must appear earlier in the canonical section ordering. This ordering invariant is validated at module load time; any violation raises an error.
+
+## Interface and Directory Contracts
+
+- The CLI entry point and its four subcommands (`init`, `walk`, `chat`, `report`) are declared as a named script in the package manifest; the command name and subcommand surface are **contractual interfaces** for users and tooling.
+- The on-disk directory layout (`.wikifi/`, `config.toml`, `.gitignore`, one markdown file per section, `.notes/`, `.cache/`) is the **explicit versioned contract** with target projects and must not change in ways that break existing wikis.
+- The `.notes/` and `.cache/` directories must always be excluded from version control; only section markdown files are committed. Any new required gitignore entries introduced in future versions must be backfilled into older wikis automatically on the next `init` run.
+- Three exact sentinel strings mark unpopulated sections and must not be altered: `Not yet populated`, `No findings were extracted`, and `upstream sections required to derive`. The report module depends on these exact strings for gap analysis and scoring exclusion.
+
+## Specialized Extractor Rules
+
+- Only migration files with `.sql` or `.ddl` suffixes are routed to the SQL migration extractor; all other migration files must fall through to the general extraction path. Routing is determined by file suffix inspection, not by file-kind classification alone.
+- When an API contract file is present but cannot be parsed, the system must emit an explicit warning finding directing migration teams to review the file manually. Unparseable specs are flagged, not silently skipped.
+- Service-to-RPC attribution in protocol definition files must be computed by tracking brace depth (counting nested blocks), not by line proximity, to ensure correct attribution in multi-service files.
+- Index definitions in schema files encode query-time performance invariants that must be preserved through migration; the extractor emits this requirement explicitly in every index finding.
+- The import/reference graph must be constructed without any binary or compiled dependencies; only pattern matching and path resolution are permitted. This is a stated architectural constraint.
+- Migration files are detected by matching a hardcoded list of well-known migration directory path tokens. A SQL file located in such a directory is classified as a migration rather than generic schema, preserving the distinction between forward-only schema changes and current schema state.
+
+## Supporting claims
+- All synthesised wiki content must be free of specific language, framework, or library names and must be translated into domain terms. [1][2][3]
+- Whenever two source notes make incompatible claims, the output must include a contradictions entry naming each position and the note indices that support it; suppressing or merging conflicting claims is forbidden. [4][5]
+- Derivative sections must draw exclusively on the aggregated bodies of the primary sections that precede them. [6][7]
+- Claims must be rendered with compact footnote-style markers and a Sources footer; detected contradictions must appear under a Conflicts in source heading. [8][5]
+- Note indices are 1-based and the internal resolution step subtracts 1 before indexing; this off-by-one invariant must be preserved. [9]
+- Files at or above 2,000,000 bytes are unconditionally skipped and never read. [10][11]
+- Files below 64 bytes of stripped content are skipped entirely. [12][11]
+- Chunk window is 150,000 bytes with 8,000 bytes of overlap; chunk overlap must satisfy 0 ≤ overlap < chunk_size and chunk size must be positive. [12][13]
+- Manifest files are truncated to 20,000 bytes maximum before inclusion in any prompt. [11]
+- The aggregation cache key must span the file reference, summary, finding text, and the full structured sources list; omitting any field allows stale metadata to be replayed. [14]
+- Cache persistence must use an atomic write pattern (write to a sibling .tmp file, then rename) to guarantee a crash never produces a corrupt cache file. [15]
+- Content fingerprints are defined as the first 12 hexadecimal characters of a SHA-256 digest and this format must be preserved across any migration. [16]
+- The minimum acceptable quality score for publishing a section without revision is 7; the fixed rubric maps 9–10 to fully grounded, 6–8 to minor issues, 3–5 to substantial gaps, and 0–2 to incoherent. [17]
+- A revised body is accepted only if its follow-up critique score is greater than or equal to the initial score; any regression causes the original body to be retained. [18]
+- The default per-call request timeout is 900 seconds. [19][20][21]
+- Three abstract interaction modes — structured completion, text completion, and chat — constitute the complete and exclusive provider contract. [22]
+- The hosted-Claude backend defaults to a 32,000 token output cap; sampling parameters must not be sent to the claude-opus-4-7 model variant. [23][24][25]
+- Disabling the reasoning trace on Qwen3-family models causes them to ignore the JSON schema constraint and emit free text; reasoning must never be disabled for these models on the structured-output path. [19][26]
+- Reasoning-capable model families must receive max_completion_tokens instead of max_tokens and may receive a reasoning_effort value; non-reasoning models must not receive reasoning_effort. [27]
+- When the structured-output parse path returns no parsed object, the implementation must fall back to validating raw JSON text against the schema rather than returning null. [28][29]
+- An Ollama-style model identifier is defined as a string containing ':' that does not begin with the prefix 'ft:' (case-insensitive); this rule must be carried forward exactly. [30]
+- Stage 1 must operate without reading any source files and must produce include/exclude patterns in gitignore-style format relative to the repository root. [31][32]
+- Stage 2 extraction targets only primary sections; derivative sections are excluded and produced in Stage 4. [33]
+- Every derivative section must reference only known section IDs, and every upstream dependency must appear earlier in the canonical section ordering; violations raise an error at module load time. [7]
+- The CLI entry point and its four subcommands (init, walk, chat, report) are contractual interfaces for users and tooling. [34]
+- The on-disk directory layout is the explicit versioned contract with target projects and must not change in ways that break existing wikis. [35]
+- .notes/ and .cache/ directories must always be excluded from version control; new required gitignore entries must be backfilled automatically on the next init run. [36]
+- Three exact sentinel strings — 'Not yet populated', 'No findings were extracted', and 'upstream sections required to derive' — must be preserved as canonical markers for unpopulated sections. [37]
+- Only migration files with .sql or .ddl suffixes are routed to the SQL migration extractor; all others fall through to the general extraction path. [38]
+- When an API contract file cannot be parsed, the system must emit an explicit warning finding rather than silently dropping it. [39]
+- Service-to-RPC attribution must be computed by tracking brace depth, not line proximity. [40]
+- Index definitions encode query-time performance invariants that must be preserved through migration; the extractor emits this requirement explicitly in every index finding. [41]
+- The import/reference graph must be constructed without any binary or compiled dependencies. [42]
+- Gherkin outputs must use Given/When/Then syntax inside fenced gherkin code blocks; Mermaid diagrams must be valid and inside fenced mermaid code blocks. [43]
+
+## Conflicts in source
+_The walker found disagreements across files. Migration teams should resolve these before re-implementation._
+
+- **The example environment configuration states that only the local-model provider is supported in v1, but multiple other sources document the hosted-Claude and OpenAI providers as fully implemented first-class backends with detailed API constraints.**
+  - Only the local-model (Ollama) provider is supported in v1. (`.env.example:7-44`)
+  - The hosted-Claude and OpenAI backends are fully implemented with detailed token caps, sampling-parameter rules, model-routing logic, and fallback behaviour. (`wikifi/config.py:122-134`, `wikifi/orchestrator.py:160-200`, `wikifi/providers/anthropic_provider.py:14-17`, `wikifi/providers/anthropic_provider.py:70-79`, `wikifi/providers/openai_provider.py:215-235`, `wikifi/providers/openai_provider.py:59-66`, `wikifi/providers/openai_provider.py:136-144`)
+
+## Sources
+1. `wikifi/aggregator.py:57-59`
+2. `wikifi/critic.py:53-61`
+3. `wikifi/deriver.py:37-39`
+4. `wikifi/aggregator.py:61-63`
+5. `wikifi/evidence.py:121-131`
+6. `wikifi/deriver.py:34-50`
+7. `wikifi/sections.py:148-158`
+8. `wikifi/evidence.py:43-52`
+9. `wikifi/aggregator.py:167-173`
+10. `wikifi/config.py:59-65`
+11. `wikifi/walker.py:61-79`
+12. `wikifi/config.py:66-81`
+13. `wikifi/extractor.py:302-308`
+14. `wikifi/cache.py:243-255`
+15. `wikifi/cache.py:205-209`
+16. `wikifi/fingerprint.py:23-27`
+17. `wikifi/critic.py:31-48`
+18. `wikifi/critic.py:137-147`
+19. `.env.example:7-44`
+20. `wikifi/providers/ollama_provider.py:50-54`
+21. `wikifi/providers/openai_provider.py:59-66`
+22. `wikifi/providers/base.py:42-52`
+23. `wikifi/config.py:122-134`
+24. `wikifi/providers/anthropic_provider.py:14-17`
+25. `wikifi/providers/anthropic_provider.py:70-79`
+26. `wikifi/providers/ollama_provider.py:9-27`
+27. `wikifi/providers/openai_provider.py:215-235`
+28. `wikifi/providers/anthropic_provider.py:107-145`
+29. `wikifi/providers/openai_provider.py:136-144`
+30. `wikifi/orchestrator.py:205-215`
+31. `wikifi/introspection.py:5-9`
+32. `wikifi/introspection.py:50-58`
+33. `wikifi/extractor.py:51-56`
+34. `wikifi/cli.py:1-7`
+35. `wikifi/wiki.py:1-8`
+36. `wikifi/wiki.py:36-47`
+37. `wikifi/report.py:103-108`
+38. `wikifi/specialized/dispatch.py:28-62`
+39. `wikifi/specialized/openapi.py:24-37`
+40. `wikifi/specialized/protobuf.py:62-67`
+41. `wikifi/specialized/sql.py:115-121`
+42. `wikifi/repograph.py:22-30`
+43. `wikifi/deriver.py:40-45`
+44. `wikifi/orchestrator.py:160-200`
