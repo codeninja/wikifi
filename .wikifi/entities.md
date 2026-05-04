@@ -1,217 +1,225 @@
 # Core Entities
 
-The system's information model spans six concern areas: wiki structure, evidence tracing, extraction and aggregation, repository analysis, caching, and pipeline orchestration. The entities below are described domain-first; implementation details such as storage format are noted only where they affect the entity's invariants.
+## Evidence Primitives
 
----
+The traceability model is anchored by three small, composable entities.
 
-## Wiki Structure
+**SourceRef** is the atomic pointer into the codebase: a repo-relative file path, an optional inclusive line range, and a short content fingerprint captured at extraction time. It renders as `path:start–end`, `path:line`, or bare `path` depending on available information.
 
-A **Section** is the fundamental organisational unit of the generated wiki. It carries:
+**Claim** is one assertion placed into a wiki section. It pairs the markdown text of the assertion with a list of `SourceRef` objects that justify it. A claim that carries no source references is explicitly considered unsupported.
 
-| Field | Description |
-|---|---|
-| Unique identifier | Stable key used throughout the pipeline |
-| Title | Human-readable heading |
-| Brief | Prose description of what belongs in the section |
-| Tier | Either *primary* (populated from per-file evidence) or *derivative* (synthesised from primary sections) |
-| Upstream list | Ordered tuple of section identifiers this section depends on (derivative sections only) |
+**Contradiction** captures two or more conflicting `Claim` objects about the same topic. It carries a one-sentence summary of the disagreement and, for each disagreeing position, the full `Claim` with its own source references.
 
-Derivative sections declare explicit upstream dependencies, forming a directed acyclic graph. The system enforces topological ordering at startup: every section's upstreams must appear earlier in the canonical section list.
+At the aggregation stage, the LLM expresses the same concepts through index-based counterparts. An **AggregatedClaim** carries claim text plus a list of 1-based indices into the ordered input notes list. When an `AggregatedClaim` is resolved against the notes list, it converges with the `Claim` / `SourceRef` model.
 
-A **WikiLayout** anchors all on-disk path resolution to a single project root, exposing named locations for the wiki directory, configuration file, gitignore, notes directory, cache directory, and per-section markdown and notes files. Its existence is a precondition for the conversational query and report commands.
-
-A **LoadedSection** pairs a Section descriptor with its rendered markdown body, representing one populated section ready for downstream use (such as building a conversational context).
-
-A **SectionReport** captures the per-section view for reporting: a reference to the Section definition, the count of contributing files, the count of findings, the character length of the written body, an emptiness flag, and an optional quality critique. A **WikiReport** aggregates all SectionReports together with overall coverage statistics and an optional mean quality score across populated sections.
-
----
-
-## Evidence and Citation Model
-
-Every factual sentence in the generated wiki is traceable back through a three-layer evidence hierarchy.
-
-**SourceRef** — the lowest-level pointer. Carries a repo-relative file path, an optional inclusive line range, and a short content fingerprint captured at extraction time. Renders as `path:start–end` or just `path` when no line range is available.
-
-**Claim** — a single markdown assertion placed in a section's narrative. Backed by zero or more SourceRefs. A claim with no sources is explicitly considered *unsupported*.
-
-**Contradiction** — groups two or more conflicting Claims under a one-sentence summary of the conflict; each conflicting position retains its own SourceRefs.
-
-**EvidenceBundle** — the aggregator's structured handoff to the renderer for one section: the markdown narrative body, the ordered list of Claims, and the list of Contradictions.
-
-During the language-model aggregation pass, an intermediate form is used: an **AggregatedClaim** pairs a prose assertion with 1-based indices into the input notes (rather than resolved file paths), and an **AggregatedContradiction** wraps a one-sentence summary around multiple such indexed positions. These are resolved into full SourceRefs and Claims before the EvidenceBundle is assembled.
+An **EvidenceBundle** (defined in the evidence model) and a **SectionBody** (defined as the LLM's structured response schema) both represent the aggregator's complete output for one wiki section: a markdown narrative body, a list of claims, and a list of contradictions. `SectionBody` is the schema the LLM fills in during generation (claims are index-based); `EvidenceBundle` is the broader domain concept once indices have been resolved to `SourceRef` objects.
 
 ---
 
 ## Extraction Layer
 
-**IntrospectionResult** captures the Stage 1 decision: include patterns, exclude patterns, a one-paragraph hypothesis about the system's purpose, an informational list of primary technologies detected, and the rationale for the filtering choices.
-
-**SectionFinding** is the atomic extraction unit from one source file for one section. Fields:
-- Target section identifier
-- Technology-agnostic markdown description (one to five sentences)
-- Optional inclusive line range within the source chunk
-
-**FileFindings** groups all SectionFindings produced for a single file, together with a one-sentence summary of that file's role. It is the unit exchanged between an extraction call and the notes store.
-
-Specialised extractors — handling schema definition languages, API contracts, and data-definition files — produce **SpecializedFindings** rather than relying on general LLM inference. Each carries a section identifier, finding text, and one or more source references. Multiple SpecializedFindings are collected into a **SpecializedResult**, which additionally carries an optional summary string.
-
-For data-definition schema files, an intermediate **table record** is derived first (table name, source line, raw body, column list, and foreign-key edges expressed as local-column → referenced-table.referenced-column tuples). All downstream entity and relationship findings are derived from this intermediate form.
-
-Domain object types from API schema files (those that are not root operation types) are surfaced directly as domain entity findings, grouped by their namespace, with closed value sets (enumerations) and shared shape contracts (interfaces, input types) captured as separate finding categories.
-
-**ExtractionStats** accumulates per-run metrics: files seen, files with findings, total findings, skipped files, chunks processed, cache hits, files routed to specialised extractors, and a breakdown by file kind.
-
----
-
-## Repository Analysis Entities
-
-**FileKind** is a fixed enumeration of seven structural categories: application code, SQL, OpenAPI contract, protocol definition, GraphQL schema, migration script, and other. The classification drives routing to the appropriate extractor.
-
-**GraphNode** represents one file's position in the cross-file import graph: its repo-relative path, the ordered set of files it imports, and the ordered set of files that import it. It exposes a combined neighbour list capped at a configurable limit for use in prompt enrichment.
-
-**RepoGraph** is the complete repository-level import graph, keyed by repo-relative file path, providing lookup of individual GraphNodes and neighbour path lists.
-
-**DirSummary** is a value object for a single non-recursive directory: its repo-relative path, file count, total byte size, a frequency map of the top-10 file extensions, and a tuple of notable filenames (manifests, readmes).
-
----
-
-## Caching Entities
-
-| Entity | Cache key | Stored payload |
+| Entity | Key fields | Invariants / notes |
 |---|---|---|
-| **CachedFindings** | Content fingerprint of the source file | Findings list, one-sentence file summary, chunk count |
-| **CachedSection** | Hash of the notes payload | Rendered markdown body, claims list, contradictions list |
+| **SectionFinding** | Target section ID, tech-agnostic markdown description (1–5 sentences), optional line range | One contribution from one file to one section |
+| **FileFindings** | List of `SectionFinding` records, one-sentence file-role summary | Unit of output from one extractor call |
+| **SpecializedFinding** | Target section ID, descriptive finding string, list of `SourceRef` objects | Produced by deterministic schema-aware extractors |
+| **SpecializedResult** | List of `SpecializedFinding` records, optional summary | Mirrors the output shape of the LLM extractor |
+| **ExtractionStats** | Files seen, files with findings, total findings, skipped files, chunks processed, cache hits, specialized-extractor files, file-kind breakdown | Run-level accumulators only; no identity |
 
-**WalkCache** is the in-memory aggregate of both caches. It tracks four counters — extraction hits, extraction misses, aggregation hits, aggregation misses — supporting efficiency reporting across a full pipeline run.
-
----
-
-## Quality-Review Entities
-
-A **Critique** captures the quality assessment of one section:
-- Integer score (0–10)
-- Short overall judgment
-- List of unsupported claims
-- List of gaps relative to the section brief
-- List of concrete revision suggestions
-
-A **ReviewOutcome** tracks the lifecycle of a single section review: the section identifier, the initial Critique, the current body text, a boolean flag indicating whether a revision was applied, and an optional follow-up Critique produced after revision.
-
-A **WikiQualityReport** aggregates the full-wiki audit: an overall numeric score, a mapping from section identifiers to individual Critiques, and optional **CoverageStats** (total files, files with findings, and per-section finding and file counts).
+Schema-aware extractors surface specialised sub-types of `SpecializedFinding`. GraphQL schema files yield five entity categories: named domain object types, interface contracts, input types (request-payload shapes), enum types (closed value sets), and root operation types. Protocol-buffer IDL files yield named protocol entities (from `message` declarations, grouped by package) and closed value sets (from `enum` declarations). SQL DDL files yield a richer internal record — a **_TableHit** — that adds the raw column-definition body, a parsed column list, and a list of foreign-key edges expressed as (local column, referenced table, referenced column) triples. API-contract files yield named request and response schemas from the component section, capped at 25 inline names.[14]
 
 ---
 
-## Pipeline Orchestration Entities
+## Wiki Taxonomy
 
-**WalkConfig** encapsulates the parameters for file traversal. Notes from two different pipeline layers describe it somewhat differently (see Conflicts below), but the agreed-upon core fields are: repository root, file-size limits, minimum content thresholds, and extra exclusion patterns. It is treated as immutable once constructed.
+A **Section** is the unit of wiki organisation. Its fields are: a stable identifier, a human-readable title, a descriptive text, a tier classification (`primary` or `derivative`), and an ordered set of upstream section identifiers it depends on. The entity is immutable once created. The full set of sections forms a dependency graph governed by a hard topological invariant: derivative sections may only reference sections that appear earlier in the canonical sequence.
 
-**Notes records** are the ephemeral per-section extraction state persisted during a walk. Each record carries a UTC timestamp and arbitrary key-value metadata. Records for a section are accumulated in insertion order.
+A **WikiLayout** is an immutable value object. It holds the project root path and derives every well-known filesystem path from it — wiki directory, config file, gitignore, notes directory, cache directory, and per-section markdown and notes files. It is the single source of truth for path resolution across all pipeline stages.
 
-**WalkReport** is the primary return value from a complete pipeline run. It carries the IntrospectionResult, ExtractionStats, AggregationStats, DerivationStats, the WalkCache state, and the RepoGraph.
-
-**AggregationStats** tracks three counters for a single aggregation pass: sections written fresh, sections skipped due to empty notes, and sections served from cache.
-
-**DerivationStats** accumulates pipeline metrics for the derivation stage: count of sections derived, skipped, and revised, plus the full list of ReviewOutcomes as an audit trail.
+A **LoadedSection** pairs a `Section` descriptor with the markdown body read from disk. It is the unit of context fed into the chat system prompt.
 
 ---
 
-## Interaction Entities
+## Cache Entities
 
-A **ChatMessage** carries a role identifier and a content string, representing one turn in a multi-turn exchange.
+Four typed cache scopes are unified into a single **WalkCache** object that is passed through the entire pipeline. It exposes typed lookup and record methods per scope and maintains hit/miss counters for each.
 
-A **ChatSession** holds a reference to the language-model provider, the frozen system prompt built from populated wiki sections, and the accumulated conversation history (an ordered list of ChatMessages). It supports appending user and assistant turns and clearing the history while retaining the wiki context.
+| Cache entity | Keyed by | Content |
+|---|---|---|
+| **CachedFindings** | Repo-relative file path | Content fingerprint, structured findings, file-role summary, chunk count |
+| **CachedSection** | Hash of the notes that produced the section | Markdown body, structured claims, contradictions, ordered finding-ID list |
+| **CachedDerivation** | Hash of upstream primary-section bodies | Rendered body, `reviewed` flag |
+| **CachedIntrospection** | Include/exclude scope hash | Stage 1 introspection result |
+
+Two invariants deserve emphasis. `CachedSection` stores an ordered list of stable finding identifiers aligned with note position so that 1-based claim source indices remain meaningful across sessions. `CachedDerivation` records whether the critic-and-reviser loop ran; a reviewed body is never silently substituted for an unreviewed one. `CachedIntrospection` deliberately excludes descriptive fields (primary languages, rationale) from its key hash, so model-run variation in those fields does not invalidate an otherwise valid scope result.
 
 ---
 
-## Configuration and Provider Entities
+## Surgical Edit Entities
 
-**Settings** captures all runtime knobs for a wiki-generation run: provider and model identity, inference endpoint, request timeout, file-size and chunk thresholds, pipeline feature flags (caching, graph building, specialised extractors, review loop), the quality threshold that triggers revision, and provider-specific credentials and token caps.
+When the finding set changes only slightly, the pipeline performs an in-place update rather than a full rewrite.
 
-An **LLMProvider** carries a provider name and a specific model variant. It is the sole point of contact between the pipeline and any language-model backend, exposing exactly three interaction modes used throughout the system.
+**SectionChange** captures the diff result for one section: a decision value (`unchanged`, `surgical`, or `rewrite`), the 1-based indices of live findings absent from the cache, the cached finding IDs no longer in the live set, a count of unchanged findings, the total live count, and a churn ratio derived from those counts.
+
+**SurgicalClaim** pairs an assertion text with 1-based indices into the added-findings list. **SurgicalContradiction** pairs a summary sentence with a list of `SurgicalClaim` objects representing disagreeing positions.
+
+**SurgicalEdit** is the structured output of one surgical pass: an edited markdown body, the list of newly introduced `SurgicalClaim` records, a list of 1-based indices into the cached claims to drop, and a full replacement list of `SurgicalContradiction` records.
+
+---
+
+## Aggregation Output
+
+**AggregationStats** tracks, across a single pipeline walk, how many sections were written fresh, left empty, served from cache, updated via surgical edit, or fully rewritten.
+
+---
+
+## Derivation
+
+**DerivedSection** is the final markdown body produced for one derivative section. Its single invariant is that it contains no top-level heading; the wiki writer adds the heading separately.
+
+**DerivationStats** accumulates, across one run, counts of derivative sections derived, skipped, revised by the critic loop, and served from cache, together with the list of individual review outcomes.
+
+---
+
+## Quality and Review
+
+**Critique** captures the quality assessment of one section: an integer score (0–10), a one-to-two sentence summary judgment, a list of unsupported claims, a list of gaps against the section brief, and a list of concrete suggested edits.
+
+**ReviewOutcome** records the full lifecycle of a section review: the section identifier, the initial `Critique`, the current body text, a boolean indicating whether a revision was accepted, and the follow-up `Critique` if revision occurred.
+
+**WikiQualityReport** aggregates a whole-wiki scoring run: an overall numeric score, a map from section identifiers to their individual `Critique` objects, and optional coverage statistics.
+
+**CoverageStats** records extraction coverage: total files seen, files that contributed findings, per-section counts of both findings and contributing files, and a coverage percentage derived from those counts.
+
+---
+
+## Reporting
+
+**SectionReport** is a read-only per-section summary: contributing file count, finding count, body character length, an empty flag, and an optional quality `Critique`.
+
+**WikiReport** aggregates coverage statistics across all sections, the list of `SectionReport` records, and an optional overall quality score computed as the mean of all scored sections.
+
+---
+
+## Pipeline Orchestration
+
+**IntrospectionResult** is the output of Stage 1: include patterns, exclude patterns, primary languages, a likely-purpose paragraph, and a rationale string. Patterns are gitignore-style and relative to the repository root.
+
+**WalkConfig** is an immutable record governing one filesystem enumeration: root directory, supplemental exclude patterns, a flag to respect the project's own ignore file, maximum file size, and minimum stripped-content size.
+
+**DirSummary** holds non-recursive aggregate statistics for one directory: repo-relative path, file count, total byte size, a top-10 map of file extensions to counts, and a list of notable manifest or readme filenames. It is produced in pre-order depth-first traversal.
+
+**WalkReport** is the top-level result for a complete pipeline run. It carries the `IntrospectionResult`, extraction statistics, aggregation statistics, derivation statistics, the `WalkCache` snapshot, the repo import graph, and a boolean indicating whether the run was a full cache hit with no generation work performed.
+
+---
+
+## Repository Graph
+
+**GraphNode** represents one in-scope file: its repo-relative path, the tuple of files it imports, the tuple of files that import it, and a capped combined-neighbor accessor used for prompt enrichment.
+
+**RepoGraph** is the aggregate of all `GraphNode` records for the in-scope file set. It supports lookup by path and neighbor-path retrieval with a configurable cap.
+
+---
+
+## Provider and Chat Entities
+
+**ChatMessage** is one turn in a conversation: a role identifier and a content string.
+
+**LLMProvider** is the abstract contract every generation backend must satisfy. It carries a provider name and a model identifier and must implement three call surfaces: structured extraction (schema-constrained, returns a validated document), free-text generation, and multi-turn conversation.
+
+**ChatSession** holds a reference to the configured provider, the frozen system prompt built from wiki content, and the growing message history for the current session. It exposes two operations: *send* (appends the user turn, calls the provider, appends the reply) and *reset* (clears history while keeping the system context).
+
+---
+
+## Settings
+
+**Settings** is the single runtime configuration entity. Its fields span: LLM provider identity and model identifier, Ollama endpoint URL, per-request timeout, file-size thresholds (maximum, chunk, overlap, minimum content), introspection tree depth, thinking-mode level, pipeline feature flags (caching, graph analysis, specialized extractors, critic loop, surgical edits), surgical-edit churn threshold, and provider-specific API keys, base URLs, and token caps.
 
 ## Supporting claims
-- A Section carries a unique identifier, human-readable title, prose brief, a tier (primary or derivative), and an ordered tuple of upstream section identifiers. [1]
-- Derivative sections declare explicit upstream dependencies forming a directed acyclic graph enforced by topological ordering at startup. [2][1]
-- WikiLayout anchors all on-disk path resolution to a single project root, exposing named locations for wiki, config, gitignore, notes, cache, and per-section files; its existence is a precondition for the chat and report commands. [3][4]
-- A LoadedSection pairs a Section descriptor with its rendered markdown body. [5]
-- A SectionReport carries the section definition reference, contributing file count, findings count, body character length, emptiness flag, and an optional quality critique. [6]
-- A WikiReport aggregates all SectionReports, overall coverage statistics, and an optional mean quality score. [7]
-- A SourceRef holds a repo-relative file path, an optional inclusive line range, and a short content fingerprint captured at extraction time. [8][9]
-- A Claim is a single markdown assertion backed by zero or more SourceRefs; a claim with no sources is explicitly considered unsupported. [8][10]
-- A Contradiction groups two or more conflicting Claims under a one-sentence summary, each position retaining its own SourceRefs. [10]
-- An EvidenceBundle is the aggregator's structured handoff to the renderer: markdown body, ordered Claims list, and Contradictions list. [8][11]
-- During the aggregation pass an AggregatedClaim pairs a prose assertion with 1-based input-note indices, and an AggregatedContradiction wraps a one-sentence summary around multiple such indexed positions; these are resolved into SourceRefs before the EvidenceBundle is assembled. [12]
-- IntrospectionResult captures include/exclude patterns, a purpose hypothesis, an informational language list, and the filtering rationale. [13]
-- A SectionFinding carries a target section identifier, a technology-agnostic markdown description of one to five sentences, and an optional line range. [14]
-- A FileFindings groups all SectionFindings for one file plus a one-sentence file-role summary, and is the unit exchanged between the extraction call and the notes store. [15]
-- A SpecializedFinding carries a section identifier, finding text, and one or more source references; multiple SpecializedFindings are collected into a SpecializedResult that also carries an optional summary string. [16][17]
-- For data-definition schema files an intermediate table record is derived first (name, source line, raw body, column list, and foreign-key edges) and all downstream findings are derived from it. [18]
-- Domain object types from schema files are surfaced as domain entity findings; closed value sets and shared shape contracts are captured as separate finding categories; a maximum of 25 items per category are rendered with elision noted. [19][20][21]
-- ExtractionStats accumulates: files seen, files with findings, total findings, skipped files, chunks processed, cache hits, specialised-extractor files, and a file-kind breakdown. [22]
-- FileKind is a fixed enumeration of seven structural categories: application code, SQL, OpenAPI, Protobuf, GraphQL, migration, and other; it drives routing to the appropriate extractor. [23]
-- A GraphNode carries its repo-relative path, the ordered set of files it imports, and the ordered set of files that import it, with a configurable cap on the combined neighbour list. [24]
-- A RepoGraph is the complete repository import graph keyed by repo-relative path. [25]
-- A DirSummary holds a directory's path, file count, total byte size, top-10 extension frequency map, and a tuple of notable filenames. [26]
-- CachedFindings stores a content fingerprint, findings list, one-sentence summary, and chunk count; CachedSection stores a notes-payload hash, rendered markdown body, claims list, and contradictions list. [27][28]
-- WalkCache aggregates both caches and tracks four counters (extraction hits/misses, aggregation hits/misses) for efficiency reporting. [29]
-- A Critique carries an integer score (0–10), a short judgment, a list of unsupported claims, a list of brief gaps, and a list of revision suggestions. [30]
-- A ReviewOutcome tracks the section identifier, initial critique, current body, revision-applied flag, and optional follow-up critique. [31]
-- A WikiQualityReport carries an overall numeric score, a mapping from section identifiers to individual Critiques, and optional CoverageStats (total files, files with findings, per-section finding and file counts). [32]
-- WalkReport is the primary return value from a full pipeline run, carrying IntrospectionResult, ExtractionStats, AggregationStats, DerivationStats, WalkCache state, and RepoGraph. [33]
-- AggregationStats tracks sections written fresh, skipped due to empty notes, and served from cache. [34]
-- DerivationStats accumulates sections derived, skipped, and revised counts, plus the full list of ReviewOutcomes. [35]
-- Notes records carry a UTC timestamp and arbitrary key-value metadata, stored per section in insertion order. [36]
-- A ChatMessage carries a role identifier and a content string representing one turn in a multi-turn exchange. [37]
-- A ChatSession holds an LLM provider reference, a frozen system prompt built from wiki sections, and an ordered conversation history; it supports appending turns and clearing history while retaining context. [38]
-- Settings captures provider and model identity, inference endpoint, timeout, file-size and chunk thresholds, pipeline feature flags, revision quality threshold, and provider-specific credentials and token caps. [39]
-- An LLMProvider carries a provider name and model variant and is the sole point of contact between the pipeline and any language-model backend. [37]
-
-## Conflicts in source
-_The walker found disagreements across files. Migration teams should resolve these before re-implementation._
-
-- **Two sources describe a 'WalkConfig' entity with partially different field sets, suggesting either two distinct same-named entities at different pipeline layers or a single entity incompletely described in each source.**
-  - WalkConfig (orchestrator layer) encapsulates repository root, byte-size limits, minimum content thresholds, and an optional introspection-derived exclusion list; it is constructed twice per run — once before introspection and once after with the exclusion list populated. (`wikifi/orchestrator.py:83-101`)
-  - WalkConfig (filesystem-walker layer) encapsulates repository root, extra exclusion patterns beyond defaults, a flag for honouring gitignore rules, maximum file size in bytes, and minimum stripped-content size in bytes; it is immutable once constructed. (`wikifi/walker.py:61-79`)
+- A SourceRef points to a specific location in the codebase: a repo-relative file path, an optional inclusive line range, and a short content fingerprint captured at extraction time. [1]
+- A Claim pairs the markdown text of an assertion with a list of SourceRef objects that justify it; a claim carrying no source references is explicitly considered unsupported. [2]
+- A Contradiction captures two or more conflicting Claim objects about the same topic, with a one-sentence summary and each disagreeing position retaining its own source references. [3]
+- An AggregatedClaim carries claim text plus a list of 1-based indices into the ordered input notes list. [4]
+- EvidenceBundle and SectionBody both represent the aggregator's complete output for one wiki section: a markdown narrative body, claims, and contradictions. [5][6]
+- A SectionFinding carries the target section identifier, a technology-agnostic markdown description of 1–5 sentences, and an optional line range within the source chunk. [7]
+- FileFindings groups all findings produced for a single file together with a one-sentence file-role summary; it is the unit of output from one extractor call. [8]
+- A SpecializedFinding carries a target section identifier, a descriptive finding string, and a list of source references linking back to originating file locations. [9]
+- A SpecializedResult aggregates a list of SpecializedFindings together with an optional summary string, mirroring the output shape of the LLM extractor. [9]
+- ExtractionStats accumulates run-level counters: files seen, files with findings, total findings, skipped files, chunks processed, cache hits, specialized-extractor files, and a file-kind breakdown. [10]
+- GraphQL schema files yield five entity categories: named domain object types, interface contracts, input types, enum types, and root operation types. [11]
+- Protocol-buffer IDL files yield named protocol entities from message declarations (grouped by package) and closed value sets from enum declarations. [12]
+- SQL DDL files yield a _TableHit internal record with table name, source line, raw column-definition body, parsed column names, and foreign-key edges as (local column, referenced table, referenced column) triples. [13]
+- A Section carries an identifier, title, description, tier classification (primary or derivative), and ordered upstream dependencies; it is immutable and participates in a topologically ordered dependency graph where derivatives may only reference earlier sections. [15]
+- WikiLayout is an immutable value object that holds the project root and derives all well-known filesystem paths from it; it is the single source of truth for path resolution. [16]
+- A LoadedSection pairs a Section descriptor with the markdown body read from disk and is the unit of context fed into the chat system prompt. [17]
+- WalkCache is the unified in-memory view of all four cache scopes plus hit/miss counters for each; it is the single cache object passed through the pipeline. [18]
+- CachedFindings is keyed by repo-relative file path and holds the content fingerprint, structured findings, file-role summary, and chunk count. [19]
+- CachedSection holds the notes hash, rendered markdown body, structured claims, contradictions, and an ordered list of stable finding identifiers so that 1-based claim source indices map to finding IDs across sessions. [20]
+- CachedDerivation holds the hash of upstream primary-section bodies, the rendered body, and a flag recording whether the critic-and-reviser review loop ran, preventing a reviewed body from being silently substituted for an unreviewed one. [21]
+- CachedIntrospection deliberately excludes descriptive fields (primary languages, rationale) from its key hash so model-run variation does not invalidate an otherwise valid scope result. [22]
+- SectionChange captures a per-section diff: a decision (unchanged/surgical/rewrite), new finding indices, dropped finding IDs, unchanged count, total live count, and a derived churn ratio. [23]
+- A SurgicalClaim pairs assertion text with 1-based indices into the added-findings list; a SurgicalContradiction pairs a summary sentence with a list of SurgicalClaims. [24]
+- SurgicalEdit is the structured output of one surgical pass: an edited markdown body, newly introduced claims, 1-based indices of cached claims to drop, and a full replacement list of contradictions. [25]
+- AggregationStats tracks how many sections were written, left empty, served from cache, surgically edited, or fully rewritten in a single walk. [5]
+- DerivedSection holds the final markdown body for one derivative section with the invariant that it contains no top-level heading. [26]
+- DerivationStats counts derivative sections derived, skipped, revised by the critic loop, and served from cache, plus the list of review outcomes. [27]
+- Critique captures an integer score (0–10), a one-to-two sentence summary judgment, unsupported claims, gaps against the section brief, and concrete suggested edits. [28]
+- ReviewOutcome records the section identifier, initial critique, current body text, revision-accepted flag, and the follow-up critique if revision occurred. [29]
+- WikiQualityReport aggregates an overall numeric score, a map from section identifiers to individual critiques, and optional coverage statistics. [30]
+- CoverageStats records total files seen, files with findings, per-section counts of findings and contributing files, and a coverage percentage. [31]
+- SectionReport is a read-only per-section summary: contributing file count, finding count, body character length, empty flag, and optional quality critique. [32]
+- WikiReport aggregates coverage statistics, the list of SectionReport records, and an optional overall quality score computed as the mean of all scored sections. [33]
+- IntrospectionResult captures Stage 1 output: include patterns, exclude patterns, primary languages, a purpose paragraph, and a rationale string; patterns are gitignore-style and relative to the repository root. [34]
+- WalkConfig is an immutable record capturing: root directory, supplemental exclude patterns, ignore-file flag, maximum file size, and minimum stripped-content size. [35]
+- DirSummary holds non-recursive aggregate statistics for one directory: repo-relative path, file count, total byte size, a top-10 extension-to-count map, and notable manifest/readme filenames; it is produced in pre-order depth-first traversal. [36]
+- WalkReport is the top-level result for a pipeline run, carrying introspection result, extraction stats, aggregation stats, derivation stats, walk cache snapshot, repo import graph, and a full-cache-hit flag. [37]
+- GraphNode carries a file's repo-relative path, the tuple of files it imports, the tuple of files that import it, and a capped combined-neighbor accessor. [38]
+- RepoGraph aggregates all GraphNode records for the in-scope file set and supports lookup by path and neighbor-path retrieval with a configurable cap. [39]
+- ChatMessage carries a role identifier and a content string. [40]
+- LLMProvider carries a provider name and model identifier and must implement structured extraction, free-text generation, and multi-turn conversation call surfaces. [40]
+- ChatSession holds a reference to the configured provider, the frozen system prompt, and the growing message history; it exposes send and reset operations. [41]
+- Settings captures LLM provider identity, model identifier, endpoint URL, timeout, file-size thresholds, introspection tree depth, thinking-mode level, pipeline feature flags, surgical-edit churn threshold, and provider-specific API keys, base URLs, and token caps. [42]
 
 ## Sources
-1. `wikifi/sections.py:30-40`
-2. `wikifi/deriver.py:112-116`
-3. `wikifi/cli.py:172-183`
-4. `wikifi/wiki.py:55-80`
-5. `wikifi/chat.py:42-45`
-6. `wikifi/report.py:29-36`
-7. `wikifi/report.py:39-44`
-8. `wikifi/aggregator.py:166-186`
-9. `wikifi/evidence.py:35-55`
-10. `wikifi/evidence.py:57-80`
-11. `wikifi/evidence.py:82-87`
-12. `wikifi/aggregator.py:74-101`
-13. `wikifi/introspection.py:47-64`
-14. `wikifi/extractor.py:113-125`
-15. `wikifi/extractor.py:128-131`
-16. `wikifi/specialized/models.py:19-22`
-17. `wikifi/specialized/models.py:25-27`
-18. `wikifi/specialized/sql.py:50-58`
-19. `wikifi/specialized/graphql.py:56-95`
-20. `wikifi/specialized/openapi.py:105-116`
-21. `wikifi/specialized/protobuf.py:42-60`
-22. `wikifi/extractor.py:134-142`
-23. `wikifi/repograph.py:43-56`
-24. `wikifi/repograph.py:143-162`
-25. `wikifi/repograph.py:165-177`
-26. `wikifi/walker.py:144-153`
-27. `wikifi/cache.py:60-66`
-28. `wikifi/cache.py:69-74`
-29. `wikifi/cache.py:77-88`
-30. `wikifi/critic.py:67-84`
-31. `wikifi/critic.py:91-96`
-32. `wikifi/critic.py:99-114`
-33. `wikifi/orchestrator.py:60-70`
-34. `wikifi/aggregator.py:103-107`
-35. `wikifi/deriver.py:57-62`
-36. `wikifi/wiki.py:136-152`
-37. `wikifi/providers/base.py:33-52`
-38. `wikifi/chat.py:46-57`
-39. `wikifi/config.py:46-155`
-40. `wikifi/orchestrator.py:83-101`
-41. `wikifi/walker.py:61-79`
+1. `wikifi/evidence.py:35-57`
+2. `wikifi/evidence.py:60-70`
+3. `wikifi/evidence.py:73-79`
+4. `wikifi/aggregator.py:76-97`
+5. `wikifi/aggregator.py:100-115`
+6. `wikifi/evidence.py:82-87`
+7. `wikifi/extractor.py:97-107`
+8. `wikifi/extractor.py:110-113`
+9. `wikifi/specialized/models.py:17-27`
+10. `wikifi/extractor.py:116-124`
+11. `wikifi/specialized/graphql.py:44-93`
+12. `wikifi/specialized/protobuf.py:43-64`
+13. `wikifi/specialized/sql.py:48-55`
+14. `wikifi/specialized/openapi.py:98-110`
+15. `wikifi/sections.py:31-38`
+16. `wikifi/wiki.py:54-76`
+17. `wikifi/chat.py:42-44`
+18. `wikifi/cache.py:146-166`
+19. `wikifi/cache.py:89-96`
+20. `wikifi/cache.py:98-116`
+21. `wikifi/cache.py:118-131`
+22. `wikifi/cache.py:133-143`
+23. `wikifi/surgical.py:127-150`
+24. `wikifi/surgical.py:72-92`
+25. `wikifi/surgical.py:95-120`
+26. `wikifi/deriver.py:58-62`
+27. `wikifi/deriver.py:64-71`
+28. `wikifi/critic.py:63-78`
+29. `wikifi/critic.py:85-90`
+30. `wikifi/critic.py:93-96`
+31. `wikifi/critic.py:216-232`
+32. `wikifi/report.py:29-36`
+33. `wikifi/report.py:39-41`
+34. `wikifi/introspection.py:43-62`
+35. `wikifi/walker.py:57-74`
+36. `wikifi/walker.py:148-157`
+37. `wikifi/orchestrator.py:76-91`
+38. `wikifi/repograph.py:151-170`
+39. `wikifi/repograph.py:172-183`
+40. `wikifi/providers/base.py:31-57`
+41. `wikifi/chat.py:46-58`
+42. `wikifi/config.py:44-181`

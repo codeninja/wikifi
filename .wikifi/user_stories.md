@@ -1,267 +1,264 @@
 # User Stories
 
-## Feature: Repository Analysis and Pipeline Execution
+Three distinct groups of stories are derived from the four confirmed personas (Onboarding Developer, Migration Lead, Legacy System Maintainer, Pipeline Operator) and the capabilities described in the upstream sections. Each story is followed by Gherkin acceptance criteria. Personas for whom no upstream evidence exists — end users of the documented system, product managers, and compliance reviewers — are out of scope and are not represented here.
 
-**As a Migration Planner, I want to run the full four-stage analysis pipeline against a target repository, so that I can establish a shared, authoritative understanding of what the system does before any migration work begins.**
+---
+
+## Feature: Repository Discovery and Structured Documentation
+
+### Story 1 — Understand system intent without reading every source file
+
+> *As an Onboarding Developer, I want a structured wiki generated automatically from an unfamiliar codebase, so that I can form an accurate picture of what the system accomplishes without reading every file individually.*
 
 ```gherkin
-Given a target repository has been registered with the system
-And a project configuration file is present at the expected location
-When I invoke the walk command
-Then the system performs repository introspection and produces an IntrospectionResult
-  with include/exclude patterns, a purpose hypothesis, and filtering rationale
-And each included file produces FileFindings containing section-level descriptions
-  and a one-sentence file-role summary
-And all findings are synthesized into coherent markdown narratives for each of the
-  eight primary wiki sections
-And derivative sections are generated only after all primary sections are finalized
-And a WalkReport is returned carrying IntrospectionResult, ExtractionStats,
-  AggregationStats, DerivationStats, WalkCache state, and RepoGraph
+Given a repository root with no prior analysis
+When the pipeline runs for the first time
+Then a wiki is produced containing at minimum the eight primary sections
+  (Domains, Intent, Capabilities, External Dependencies, Integrations,
+   Cross-Cutting Concerns, Entities, Hard Specifications)
+And each section describes the system in technology-agnostic domain terms
+And every claim carries an inline citation marker linked to the originating
+  file path and line range
+And no section contains implementation-specific language
+```
+
+### Story 2 — Navigate cross-module flows without tracing imports manually
+
+> *As an Onboarding Developer, I want findings to describe flows between modules rather than treating each file in isolation, so that I can understand how the system's parts interact without manually tracing every dependency.*
+
+```gherkin
+Given a codebase with inter-file dependencies recorded in the repository graph
+When a source file is analysed
+Then the cross-file reference graph is consulted as part of that file's analysis
+And the resulting findings describe relationships and flows to neighbouring modules
+And findings are not limited to the contents of the single file under analysis
+```
+
+### Story 3 — Confirm analysis covered the full system
+
+> *As a Migration Lead, I want a coverage report showing how many files contributed findings to each wiki section, so that I can verify the analysis walked the full repository before treating the wiki as migration input.*
+
+```gherkin
+Given a completed pipeline run
+When the coverage report is reviewed
+Then each section entry shows the count of files that contributed findings
+And sections with zero contributing files are flagged as empty
+And a coverage percentage is included in the report
+And the report is produced without modifying any wiki section
 ```
 
 ---
 
-## Feature: Evidence Traceability
+## Feature: Citation Traceability
 
-**As a Migration Planner, I want every claim in the generated wiki traceable to a precise source location, so that I can verify assertions and investigate discrepancies before committing to migration decisions.**
+### Story 4 — Trace any wiki claim back to its source before acting on it
+
+> *As a Migration Lead, I want every wiki assertion rendered with inline citation markers linked to a numbered source footer, so that I can verify any claim against the codebase before committing to a re-implementation decision.*
 
 ```gherkin
-Given the pipeline has completed a walk of the repository
-When I read any narrative section of the generated wiki
-Then each factual sentence is backed by at least one SourceRef identifying a
-  repo-relative file path and an optional inclusive line range
-And numbered citations in section narratives resolve to the originating files
-And any Claim with no supporting sources is explicitly marked as unsupported
-  rather than silently presented as fact
+Given a generated wiki section containing multiple claims
+When I inspect any individual claim
+Then it carries at least one inline citation marker
+And that marker resolves to a footer entry identifying the originating file path
+  and inclusive line range
+And any claim carrying no source reference is explicitly identified as unsupported
+  rather than silently omitted
 ```
 
 ---
 
-## Feature: Contradiction and Conflict Surfacing
+## Feature: Contradiction Surfacing
 
-**As a Migration Planner, I want conflicting assertions about the same domain topic surfaced explicitly, so that I do not inherit wrong assumptions when planning the migration.**
+### Story 5 — Use conflict blocks as a migration work-item list
+
+> *As a Migration Lead, I want incompatible source claims surfaced as explicit contradiction blocks rather than silently resolved, so that the migration team has a concrete and honest list of ambiguities to resolve.*
 
 ```gherkin
-Given two or more source files contain incompatible assertions about the same
-  domain topic
-When the aggregation stage processes findings from those files
-Then a Contradiction entity is created grouping the conflicting Claims
-And each conflicting Claim retains its own SourceRefs pointing to its
-  originating file path and line range
-And the disagreement is rendered explicitly in the relevant section narrative
-  rather than being silently merged into a single assertion
+Given two or more source locations that assert incompatible things about the same topic
+When the wiki section covering that topic is synthesised
+Then a "Conflicts in source" block is included in that section
+And each conflicting position is listed with its own source references
+And no silent reconciliation of the disagreement is performed
+```
+
+### Story 6 — Detect newly introduced inconsistencies after a code change
+
+> *As a Legacy System Maintainer, I want newly introduced contradictions made visible after each incremental run, so that I know when a recent change has created an inconsistency without reviewing every file manually.*
+
+```gherkin
+Given a previous run produced no contradiction block for a given section
+And a code change has introduced conflicting claims between two files
+When the pipeline is re-run
+Then the affected section now contains a contradiction block surfacing the conflict
+And each disagreeing position retains its own source references
 ```
 
 ---
 
-## Feature: Pre-Migration Coverage Reporting
+## Feature: Incremental Re-Analysis
 
-**As a Migration Planner, I want a coverage report after each pipeline run, so that I can confirm the walk reached all intent-bearing areas of the repository before acting on the output.**
+### Story 7 — Avoid full analysis cost when only a few files changed
+
+> *As a Legacy System Maintainer, I want only changed files re-processed on each run, so that I do not pay the full analysis cost every time a small part of the codebase changes.*
 
 ```gherkin
-Given a pipeline walk has completed
-When I invoke the report command
-Then a WikiReport is produced aggregating all SectionReports
-And each SectionReport shows contributing file count, findings count,
-  body character length, and an emptiness flag
-And a WikiQualityReport is available with CoverageStats showing total files,
-  files with findings, and per-section finding and file counts
-And sections with zero findings are flagged as empty rather than omitted
+Given a prior completed pipeline run with cached results
+When the pipeline is re-run and only a subset of files have changed
+Then only files whose content has changed are re-extracted
+And sections whose entire evidence base is unchanged are served from cache
+And a run in which nothing has changed is a complete no-op with no generation work performed
+```
+
+### Story 8 — Preserve reviewed prose and citation numbering on small changes
+
+> *As a Legacy System Maintainer, I want targeted in-place edits performed when findings change only slightly, so that carefully reviewed prose, citation numbering, and unaffected paragraphs are not erased on every run.*
+
+```gherkin
+Given a section with an established cached body
+When the re-run finds that only a small subset of findings for that section has changed
+And the churn ratio is at or below the configured threshold
+Then the system performs a surgical edit introducing new claims and removing dropped claims
+And all unaffected paragraphs and citation numbering are retained verbatim
+When the churn ratio exceeds the threshold or no prior body exists
+Then a full rewrite is performed instead
 ```
 
 ---
 
-## Feature: Integration Inventory
+## Feature: Quality Review
 
-**As a Migration Planner, I want a structured inventory of external integration touchpoints, so that I can identify dependencies that must be preserved, replaced, or renegotiated during migration.**
+### Story 9 — Score and revise wiki sections before migration sign-off
+
+> *As a Migration Lead, I want an optional critic-and-reviser cycle to score section bodies and flag unsupported claims, so that I can assess documentation quality before committing to use the wiki as migration input.*
 
 ```gherkin
-Given the repository contains API contract files, interface definition files,
-  or data-definition schema files
-When the schema-aware extraction stage routes those files to specialized extractors
-Then HTTP endpoints with operation, path, and summary are surfaced as structured findings
-And remote procedure calls including streaming legs are extracted from interface
-  definition files
-And foreign-key constraints and persisted entity relationships are extracted from
-  data-definition files
-And each finding carries one or more SourceRefs traceable to the originating
-  file and line range
-And the integrations section of the wiki consolidates these findings into a
-  readable inventory
+Given a completed wiki generation run
+When the critic loop is enabled for a section
+Then the section body is scored on an integer scale from 0 to 10
+And a list of unsupported claims is produced
+And a list of gaps against the section brief is produced
+And a concrete list of suggested edits is produced
+And a revised body is generated and kept only if it scores better than the original
+And per-section quality scores are included in the coverage report alongside
+  an overall mean score
+```
+
+### Story 10 — Distinguish reviewed from unreviewed cached derivations
+
+> *As a Migration Lead, I want the cache to record whether the critic loop ran for a derivative section, so that a reviewed body is never silently replaced by an unreviewed one on a subsequent run.*
+
+```gherkin
+Given a derivative section whose cached body was produced with the critic loop enabled
+When the pipeline is re-run with the critic loop disabled
+Then the cached reviewed body is served without being silently substituted
+  by an unreviewed regeneration
+And the reviewed flag in the cached derivation record remains set
 ```
 
 ---
 
-## Feature: Schema-Aware Extraction
+## Feature: Interactive Exploration
 
-**As a Migration Planner, I want schema and contract files processed by format-specific extractors, so that persisted entity structures and external contracts are surfaced accurately without relying solely on general inference.**
+### Story 11 — Ask follow-up questions grounded in the generated wiki
+
+> *As an Onboarding Developer, I want an interactive conversational session grounded in the wiki, so that I can chase down specific flows or clarify ambiguous sections without re-reading the raw source.*
 
 ```gherkin
-Given the repository contains files whose kind is classified as SQL data-definition,
-  API contract, interface definition, or query/mutation schema
-When the extraction stage routes these files by FileKind to the appropriate
-  specialized extractor
-Then persisted entities with their columns, foreign-key edges, uniqueness and
-  nullability invariants, and index definitions are captured as SpecializedFindings
-And closed value sets and shared shape contracts from schema files are captured
-  as separate finding categories
-And every SpecializedFinding carries one or more SourceRefs traceable to the
-  source file and line range
-And a SpecializedResult collects all findings for the file along with an optional
-  summary string
+Given a wiki with at least one fully populated section
+When an interactive session is opened
+Then questions can be answered across multiple turns using populated sections as context
+And empty or placeholder sections are excluded from the assistant's context
+And conversation history can be reset while the wiki context is retained
+```
+
+### Story 12 — Know which wiki sections are informing chat answers
+
+> *As an Onboarding Developer, I want to list the currently loaded wiki sections at any time during a session, so that I understand the scope of context informing the answers I receive.*
+
+```gherkin
+Given an active interactive session
+When the user requests the list of loaded sections
+Then the session returns the identifiers and titles of all fully populated sections
+  currently included in the context
 ```
 
 ---
 
-## Feature: Wiki Navigation and Onboarding
+## Feature: Pipeline Configuration and Backend Flexibility
 
-**As an Onboarding Engineer, I want structured, domain-level descriptions of each file's role, so that I can build a coherent mental model of the system without reading the entire codebase.**
+### Story 13 — Run the full pipeline unattended from a single entry point
+
+> *As a Pipeline Operator, I want the full pipeline to run unattended via a single command-line entry point, so that I can integrate wiki generation into scheduled automated workflows without manual steps.*
 
 ```gherkin
-Given a wiki has been generated for the target repository
-When I navigate to any primary wiki section
-Then each included file is represented by at least one SectionFinding with a
-  technology-agnostic description of one to five sentences
-And each file's one-sentence role summary from its FileFindings is accessible
-And cross-file import-graph context has been injected so relationships between
-  files are reflected in section narratives
-And all descriptions are free of implementation-specific terminology
+Given a configured repository target and a valid settings source
+When the pipeline is invoked via the command-line interface
+Then the pipeline runs to completion without prompting for human input
+And all domain logic is delegated to internal modules
+And the run always produces some output even when individual section synthesis fails
 ```
 
-**As an Onboarding Engineer, I want a navigable wiki covering all eight primary concerns plus derivative sections, so that I can locate relevant information without a guided tour of the codebase.**
+### Story 14 — Swap inference backends without changing pipeline logic
+
+> *As a Pipeline Operator, I want the inference backend selected at runtime via configuration, so that I can swap or rotate backends without modifying any pipeline code.*
 
 ```gherkin
-Given the pipeline has completed a walk
-When I open the generated wiki
-Then eight primary sections are present: business domains, system intent,
-  capabilities, external dependencies, integrations, cross-cutting concerns,
-  core entities, and hard specifications
-And three derivative sections are present: personas, user stories, and
-  architectural diagrams
-And any section for which no findings exist contains a placeholder declaring
-  the gap rather than fabricating content
+Given a pipeline configured to use one inference backend
+When the backend identifier is changed in configuration
+Then the pipeline uses the new backend on the next run
+And no pipeline logic changes are required
+And all three call surfaces (structured extraction, free-text generation,
+  multi-turn conversation) are satisfied by the new backend
 ```
 
----
+### Story 15 — Drive per-repository settings independently
 
-## Feature: Conversational Query Interface
-
-**As an Onboarding Engineer, I want to ask targeted questions about the system through a conversational interface and receive answers that cite specific wiki sections, so that I can deepen my understanding without interrupting senior colleagues.**
+> *As a Pipeline Operator, I want configuration resolved in strict precedence order from a per-target config file, environment variables, and built-in defaults, so that each analysed repository controls its own settings without affecting others.*
 
 ```gherkin
-Given a wiki has been generated and a WikiLayout exists at the project root
-When I invoke the chat subcommand and submit a domain question
-Then the ChatSession formulates its response using a frozen system prompt built
-  from the populated wiki sections
-And each response cites the specific sections from which it draws information
-And the session accumulates conversation history across turns while retaining
-  the frozen wiki context
-And when the wiki does not contain information relevant to the question the
-  session explicitly declares the gap rather than inventing an answer
-```
-
-**As a Non-Technical Stakeholder, I want to ask plain-language questions about system capabilities and integration points, so that I can assess scope and risk without requiring engineering background.**
-
-```gherkin
-Given a wiki has been generated and the chat subcommand is available
-When I submit a plain-language question about a system capability or integration
-Then the ChatSession provides an answer grounded in the business-domain,
-  system-intent, and integrations sections
-And the answer contains no implementation-specific terminology
-And if the question falls outside what the wiki covers the session admits the
-  gap explicitly rather than speculating
+Given multiple repository targets each with their own config file
+When the pipeline is run for a given target
+Then the per-target config file takes precedence over environment variables
+And environment variables take precedence over built-in defaults
+And settings from one target's config file do not affect another target's run
 ```
 
 ---
 
-## Feature: Technology-Agnostic Output
+## Feature: Resilience and Graceful Degradation
 
-**As a Non-Technical Stakeholder, I want all generated documentation expressed in domain terms, so that the wiki remains meaningful and shareable after the technology stack changes.**
+### Story 16 — Resume a crashed run without restarting from scratch
+
+> *As a Legacy System Maintainer, I want cache state persisted after each file so that a pipeline crash resumes from the last completed file, so that a failure mid-run does not force a full restart.*
 
 ```gherkin
-Given the pipeline has completed a walk and generated all wiki sections
-When I read any section body
-Then no section contains references to specific implementation technologies,
-  frameworks, or libraries
-And business-level capability summaries are present in the business domains
-  and system intent sections
-And the integrations section describes external dependencies in terms that
-  do not require an engineering background to interpret
+Given a pipeline run that crashes partway through a large codebase
+When the pipeline is re-invoked
+Then it resumes from the last successfully cached file
+And previously cached findings are not re-extracted
+And no work completed before the crash is lost
 ```
 
----
+### Story 17 — Continue a run when a file cannot be parsed
 
-## Feature: Incremental Re-Processing and Caching
-
-**As a Platform or Documentation Engineer, I want the pipeline to skip unchanged files on repeated runs, so that documentation stays current without incurring the full inference cost of a fresh walk.**
+> *As a Pipeline Operator, I want unparseable files flagged for manual review rather than halting the pipeline, so that a single malformed file does not block analysis of the rest of the repository.*
 
 ```gherkin
-Given a prior pipeline walk has completed and a WalkCache is populated
-And only a subset of source files have changed since the last run
-When I invoke the walk command again
-Then files whose content fingerprint matches an existing CachedFindings entry
-  are served from cache without triggering new inference calls
-And section aggregations whose notes-payload hash matches an existing
-  CachedSection entry are served from cache
-And ExtractionStats records the count of cache hits and misses for the run
+Given a repository containing one or more malformed structured-artifact files
+When the pipeline processes those files
+Then each unparseable file is recorded as flagged for manual review
+And pipeline execution continues with the remaining in-scope files
+And the final run report identifies which files were flagged
 ```
 
-**As a Platform or Documentation Engineer, I want interrupted pipeline runs to resume from the point of failure, so that compute already expended on a large repository is not wasted.**
+### Story 18 — Always receive some wiki output even when synthesis fails
+
+> *As a Pipeline Operator, I want raw extracted notes preserved when section synthesis fails, so that automated pipelines always receive some output and never produce blank sections.*
 
 ```gherkin
-Given a pipeline walk was interrupted before all files were processed
-And the WalkCache contains findings for files processed before the interruption
-When I re-invoke the walk command
-Then files already present in the cache are not re-processed
-And the run completes from the point of interruption rather than restarting
-And the final WalkReport reflects contributions from both cached and newly
-  processed files
-```
-
----
-
-## Feature: Quality Review Loop
-
-**As a Platform or Documentation Engineer, I want sections that fall below a configured quality threshold to be automatically revised, so that generated documentation meets a defined quality bar before it is distributed.**
-
-```gherkin
-Given the quality review loop feature flag is enabled in Settings
-And a numeric quality threshold has been configured for the project
-When the derivation stage produces a Critique for each section
-Then any section whose Critique score falls below the threshold triggers an
-  automatic revision pass
-And a ReviewOutcome is recorded capturing the section identifier, initial
-  Critique, current body text, revision-applied flag, and optional follow-up Critique
-And DerivationStats accumulates counts of sections derived, revised, and skipped
-```
-
-**As a Platform or Documentation Engineer, I want a per-section quality audit report available after each run, so that I can verify coverage and quality before distributing the wiki.**
-
-```gherkin
-Given a pipeline walk has completed with the review loop enabled
-When I request the quality report
-Then a WikiQualityReport is produced with an overall numeric score and a
-  mapping of section identifiers to individual Critiques
-And each Critique declares the integer score, unsupported claims, gaps relative
-  to the section brief, and concrete revision suggestions
-And CoverageStats within the report show total files, files with findings,
-  and per-section finding and file counts
-```
-
----
-
-## Feature: Per-Project Pipeline Configuration
-
-**As a Platform or Documentation Engineer, I want each project to carry its own configuration controlling provider, model, feature flags, and quality threshold, so that different projects can express different cost-quality trade-offs independently.**
-
-```gherkin
-Given a project TOML configuration file is present at the project root
-When the pipeline is initialized for that project
-Then Settings are loaded from the configuration file including provider and model
-  identity, inference endpoint, timeout, file-size and chunk thresholds, pipeline
-  feature flags, revision quality threshold, and provider-specific credentials
-And the chosen provider is the sole point of contact between the pipeline and
-  any language-model backend for that run
-And if the configuration file is absent or unparseable the system falls back
-  to environment-derived defaults without failing
+Given a section whose synthesis step fails at runtime
+When the pipeline completes
+Then the raw extracted notes for that section are preserved in the output
+And the section is not blank
+And the pipeline does not halt due to the synthesis failure
 ```
