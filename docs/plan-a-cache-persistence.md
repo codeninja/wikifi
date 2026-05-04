@@ -47,24 +47,22 @@ Bump `CACHE_VERSION` to `2`. Existing v1 caches load to empty (already the behav
 
 ### 4. Walk early-out
 
-After stage 2 completes, compute a tri-state check on the orchestrator side:
+After stage 2 completes, the orchestrator decides whether to skip stages 3 and 4. The check has to be strong enough to survive *partial* prior walks — a walk that crashed mid-stage-3 leaves a fully-populated extraction cache alongside stale section bodies on disk. A naive predicate ("extraction was 100% cached + scope matches") would freeze that staleness in place forever; the next walk would short-circuit with the wrong content still in section .md files.
 
-```
-fully_cached = (
-    extraction.cache_hits + extraction.specialized_files == extraction.files_seen
-    and extraction.files_seen > 0
-    and not introspection_scope_changed
-)
-```
+Five conditions must all hold:
 
-`introspection_scope_changed` requires caching the prior introspection result. Store it on the cache as `cache.introspection: IntrospectionResult | None` and compare `(include, exclude, primary_languages)` tuples. Don't include `rationale` or `likely_purpose` — those are descriptive, not scope-defining.
+1. Caching is on.
+2. We saw at least one file (an empty repo never short-circuits).
+3. Every file processed in stage 2 hit either the per-file cache or a deterministic specialized extractor — no LLM call produced new findings.
+4. The introspection scope hash matches the prior walk's. Scope is only `(include, exclude)` — `primary_languages` and `rationale` are descriptive and would otherwise cause spurious scope-change detections from one-token model variations.
+5. Every primary section's aggregation cache and every derivative section's derivation cache is *fresh* against the live notes / upstream bodies. Helpers `aggregation_fully_cached(layout, cache)` and `derivation_fully_cached(layout, cache, *, review)` encapsulate this — they iterate sections and assert each cache entry exists with a matching hash.
 
 When `fully_cached` is true:
 - Skip stages 3 and 4 entirely.
 - Section markdown on disk is from the prior walk; it's the cached content — leave it alone.
 - Walk report shows "no changes detected — wiki already current" and reports the cache hit count.
 
-When false (any new/changed/removed files, or scope shift): run stages 3 and 4 normally, but now they persist incrementally.
+When false (any new/changed/removed files, scope shift, or any cache gap from a prior interrupted walk): run stages 3 and 4 normally, but now they persist incrementally so the next walk can short-circuit cleanly.
 
 ### 5. Report surface
 
