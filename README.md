@@ -48,7 +48,6 @@ Every claim in the wiki carries a numbered citation back to a `SourceRef` (file 
 | `wikifi init` | One-time setup. Scaffolds `.wikifi/` and local config. |
 | `wikifi walk` | Walks the target codebase and produces the wiki. |
 | `wikifi report` | Coverage + quality report (per-section file counts, findings, body sizes). |
-| `wikifi ask` | Natural-language queries against the wiki, with optional context injection from the source. |
 | `wikifi chat` | Interactive REPL for iterative exploration of the wiki and the source. |
 
 `walk` flags:
