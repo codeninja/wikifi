@@ -21,6 +21,15 @@ uv run wikifi init
 uv run wikifi walk
 ```
 
+### LLM Config 
+
+`.wikifi/config.toml`
+```
+provider = "anthropic" # openai | local(default)
+model = "claude-sonnet-4-6" 
+# ollama_host = "http://localhost:11434"
+```
+
 By default wikifi runs against a **local Ollama** server (Qwen 3 27B at the highest reasoning level the model exposes) — no cloud dependency, no API key, no data leaving the machine. Hosted Anthropic and OpenAI backends are opt-in.
 
 ## What you get
