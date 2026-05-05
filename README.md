@@ -1,4 +1,4 @@
-![wikifi](./assets/wikifi.png)
+![wikifi](https://raw.githubusercontent.com/codeninja/wikifi/main/assets/wikifi.png)
 
 # wikifi
 

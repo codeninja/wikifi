@@ -4,7 +4,8 @@ version = "0.1.0"
 description = "Walk any codebase and produce a technology-agnostic markdown wiki of its intent"
 readme = "README.md"
 requires-python = ">=3.12"
-license = { text = "MIT" }
+license = "Apache-2.0"
+license-files = ["LICENSE"]
 authors = [{ name = "codeninja" }]
 keywords = ["wiki", "documentation", "migration", "llm", "ollama"]
 dependencies = [
@@ -38,6 +39,16 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["wikifi"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "/wikifi",
+    "/tests",
+    "/README.md",
+    "/LICENSE",
+    "/pyproject.toml",
+    "/uv.lock",
+]
 
 [tool.ruff]
 target-version = "py312"
